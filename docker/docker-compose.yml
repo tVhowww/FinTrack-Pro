@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  # 1. Database cho Service Identity (Quản lý User)
+  identity-db:
+    image: postgres:16-alpine
+    container_name: fintrack-identity-db
+    restart: always
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=identity_service_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - identity_data:/var/lib/postgresql/data
+
+  # 2. Database cho Service Core (Quản lý Thu chi/Ví)
+  core-db:
+    image: postgres:16-alpine
+    container_name: fintrack-core-db
+    restart: always
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=core_service_db
+    ports:
+      - "5433:5432" # Chú ý: Map ra cổng 5433 ở máy thật để không đụng thằng trên
+    volumes:
+      - core_data:/var/lib/postgresql/data
+
+  # 3. Công cụ quản lý DB (pgAdmin) - Optional nhưng nên có để dễ debug
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: fintrack-pgadmin
+    restart: always
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@fintrack.com
+      - PGADMIN_DEFAULT_PASSWORD=root
+    ports:
+      - "5050:80"
+    depends_on:
+      - identity-db
+      - core-db
+
+volumes:
+  identity_data:
+  core_data:

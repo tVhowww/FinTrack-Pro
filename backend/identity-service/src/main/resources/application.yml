@@ -1,0 +1,23 @@
+server:
+  port: 8080 # Service này s? ch?y ? c?ng 8080
+
+spring:
+  application:
+    name: identity-service
+
+  # C?u hình k?t n?i Database (Tr? vào cái Docker b?n v?a d?ng)
+  datasource:
+    url: jdbc:postgresql://localhost:5432/identity_service_db
+    username: postgres
+    password: password
+    driver-class-name: org.postgresql.Driver
+
+  # C?u hình JPA (Hibernate)
+  jpa:
+    hibernate:
+      ddl-auto: update # T? ??ng t?o b?ng d?a trên code Java (Entity)
+    show-sql: true # Hi?n câu l?nh SQL trong log ?? d? debug
+    properties:
+      hibernate:
+        format_sql: true # Format SQL cho ??p
+        dialect: org.hibernate.dialect.PostgreSQLDialect
