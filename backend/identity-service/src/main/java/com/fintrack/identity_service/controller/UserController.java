@@ -1,6 +1,7 @@
 package com.fintrack.identity_service.controller;
 
 import com.fintrack.identity_service.dto.request.UserCreationRequest;
+import com.fintrack.identity_service.dto.response.ApiResponse;
 import com.fintrack.identity_service.entity.User;
 import com.fintrack.identity_service.service.UserService;
 import jakarta.validation.Valid;
@@ -14,8 +15,12 @@ public class UserController {
     private final UserService userService;
 
     @PostMapping
-    public User createUser(@RequestBody @Valid UserCreationRequest request) {
-        return userService.createUser(request);
+    public ApiResponse<User> createUser(@RequestBody @Valid UserCreationRequest request) {
+        ApiResponse<User> apiResponse = new ApiResponse<>();
+
+        apiResponse.setResult(userService.createUser(request));
+
+        return apiResponse;
     }
 
     @GetMapping

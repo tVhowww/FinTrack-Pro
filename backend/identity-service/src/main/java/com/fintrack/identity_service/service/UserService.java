@@ -2,6 +2,8 @@ package com.fintrack.identity_service.service;
 
 import com.fintrack.identity_service.dto.request.UserCreationRequest;
 import com.fintrack.identity_service.entity.User;
+import com.fintrack.identity_service.exception.AppException;
+import com.fintrack.identity_service.exception.ErrorCode;
 import com.fintrack.identity_service.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -13,11 +15,11 @@ public class UserService {
 
     public User createUser(UserCreationRequest request) {
         if (userRepository.existsByUsername(request.getUsername())) {
-            throw new RuntimeException("USER_EXISTED");
+            throw new AppException(ErrorCode.USER_EXISTED);
         }
 
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new RuntimeException("EMAIL_EXISTED");
+            throw new AppException(ErrorCode.USER_EXISTED);
         }
 
         User user = User.builder()
