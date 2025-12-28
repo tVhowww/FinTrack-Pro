@@ -4,6 +4,7 @@ import com.fintrack.identity_service.dto.request.UserCreationRequest;
 import com.fintrack.identity_service.entity.User;
 import com.fintrack.identity_service.exception.AppException;
 import com.fintrack.identity_service.exception.ErrorCode;
+import com.fintrack.identity_service.mapper.UserMapper;
 import com.fintrack.identity_service.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class UserService {
     private final UserRepository userRepository;
+    private final UserMapper userMapper;
 
     public User createUser(UserCreationRequest request) {
         if (userRepository.existsByUsername(request.getUsername())) {
@@ -22,13 +24,7 @@ public class UserService {
             throw new AppException(ErrorCode.USER_EXISTED);
         }
 
-        User user = User.builder()
-                .username(request.getUsername())
-                .password(request.getPassword())
-                .email(request.getEmail())
-                .fullName(request.getFullName())
-                .dob(request.getDob())
-                .build();
+        User user = userMapper.toUser(request);
 
         return userRepository.save(user);
     }
