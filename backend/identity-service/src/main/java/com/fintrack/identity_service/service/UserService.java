@@ -1,6 +1,7 @@
 package com.fintrack.identity_service.service;
 
 import com.fintrack.identity_service.dto.request.UserCreationRequest;
+import com.fintrack.identity_service.dto.response.UserResponse;
 import com.fintrack.identity_service.entity.User;
 import com.fintrack.identity_service.exception.AppException;
 import com.fintrack.identity_service.exception.ErrorCode;
@@ -15,7 +16,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final UserMapper userMapper;
 
-    public User createUser(UserCreationRequest request) {
+    public UserResponse createUser(UserCreationRequest request) {
         if (userRepository.existsByUsername(request.getUsername())) {
             throw new AppException(ErrorCode.USER_EXISTED);
         }
@@ -26,6 +27,8 @@ public class UserService {
 
         User user = userMapper.toUser(request);
 
-        return userRepository.save(user);
+        user = userRepository.save(user);
+
+        return userMapper.toUserResponse(user);
     }
 }
