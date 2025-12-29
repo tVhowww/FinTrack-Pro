@@ -1,23 +1,26 @@
 server:
-  port: 8080 # Service này s? ch?y ? c?ng 8080
+  port: 8080 # Service nï¿½y s? ch?y ? c?ng 8080
 
 spring:
   application:
     name: identity-service
 
-  # C?u hình k?t n?i Database (Tr? vào cái Docker b?n v?a d?ng)
+  # C?u hï¿½nh k?t n?i Database (Tr? vï¿½o cï¿½i Docker b?n v?a d?ng)
   datasource:
     url: jdbc:postgresql://localhost:5432/identity_service_db
     username: postgres
     password: password
     driver-class-name: org.postgresql.Driver
 
-  # C?u hình JPA (Hibernate)
+  # C?u hï¿½nh JPA (Hibernate)
   jpa:
     hibernate:
-      ddl-auto: update # T? ??ng t?o b?ng d?a trên code Java (Entity)
-    show-sql: true # Hi?n câu l?nh SQL trong log ?? d? debug
+      ddl-auto: update # T? ??ng t?o b?ng d?a trï¿½n code Java (Entity)
+    show-sql: true # Hi?n cï¿½u l?nh SQL trong log ?? d? debug
     properties:
       hibernate:
         format_sql: true # Format SQL cho ??p
         dialect: org.hibernate.dialect.PostgreSQLDialect
+
+jwt:
+  signerKey: "1234567890123456789012345678901234567890123456789012345678901234" # 64 digits - Key nÃ y pháº£i Äá»¦ DÃ€I (Ã­t nháº¥t 32 kÃ½ tá»±) náº¿u khÃ´ng sáº½ lá»—i
