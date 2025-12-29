@@ -1,5 +1,7 @@
 server:
   port: 8080 # Service n�y s? ch?y ? c?ng 8080
+  servlet:
+    context-path: /identity # Thêm dòng này: Tự động thêm /identity vào trước mọi API
 
 spring:
   application:

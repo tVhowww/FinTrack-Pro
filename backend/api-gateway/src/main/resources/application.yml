@@ -1,0 +1,22 @@
+server:
+  port: 8888 # Cong chuan cua Gateway
+
+spring:
+  application:
+    name: api-gateway
+
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes:
+            - id: identity_service
+              uri: http://localhost:8080
+              predicates:
+                - Path=/identity/**
+
+# Disable Eureka Client
+eureka:
+  client:
+    register-with-eureka: false
+    fetch-registry: false
