@@ -9,11 +9,18 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/users")
 @RequiredArgsConstructor
 public class UserController {
     private final UserService userService;
+
+    @GetMapping
+    public List<User> getUsers() {
+        return userService.getUsers();
+    }
 
     @PostMapping
     public ApiResponse<UserResponse> createUser(@RequestBody @Valid UserCreationRequest request) {
@@ -24,8 +31,8 @@ public class UserController {
         return apiResponse;
     }
 
-    @GetMapping
-    public String checkHealth() {
-        return "Identity Service is running.";
-    }
+//    @GetMapping
+//    public String checkHealth() {
+//        return "Identity Service is running.";
+//    }
 }
