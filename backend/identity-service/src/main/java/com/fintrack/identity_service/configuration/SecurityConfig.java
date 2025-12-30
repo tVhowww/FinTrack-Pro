@@ -34,7 +34,8 @@ public class SecurityConfig {
 
     // 1. Định nghĩa các đường dẫn được phép truy cập không cần login
     private final String[] PUBLIC_ENDPOINTS = {
-            "/users", "/auth/token"
+            "/users", "/auth/token", "/auth/introspect", "/auth/logout",
+            "/auth/refresh"
     };
 
     @Bean

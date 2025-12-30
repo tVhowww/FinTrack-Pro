@@ -1,15 +1,20 @@
 package com.fintrack.identity_service.service;
 
 import com.fintrack.identity_service.dto.request.AuthenticationRequest;
+import com.fintrack.identity_service.dto.request.IntrospectRequest;
 import com.fintrack.identity_service.dto.response.AuthenticationResponse;
+import com.fintrack.identity_service.dto.response.IntrospectResponse;
 import com.fintrack.identity_service.exception.AppException;
 import com.fintrack.identity_service.exception.ErrorCode;
 import com.fintrack.identity_service.repository.UserRepository;
 import com.nimbusds.jose.*;
 import com.nimbusds.jose.crypto.MACSigner;
+import com.nimbusds.jose.crypto.MACVerifier;
 import com.nimbusds.jwt.JWTClaimsSet;
+import com.nimbusds.jwt.SignedJWT;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.NonFinal;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -20,6 +25,7 @@ import java.util.Date;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class AuthenticationService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -27,6 +33,46 @@ public class AuthenticationService {
     @NonFinal
     @Value("${jwt.signerKey}")
     protected String SIGNER_KEY;
+
+    public IntrospectResponse introspect(IntrospectRequest request) {
+        var token = request.getToken();
+        boolean isValid = true;
+
+        try {
+            // Check null Key ngay lập tức
+            if (SIGNER_KEY == null || SIGNER_KEY.isEmpty()) {
+                throw new RuntimeException("CRITICAL: SIGNER_KEY is null! Check application.yml");
+            }
+
+            log.info("Checking token: {}", token); // In token ra xem có nhận được không
+
+            // 1. Parse token xem có đúng định dạng JWT không
+            JWSVerifier verifier = new MACVerifier(SIGNER_KEY.getBytes());
+            SignedJWT signedJWT = SignedJWT.parse(token);
+
+            // 2. Kiểm tra chữ ký (có bị sửa đổi không)
+            // và kiểm tra thời gian hết hạn (exp claim)
+            Date expiryTime = signedJWT.getJWTClaimsSet().getExpirationTime();
+
+            var verified = signedJWT.verify(verifier);
+
+            // Log kết quả verify
+            log.info("Verified: {}, Expiry: {}", verified, expiryTime);
+
+            // Token chỉ hợp lệ khi: Chữ ký đúng VÀ Chưa hết hạn
+            if (!(verified && expiryTime.after(new Date()))) {
+                isValid = false;
+            }
+
+        } catch (Exception e) {
+            log.error("Introspect Failed: ", e);
+            isValid = false;
+        }
+
+        return IntrospectResponse.builder()
+                .valid(isValid)
+                .build();
+    }
 
     public AuthenticationResponse authenticate(AuthenticationRequest request) {
         // 1. Tìm user theo username
