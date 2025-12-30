@@ -4,16 +4,31 @@ server:
 spring:
   application:
     name: api-gateway
-
   cloud:
     gateway:
       server:
         webflux:
           routes:
-            - id: identity_service
-              uri: lb://IDENTITY-SERVICE # lb = Load Balancer, IDENTITY-SERVICE = ten spring.application.name ben kia
+            # ----------------------------------------------------
+            # 1. Route Public (Ưu tiên chạy trước)
+            # Khớp: /identity/auth/login, /identity/auth/token...
+            # ----------------------------------------------------
+            - id: identity_public
+              uri: lb://IDENTITY-SERVICE
               predicates:
-                - Path=/identity/**
+                - Path=/identity/auth/**
+              # Không có filters -> Ai vào cũng được
+
+            # ----------------------------------------------------
+            # 2. Route Private (Hốt tất cả những gì còn lại)
+            # Khớp: /identity/users, /identity/admin, /identity/bat-ky-cai-gi...
+            # ----------------------------------------------------
+            - id: identity_private
+              uri: lb://IDENTITY-SERVICE
+              predicates:
+                - Path=/identity/** # <--- Bắt tất cả prefix /identity
+              filters:
+                - Authentication # <--- Bắt buộc phải có token mới cho qua
 
 eureka:
   client:
