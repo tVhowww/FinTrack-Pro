@@ -1,12 +1,14 @@
 package com.fintrack.identity_service.exception;
 
 import com.fintrack.identity_service.dto.response.ApiResponse;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 
 @ControllerAdvice // Đánh dấu class này là nơi xử lý lỗi chung toàn bộ ứng dụng
+@Slf4j
 public class GlobalExceptionHandler {
 
     // 1. Bắt các lỗi Business logic (AppException)
@@ -18,7 +20,9 @@ public class GlobalExceptionHandler {
         apiResponse.setCode(errorCode.getCode());
         apiResponse.setMessage(errorCode.getMessage());
 
-        return ResponseEntity.badRequest().body(apiResponse);
+        return ResponseEntity
+                .status(errorCode.getStatusCode())
+                .body(apiResponse);
     }
 
     // 2. Bắt lỗi validate dữ liệu (MethodArgumentNotValidException)
@@ -45,12 +49,14 @@ public class GlobalExceptionHandler {
     // 3. Bắt các lỗi còn lại (Exception)
     @ExceptionHandler(value = Exception.class)
     ResponseEntity<ApiResponse> handlingRuntimeException(RuntimeException exception) {
+        log.error("Exception: ", exception);
+
         ApiResponse apiResponse = new ApiResponse();
 
         apiResponse.setCode(ErrorCode.UNCATEGORIZED_EXCEPTION.getCode());
         apiResponse.setMessage(ErrorCode.UNCATEGORIZED_EXCEPTION.getMessage());
 
-        return ResponseEntity.badRequest().body(apiResponse);
+        return ResponseEntity.internalServerError().body(apiResponse);
     }
 
 }
