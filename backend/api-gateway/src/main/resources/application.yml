@@ -11,12 +11,13 @@ spring:
         webflux:
           routes:
             - id: identity_service
-              uri: http://localhost:8080
+              uri: lb://IDENTITY-SERVICE # lb = Load Balancer, IDENTITY-SERVICE = ten spring.application.name ben kia
               predicates:
                 - Path=/identity/**
 
-# Disable Eureka Client
 eureka:
   client:
-    register-with-eureka: false
-    fetch-registry: false
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+    register-with-eureka: true
+    fetch-registry: true
