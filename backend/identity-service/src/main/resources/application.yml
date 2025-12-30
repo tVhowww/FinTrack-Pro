@@ -1,28 +1,33 @@
 server:
-  port: 8080 # Service n�y s? ch?y ? c?ng 8080
+  port: 8080 # Service nay se chay o cong 8080
   servlet:
-    context-path: /identity # Thêm dòng này: Tự động thêm /identity vào trước mọi API
+    context-path: /identity # Them dong nay: Tu dong thêm /identity vao truoc moi API
 
 spring:
   application:
     name: identity-service
 
-  # C?u h�nh k?t n?i Database (Tr? v�o c�i Docker b?n v?a d?ng)
+  # Cau hinh ket noi Database
   datasource:
     url: jdbc:postgresql://localhost:5432/identity_service_db
     username: postgres
     password: password
     driver-class-name: org.postgresql.Driver
 
-  # C?u h�nh JPA (Hibernate)
+  # Cau hinh JPA (Hibernate)
   jpa:
     hibernate:
-      ddl-auto: update # T? ??ng t?o b?ng d?a tr�n code Java (Entity)
-    show-sql: true # Hi?n c�u l?nh SQL trong log ?? d? debug
+      ddl-auto: update
+    show-sql: true
     properties:
       hibernate:
-        format_sql: true # Format SQL cho ??p
+        format_sql: true
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
 jwt:
-  signerKey: "1234567890123456789012345678901234567890123456789012345678901234" # 64 digits - Key này phải ĐỦ DÀI (ít nhất 32 ký tự) nếu không sẽ lỗi
+  signerKey: "1234567890123456789012345678901234567890123456789012345678901234" # 64 digits - Key nay phai DU DAI (it nhat 32 ky tu) neu khong se loi
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
