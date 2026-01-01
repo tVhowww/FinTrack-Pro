@@ -34,8 +34,10 @@ public class SecurityConfig {
 
     // 1. Định nghĩa các đường dẫn được phép truy cập không cần login
     private final String[] PUBLIC_ENDPOINTS = {
-            "/users", "/auth/token", "/auth/introspect", "/auth/logout",
-            "/auth/refresh"
+            "/auth/token", "/auth/introspect", "/auth/logout",
+            "/auth/refresh", "/v3/api-docs/**",
+            "/swagger-ui/**",
+            "/swagger-ui.html"
     };
 
     @Bean
@@ -46,8 +48,12 @@ public class SecurityConfig {
 
                 // Phân quyền request
                 .authorizeHttpRequests(request -> request
-                        // Cho phép POST vào /users (Đăng ký) mà không cần login)
-                        .requestMatchers(HttpMethod.POST, PUBLIC_ENDPOINTS).permitAll()
+                        // Cho phép các endpoint trong danh sách PUBLIC
+                        .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
+
+                        // Cho phép tạo user mới (POST /users) mà không cần token (Sign up)
+                        .requestMatchers(HttpMethod.POST, "/users").permitAll()
+
                         // Các request khác đều cần phải xác thực (login)
                         .anyRequest().authenticated()
                 );
