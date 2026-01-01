@@ -9,6 +9,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
+import java.util.Set;
 
 @Data
 @NoArgsConstructor
@@ -29,4 +30,6 @@ public class UserCreationRequest {
     private String fullName;
 
     private LocalDate dob;
+
+    private Set<String> roles;
 }
