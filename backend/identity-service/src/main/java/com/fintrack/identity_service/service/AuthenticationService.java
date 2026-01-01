@@ -2,11 +2,14 @@ package com.fintrack.identity_service.service;
 
 import com.fintrack.identity_service.dto.request.AuthenticationRequest;
 import com.fintrack.identity_service.dto.request.IntrospectRequest;
+import com.fintrack.identity_service.dto.request.LogoutRequest;
 import com.fintrack.identity_service.dto.response.AuthenticationResponse;
 import com.fintrack.identity_service.dto.response.IntrospectResponse;
+import com.fintrack.identity_service.entity.InvalidatedToken;
 import com.fintrack.identity_service.entity.User;
 import com.fintrack.identity_service.exception.AppException;
 import com.fintrack.identity_service.exception.ErrorCode;
+import com.fintrack.identity_service.repository.InvalidatedTokenRepository;
 import com.fintrack.identity_service.repository.UserRepository;
 import com.nimbusds.jose.*;
 import com.nimbusds.jose.crypto.MACSigner;
@@ -21,10 +24,12 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 
+import java.text.ParseException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import java.util.StringJoiner;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -32,41 +37,43 @@ import java.util.StringJoiner;
 public class AuthenticationService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final InvalidatedTokenRepository invalidatedTokenRepository;
 
     @NonFinal
     @Value("${jwt.signerKey}")
     protected String SIGNER_KEY;
+
+    public void logout(LogoutRequest request) throws ParseException, JOSEException {
+        try {
+            var signToken = verifyToken(request.getToken(), true);
+
+            // Lấy JTI (ID của token)
+            String jit = signToken.getJWTClaimsSet().getJWTID();
+
+            // Lấy thời gian hết hạn
+            Date expiryTime = signToken.getJWTClaimsSet().getExpirationTime();
+
+            // Tạo bản ghi token bị hủy
+            InvalidatedToken invalidatedToken = InvalidatedToken.builder()
+                    .id(jit)
+                    .expiryTime(expiryTime)
+                    .build();
+
+            // Lưu vào "Sổ đen"
+            invalidatedTokenRepository.save(invalidatedToken);
+
+        } catch (AppException e) {
+            log.info("Token already expired or invalid, no need to logout");
+        }
+
+    }
 
     public IntrospectResponse introspect(IntrospectRequest request) {
         var token = request.getToken();
         boolean isValid = true;
 
         try {
-            // Check null Key ngay lập tức
-            if (SIGNER_KEY == null || SIGNER_KEY.isEmpty()) {
-                throw new RuntimeException("CRITICAL: SIGNER_KEY is null! Check application.yml");
-            }
-
-            log.info("Checking token: {}", token); // In token ra xem có nhận được không
-
-            // 1. Parse token xem có đúng định dạng JWT không
-            JWSVerifier verifier = new MACVerifier(SIGNER_KEY.getBytes());
-            SignedJWT signedJWT = SignedJWT.parse(token);
-
-            // 2. Kiểm tra chữ ký (có bị sửa đổi không)
-            // và kiểm tra thời gian hết hạn (exp claim)
-            Date expiryTime = signedJWT.getJWTClaimsSet().getExpirationTime();
-
-            var verified = signedJWT.verify(verifier);
-
-            // Log kết quả verify
-            log.info("Verified: {}, Expiry: {}", verified, expiryTime);
-
-            // Token chỉ hợp lệ khi: Chữ ký đúng VÀ Chưa hết hạn
-            if (!(verified && expiryTime.after(new Date()))) {
-                isValid = false;
-            }
-
+            verifyToken(token, false);
         } catch (Exception e) {
             log.error("Introspect Failed: ", e);
             isValid = false;
@@ -77,6 +84,7 @@ public class AuthenticationService {
                 .build();
     }
 
+    // login
     public AuthenticationResponse authenticate(AuthenticationRequest request) {
         // 1. Tìm user theo username
         var user = userRepository.findByUsername(request.getUsername())
@@ -98,6 +106,7 @@ public class AuthenticationService {
                 .build();
     }
 
+    // --- HELPERS ---
     private String generateToken(User user) {
         // Tạo Header (Thuật toán mã hóa là HS512)
         JWSHeader header = new JWSHeader(JWSAlgorithm.HS512);
@@ -109,6 +118,7 @@ public class AuthenticationService {
                 .issueTime(new Date())
                 .expirationTime(new Date(Instant.now().plus(1, ChronoUnit.HOURS).toEpochMilli() // hết hạn sau 1 giờ
                 ))
+                .jwtID(UUID.randomUUID().toString())
                 .claim("userId", user.getId())
                 .claim("scope", buildScope(user))
                 .build();
@@ -126,6 +136,32 @@ public class AuthenticationService {
             throw new RuntimeException(e);
         }
 
+    }
+
+    // isRefresh: tham số này để dùng sau này nếu bạn làm refresh token (tạm thời chưa dùng)
+    private SignedJWT verifyToken(String token, boolean isRefresh) throws JOSEException, ParseException {
+        JWSVerifier verifier = new MACVerifier(SIGNER_KEY.getBytes());
+
+        SignedJWT signedJWT = SignedJWT.parse(token);
+
+        Date expiryTime = (isRefresh)
+                ? new Date(signedJWT.getJWTClaimsSet().getIssueTime()
+                .toInstant().plus(signedJWT.getJWTClaimsSet().getExpirationTime().toInstant().getEpochSecond(), ChronoUnit.SECONDS).toEpochMilli())
+                : signedJWT.getJWTClaimsSet().getExpirationTime();
+
+        var verified = signedJWT.verify(verifier);
+
+        // 1. Kiểm tra expire và chữ ký
+        if (!(verified && expiryTime.after(new Date()))) {
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
+        }
+
+        // 2. <--- CHANGE: Kiểm tra xem token có nằm trong Blacklist (đã logout) không
+        if (invalidatedTokenRepository.existsById(signedJWT.getJWTClaimsSet().getJWTID())) {
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
+        }
+
+        return signedJWT;
     }
 
     private String buildScope(User user) {
