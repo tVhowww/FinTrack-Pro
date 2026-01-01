@@ -3,6 +3,7 @@ package com.fintrack.identity_service.controller;
 import com.fintrack.identity_service.dto.request.AuthenticationRequest;
 import com.fintrack.identity_service.dto.request.IntrospectRequest;
 import com.fintrack.identity_service.dto.request.LogoutRequest;
+import com.fintrack.identity_service.dto.request.RefreshTokenRequest;
 import com.fintrack.identity_service.dto.response.ApiResponse;
 import com.fintrack.identity_service.dto.response.AuthenticationResponse;
 import com.fintrack.identity_service.dto.response.IntrospectResponse;
@@ -43,6 +44,14 @@ public class AuthenticationController {
         authenticationService.logout(request);
         return ApiResponse.<Void>builder()
                 .message("Logout successful")
+                .build();
+    }
+
+    @PostMapping("/refresh")
+    public ApiResponse<AuthenticationResponse> refreshToken(@RequestBody RefreshTokenRequest request) throws ParseException, JOSEException {
+        var result = authenticationService.refreshToken(request);
+        return ApiResponse.<AuthenticationResponse>builder()
+                .result(result)
                 .build();
     }
 }

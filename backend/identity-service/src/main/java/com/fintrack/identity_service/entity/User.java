@@ -35,6 +35,9 @@ public class User {
 
     private LocalDate dob;
 
+    @Column(name = "current_jwt_id")
+    private String currentJwtId; // Lưu JTI của token hợp lệ cuối cùng
+
     // Dùng ElementCollection để Hibernate tự tạo bảng phụ 'user_roles'
     @ElementCollection(fetch = FetchType.EAGER) // EAGER để khi query User là có luôn Role
     private Set<String> roles;
