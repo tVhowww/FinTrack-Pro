@@ -54,6 +54,8 @@ public class SecurityConfig {
                         // Cho phép tạo user mới (POST /users) mà không cần token (Sign up)
                         .requestMatchers(HttpMethod.POST, "/users").permitAll()
 
+                        .requestMatchers(HttpMethod.GET, "/users").hasAuthority("SCOPE_ADMIN")
+
                         // Các request khác đều cần phải xác thực (login)
                         .anyRequest().authenticated()
                 );

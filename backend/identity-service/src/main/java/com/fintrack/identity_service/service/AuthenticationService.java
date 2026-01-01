@@ -4,6 +4,7 @@ import com.fintrack.identity_service.dto.request.AuthenticationRequest;
 import com.fintrack.identity_service.dto.request.IntrospectRequest;
 import com.fintrack.identity_service.dto.response.AuthenticationResponse;
 import com.fintrack.identity_service.dto.response.IntrospectResponse;
+import com.fintrack.identity_service.entity.User;
 import com.fintrack.identity_service.exception.AppException;
 import com.fintrack.identity_service.exception.ErrorCode;
 import com.fintrack.identity_service.repository.UserRepository;
@@ -18,10 +19,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
+import java.util.StringJoiner;
 
 @Service
 @RequiredArgsConstructor
@@ -87,7 +90,7 @@ public class AuthenticationService {
         }
 
         // 3. Nếu đúng, tạo Token
-        var token = generateToken(request.getUsername());
+        var token = generateToken(user);
 
         return AuthenticationResponse.builder()
                 .token(token)
@@ -95,18 +98,19 @@ public class AuthenticationService {
                 .build();
     }
 
-    private String generateToken(String username) {
+    private String generateToken(User user) {
         // Tạo Header (Thuật toán mã hóa là HS512)
         JWSHeader header = new JWSHeader(JWSAlgorithm.HS512);
 
         // Tạo Body (Claims - Nội dung bên trong token)
         JWTClaimsSet jwtClaimsSet = new JWTClaimsSet.Builder()
-                .subject(username)
+                .subject(user.getUsername())
                 .issuer("fintrack.com")
                 .issueTime(new Date())
                 .expirationTime(new Date(Instant.now().plus(1, ChronoUnit.HOURS).toEpochMilli() // hết hạn sau 1 giờ
                 ))
-                .claim("userId", "CustomClainExample") // Bạn có thể nhét thêm field tùy ý
+                .claim("userId", user.getId())
+                .claim("scope", buildScope(user))
                 .build();
 
         // Tạo payload
@@ -122,5 +126,13 @@ public class AuthenticationService {
             throw new RuntimeException(e);
         }
 
+    }
+
+    private String buildScope(User user) {
+        StringJoiner stringJoiner = new StringJoiner(" ");
+        if (!CollectionUtils.isEmpty(user.getRoles())) {
+            user.getRoles().forEach(stringJoiner::add);
+        }
+        return stringJoiner.toString();
     }
 }

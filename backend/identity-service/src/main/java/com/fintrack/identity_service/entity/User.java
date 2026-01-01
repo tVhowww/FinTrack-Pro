@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
+import java.util.Set;
 
 
 @Entity
@@ -34,5 +35,7 @@ public class User {
 
     private LocalDate dob;
 
-    // Sau này sẽ thêm Role (Admin/User) ở đây
+    // Dùng ElementCollection để Hibernate tự tạo bảng phụ 'user_roles'
+    @ElementCollection(fetch = FetchType.EAGER) // EAGER để khi query User là có luôn Role
+    private Set<String> roles;
 }
