@@ -2,14 +2,17 @@ package com.fintrack.identity_service.configuration;
 
 import com.fintrack.identity_service.dto.response.ApiResponse;
 import com.fintrack.identity_service.exception.ErrorCode;
+import com.fintrack.identity_service.repository.InvalidatedTokenRepository;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -17,8 +20,12 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
+import org.springframework.security.oauth2.jwt.BadJwtException;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import tools.jackson.databind.ObjectMapper;
@@ -28,7 +35,11 @@ import java.io.IOException;
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
+@RequiredArgsConstructor
 public class SecurityConfig {
+    private final InvalidatedTokenRepository invalidatedTokenRepository;
+
     @Value("${jwt.signerKey}")
     private String signerKey;
 
@@ -53,8 +64,6 @@ public class SecurityConfig {
 
                         // Cho phép tạo user mới (POST /users) mà không cần token (Sign up)
                         .requestMatchers(HttpMethod.POST, "/users").permitAll()
-
-                        .requestMatchers(HttpMethod.GET, "/users").hasAuthority("SCOPE_ADMIN")
 
                         // Các request khác đều cần phải xác thực (login)
                         .anyRequest().authenticated()
@@ -90,16 +99,42 @@ public class SecurityConfig {
     }
 
     @Bean
+    JwtAuthenticationConverter jwtAuthenticationConverter() {
+        JwtGrantedAuthoritiesConverter grantedAuthoritiesConverter = new JwtGrantedAuthoritiesConverter();
+        // Set prefix là rỗng (mặc định nó là "SCOPE_")
+        // Vì trong Token ta đã tự build chữ "ROLE_" rồi, nên giờ lấy y nguyên là được
+        grantedAuthoritiesConverter.setAuthorityPrefix("");
+
+        JwtAuthenticationConverter jwtAuthenticationConverter = new JwtAuthenticationConverter();
+        jwtAuthenticationConverter.setJwtGrantedAuthoritiesConverter(grantedAuthoritiesConverter);
+        return jwtAuthenticationConverter;
+    }
+
+    @Bean
     JwtDecoder jwtDecoder() {
-        // Tạo SecretKeySpec từ chuỗi signerKey của chúng ta
         SecretKeySpec secretKeySpec = new SecretKeySpec(signerKey.getBytes(), "HS512");
 
-        // Cấu hình Decoder sử dụng thuật toán HS512 và Key bí mật
-        return NimbusJwtDecoder
+        // Tạo decoder chuẩn của Nimbus (để verify chữ ký và hạn dùng trước)
+        NimbusJwtDecoder nimbusJwtDecoder = NimbusJwtDecoder
                 .withSecretKey(secretKeySpec)
                 .macAlgorithm(MacAlgorithm.HS512)
                 .build();
 
+        // Trả về một chức năng lồng ghép (Wrapper)
+        return token -> {
+            // Bước 1: Verify token theo chuẩn (Check chữ ký, hết hạn chưa)
+            // Nếu sai chữ ký hoặc hết hạn, nimbus sẽ tự throw Exception ở đây
+            Jwt jwt = nimbusJwtDecoder.decode(token);
+
+            // Bước 2: Check xem token ID (JTI) có nằm trong "Sổ đen" (Database) không
+            if (invalidatedTokenRepository.existsById(jwt.getId())) {
+                // Nếu có -> Nghĩa là token này đã Logout -> Báo lỗi
+                throw new BadJwtException("Token has been invalidated");
+            }
+
+            // Nếu mọi thứ ok -> Trả về thông tin token
+            return jwt;
+        };
     }
 
     @Bean

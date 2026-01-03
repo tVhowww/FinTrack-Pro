@@ -7,6 +7,7 @@ import com.fintrack.identity_service.entity.User;
 import com.fintrack.identity_service.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -18,6 +19,7 @@ public class UserController {
     private final UserService userService;
 
     @GetMapping
+    @PreAuthorize("hasAuthority('USER_READ')")
     public List<User> getUsers() {
         return userService.getUsers();
     }
@@ -31,8 +33,11 @@ public class UserController {
         return apiResponse;
     }
 
-//    @GetMapping
-//    public String checkHealth() {
-//        return "Identity Service is running.";
-//    }
+    @GetMapping("/{userId}")
+    @PreAuthorize("hasAuthority('USER_READ')")
+    ApiResponse<UserResponse> getUser(@PathVariable("userId") String userId) {
+        return ApiResponse.<UserResponse>builder()
+                .result(userService.getUser(userId))
+                .build();
+    }
 }
