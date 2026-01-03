@@ -6,11 +6,13 @@ import com.fintrack.identity_service.entity.User;
 import com.fintrack.identity_service.exception.AppException;
 import com.fintrack.identity_service.exception.ErrorCode;
 import com.fintrack.identity_service.mapper.UserMapper;
+import com.fintrack.identity_service.repository.RoleRepository;
 import com.fintrack.identity_service.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.HashSet;
 import java.util.List;
 
 @Service
@@ -19,6 +21,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
+    private final RoleRepository roleRepository;
 
     public List<User> getUsers() {
         return userRepository.findAll();
@@ -37,7 +40,19 @@ public class UserService {
 
         user.setPassword(passwordEncoder.encode(request.getPassword()));
 
+        // Logic set Role mới:
+        // request.getRoles() trả về List<String> (VD: ["ADMIN", "USER"])
+        var roles = roleRepository.findAllById(request.getRoles());
+        user.setRoles(new HashSet<>(roles));
+
         user = userRepository.save(user);
+
+        return userMapper.toUserResponse(user);
+    }
+
+    public UserResponse getUser(String userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
 
         return userMapper.toUserResponse(user);
     }

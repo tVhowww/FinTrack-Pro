@@ -38,7 +38,11 @@ public class User {
     @Column(name = "current_jwt_id")
     private String currentJwtId; // Lưu JTI của token hợp lệ cuối cùng
 
-    // Dùng ElementCollection để Hibernate tự tạo bảng phụ 'user_roles'
-    @ElementCollection(fetch = FetchType.EAGER) // EAGER để khi query User là có luôn Role
-    private Set<String> roles;
+    @ManyToMany
+    @JoinTable(
+            name = "user_roles", // Tên bảng trung gian
+            joinColumns = @JoinColumn(name = "user_id"), // Khóa ngoại trỏ về User
+            inverseJoinColumns = @JoinColumn(name = "role_name") // Khóa ngoại trỏ về Role
+    )
+    private Set<Role> roles;
 }

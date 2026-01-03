@@ -16,11 +16,16 @@ public enum ErrorCode {
     PASSWORD_INVALID(1004, "Password must be at least 6 characters", HttpStatus.BAD_REQUEST),
     INVALID_KEY_MESSAGE(1005, "Invalid message key", HttpStatus.BAD_REQUEST),
 
-    // 404
-    USER_NOT_EXISTED(1006, "User not existed", HttpStatus.NOT_FOUND),
-
     // 401
-    UNAUTHENTICATED(1007, "Unauthenticated", HttpStatus.UNAUTHORIZED),
+    UNAUTHENTICATED(1006, "Unauthenticated", HttpStatus.UNAUTHORIZED),
+
+    // 403
+    UNAUTHORIZED(1007, "You do not have permission", HttpStatus.FORBIDDEN),
+
+    // 404
+    USER_NOT_EXISTED(1008, "User not existed", HttpStatus.NOT_FOUND),
+    ROLE_NOT_EXISTED(1009, "Role not existed", HttpStatus.NOT_FOUND),
+
     ;
 
 
