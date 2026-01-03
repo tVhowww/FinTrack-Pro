@@ -1,6 +1,7 @@
 package com.fintrack.wallet_service.service;
 
 import com.fintrack.wallet_service.dto.request.WalletCreationRequest;
+import com.fintrack.wallet_service.dto.request.WalletUpdateRequest;
 import com.fintrack.wallet_service.dto.response.WalletResponse;
 import com.fintrack.wallet_service.entity.Wallet;
 import com.fintrack.wallet_service.exception.AppException;
@@ -54,5 +55,22 @@ public class WalletService {
         return wallets.stream()
                 .map(walletMapper::toWalletResponse)
                 .toList();
+    }
+
+    public WalletResponse update(String id, WalletUpdateRequest request) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+        Jwt jwt = (Jwt) authentication.getPrincipal();
+        String userId = jwt.getClaimAsString("userId");
+
+        Wallet wallet = walletRepository.findByIdAndUserId(id, userId)
+                .orElseThrow(() -> new AppException(ErrorCode.WALLET_NOT_FOUND));
+
+        wallet.setName(request.getName());
+        if (request.getCurrency() != null) {
+            wallet.setCurrency(request.getCurrency());
+        }
+
+        return walletMapper.toWalletResponse(walletRepository.save(wallet));
     }
 }
