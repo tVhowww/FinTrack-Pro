@@ -30,6 +30,20 @@ spring:
               filters:
                 - Authentication # <--- Bắt buộc phải có token mới cho qua
 
+            # ----------------------------------------------------
+            # 3. Route cho Wallet Service
+            # Khớp: /wallet/wallets, /wallet/...
+            # ----------------------------------------------------
+            - id: wallet_service
+              uri: lb://WALLET-SERVICE # Tên service đăng ký trên Eureka (viết hoa thường không quan trọng nhưng nên khớp)
+              predicates:
+                - Path=/wallet/** # Khớp với context-path bạn đã cấu hình bên Wallet Service
+              filters:
+              # Bạn có thể bật Authentication Filter ở đây nếu muốn Gateway chặn ngay từ vòng gửi xe.
+              # Tuy nhiên, vì Wallet Service đã là Resource Server (tự check token),
+              # nên tạm thời không cần filter này cũng được, để Wallet tự lo.
+              # - Authentication
+
 eureka:
   client:
     service-url:
