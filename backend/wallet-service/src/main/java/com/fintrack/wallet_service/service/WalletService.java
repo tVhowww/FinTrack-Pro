@@ -13,6 +13,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 public class WalletService {
@@ -39,5 +41,18 @@ public class WalletService {
         wallet.setUserId(userId);
 
         return walletMapper.toWalletResponse(walletRepository.save(wallet));
+    }
+
+    public List<WalletResponse> getMyWallets() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+        Jwt jwt = (Jwt) authentication.getPrincipal();
+        String userId = jwt.getClaimAsString("userId");
+
+        var wallets = walletRepository.findByUserIdAndIsActiveTrueOrderByCreatedAtDesc(userId);
+
+        return wallets.stream()
+                .map(walletMapper::toWalletResponse)
+                .toList();
     }
 }
