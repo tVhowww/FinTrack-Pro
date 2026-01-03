@@ -41,4 +41,11 @@ public class WalletController {
                 .build();
     }
 
+    @DeleteMapping("/{id}")
+    ApiResponse<String> delete(@PathVariable String id) {
+        walletService.delete(id);
+        return ApiResponse.<String>builder()
+                .message("Wallet has been deleted")
+                .build();
+    }
 }
