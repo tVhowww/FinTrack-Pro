@@ -73,4 +73,18 @@ public class WalletService {
 
         return walletMapper.toWalletResponse(walletRepository.save(wallet));
     }
+
+    public void delete(String id) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+        Jwt jwt = (Jwt) authentication.getPrincipal();
+        String userId = jwt.getClaimAsString("userId");
+
+        Wallet wallet = walletRepository.findByIdAndUserId(id, userId)
+                .orElseThrow(() -> new AppException(ErrorCode.WALLET_NOT_FOUND));
+
+        // Soft Delete
+        wallet.setActive(false);
+        walletRepository.save(wallet);
+    }
 }
