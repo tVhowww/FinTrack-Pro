@@ -22,7 +22,9 @@ import javax.crypto.spec.SecretKeySpec;
 public class SecurityConfig {
 
     private final String[] PUBLIC_ENDPOINTS = {
-            "/actuator/**" // Cho phép endpoint check sức khỏe (nếu có)
+            "/v3/api-docs/**",
+            "/swagger-ui/**",
+            "/swagger-ui.html"
     };
 
     @Value("${jwt.signerKey}")

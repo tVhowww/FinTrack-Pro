@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface WalletRepository extends JpaRepository<Wallet, String> {
@@ -13,4 +14,7 @@ public interface WalletRepository extends JpaRepository<Wallet, String> {
 
     // Tìm ví của user và chưa bị xóa (Sắp xếp mới nhất lên đầu)
     List<Wallet> findByUserIdAndIsActiveTrueOrderByCreatedAtDesc(String userId);
+
+    // Tìm ví theo ID và UserID (Quan trọng để check quyền sở hữu)
+    Optional<Wallet> findByIdAndUserId(String id, String userId);
 }
