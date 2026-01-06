@@ -44,6 +44,15 @@ spring:
               # nên tạm thời không cần filter này cũng được, để Wallet tự lo.
               # - Authentication
 
+              # ----------------------------------------------------
+              # 4. Route cho Transaction Service
+              # Khớp: /transaction/transactions, /transaction/...
+              # ----------------------------------------------------
+            - id: transaction_service
+              uri: lb://TRANSACTION-SERVICE
+              predicates:
+                - Path=/transaction/**
+
 eureka:
   client:
     service-url:

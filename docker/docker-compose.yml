@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  # 1. Database cho Service Identity (Quản lý User)
+  # Database cho Service Identity (Quản lý User)
   identity-db:
     image: postgres:16-alpine
     container_name: fintrack-identity-db
@@ -15,21 +15,6 @@ services:
     volumes:
       - identity_data:/var/lib/postgresql/data
 
-  # 2. Database cho Service Core (Quản lý Thu chi/Ví)
-  core-db:
-    image: postgres:16-alpine
-    container_name: fintrack-core-db
-    restart: always
-    environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=core_service_db
-    ports:
-      - "5433:5432" # Chú ý: Map ra cổng 5433 ở máy thật để không đụng thằng trên
-    volumes:
-      - core_data:/var/lib/postgresql/data
-
-  # 3. Database cho Service Core (Quản lý Thu chi/Ví)
   wallet-db:
     image: postgres:16-alpine
     container_name: fintrack-wallet-db
@@ -39,9 +24,22 @@ services:
       - POSTGRES_PASSWORD=password
       - POSTGRES_DB=wallet_service_db
     ports:
-      - "5434:5432" # Chú ý: Map ra cổng 5433 ở máy thật để không đụng thằng trên
+      - "5433:5432"
     volumes:
       - wallet_data:/var/lib/postgresql/data
+
+  transaction-db:
+    image: postgres:16-alpine
+    container_name: fintrack-transaction-db
+    restart: always
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=transaction_service_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - transaction_data:/var/lib/postgresql/data
 
   # 1. Công cụ quản lý DB (pgAdmin) - Optional nhưng nên có để dễ debug
   pgadmin:
@@ -57,11 +55,11 @@ services:
       - pgadmin_data:/var/lib/pgadmin
     depends_on:
       - identity-db
-      - core-db
       - wallet-db
+      - transaction-db
 
 volumes:
   identity_data:
-  core_data:
   wallet_data:
   pgadmin_data:
+  transaction_data:
