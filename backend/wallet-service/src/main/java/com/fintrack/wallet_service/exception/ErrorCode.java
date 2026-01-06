@@ -15,7 +15,8 @@ public enum ErrorCode {
     WALLET_EXISTED(2001, "Wallet already exists", HttpStatus.BAD_REQUEST),
     WALLET_NOT_FOUND(2002, "Wallet not found", HttpStatus.NOT_FOUND),
     INVALID_BALANCE(2003, "Balance cannot be negative", HttpStatus.BAD_REQUEST),
-    WALLET_NAME_INVALID(2004, "Wallet name is invalid", HttpStatus.BAD_REQUEST)
+    WALLET_NAME_INVALID(2004, "Wallet name is invalid", HttpStatus.BAD_REQUEST),
+    INSUFFICIENT_BALANCE(2005, "Insufficient balance", HttpStatus.BAD_REQUEST)
     ;
 
     ErrorCode(int code, String message, HttpStatusCode statusCode) {

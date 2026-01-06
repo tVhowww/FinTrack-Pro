@@ -1,5 +1,6 @@
 package com.fintrack.wallet_service.service;
 
+import com.fintrack.wallet_service.dto.request.WalletBalanceUpdateRequest;
 import com.fintrack.wallet_service.dto.request.WalletCreationRequest;
 import com.fintrack.wallet_service.dto.request.WalletUpdateRequest;
 import com.fintrack.wallet_service.dto.response.WalletResponse;
@@ -13,7 +14,9 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Service
@@ -21,6 +24,26 @@ import java.util.List;
 public class WalletService {
     private final WalletRepository walletRepository;
     private final WalletMapper walletMapper;
+
+    @Transactional // đảm bảo tính nhất quán
+    public WalletResponse updateBalance(String walletId,  WalletBalanceUpdateRequest request) {
+        // 1. Tìm ví
+        Wallet wallet = walletRepository.findById(walletId)
+                .orElseThrow(() -> new AppException(ErrorCode.WALLET_NOT_FOUND));
+
+        // 2. Tính toán số dư
+        BigDecimal newBalance = wallet.getBalance().add(request.getAmount());
+
+        // 3. Kiểm tra nếu số dư âm
+        if (newBalance.compareTo(BigDecimal.ZERO) < 0) {
+            throw new AppException(ErrorCode.INSUFFICIENT_BALANCE);
+        }
+
+        // 4. Cập nhật số dư và lưu
+        wallet.setBalance(newBalance);
+        return walletMapper.toWalletResponse(walletRepository.save(wallet));
+
+    }
 
     public WalletResponse create(WalletCreationRequest request) {
         // 1. Lấy userId từ Token (Claim "userId" mà Identity Service đã bỏ vào)
