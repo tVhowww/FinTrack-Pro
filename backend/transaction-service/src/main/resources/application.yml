@@ -7,7 +7,7 @@ spring:
   application:
     name: transaction-service
   datasource:
-    url: jdbc:postgresql://localhost:5434/transaction_service
+    url: jdbc:postgresql://localhost:5434/transaction_service_db
     username: postgres
     password: password
     driver-class-name: org.postgresql.Driver
@@ -20,7 +20,7 @@ spring:
         format_sql: true
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
-# C?u hình Eureka Client
+# Cau hinh Eureka Client
 eureka:
   client:
     service-url:
@@ -28,7 +28,7 @@ eureka:
     fetch-registry: true
     register-with-eureka: true
 
-# C?u hình Feign Client (?? g?i Wallet Service)
+# Cau hinh Feign Client (de goi Wallet Service)
 feign:
   client:
     config:
