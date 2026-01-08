@@ -18,6 +18,8 @@ spring:
               predicates:
                 - Path=/identity/auth/**
               # Không có filters -> Ai vào cũng được
+              filters:
+                - AddRequestHeader=X-Internal-Secret, bao-mat-noi-bo-123
 
             # ----------------------------------------------------
             # 2. Route Private (Hốt tất cả những gì còn lại)
@@ -29,6 +31,7 @@ spring:
                 - Path=/identity/** # <--- Bắt tất cả prefix /identity
               filters:
                 - Authentication # <--- Bắt buộc phải có token mới cho qua
+                - AddRequestHeader=X-Internal-Secret, bao-mat-noi-bo-123
 
             # ----------------------------------------------------
             # 3. Route cho Wallet Service
@@ -37,12 +40,14 @@ spring:
             - id: wallet_service
               uri: lb://WALLET-SERVICE # Tên service đăng ký trên Eureka (viết hoa thường không quan trọng nhưng nên khớp)
               predicates:
-                - Path=/wallet/** # Khớp với context-path bạn đã cấu hình bên Wallet Service
+                - Path=/wallet/wallets/**, /wallet/users/** # chặn đi vào internal
+#                - Path=/wallet/** # Khớp với context-path bạn đã cấu hình bên Wallet Service
               filters:
               # Bạn có thể bật Authentication Filter ở đây nếu muốn Gateway chặn ngay từ vòng gửi xe.
               # Tuy nhiên, vì Wallet Service đã là Resource Server (tự check token),
               # nên tạm thời không cần filter này cũng được, để Wallet tự lo.
-              # - Authentication
+               - Authentication
+               - AddRequestHeader=X-Internal-Secret, bao-mat-noi-bo-123
 
               # ----------------------------------------------------
               # 4. Route cho Transaction Service
@@ -52,6 +57,9 @@ spring:
               uri: lb://TRANSACTION-SERVICE
               predicates:
                 - Path=/transaction/**
+              filters:
+                - Authentication
+                - AddRequestHeader=X-Internal-Secret, bao-mat-noi-bo-123
 
 eureka:
   client:
@@ -59,3 +67,6 @@ eureka:
       defaultZone: http://localhost:8761/eureka/
     register-with-eureka: true
     fetch-registry: true
+
+app:
+  internal-secret: "bao-mat-noi-bo-123"

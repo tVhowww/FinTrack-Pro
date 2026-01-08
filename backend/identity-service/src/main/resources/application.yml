@@ -31,3 +31,6 @@ eureka:
   client:
     service-url:
       defaultZone: http://localhost:8761/eureka/
+
+app:
+  internal-secret: "bao-mat-noi-bo-123" # Phải khớp với Gateway

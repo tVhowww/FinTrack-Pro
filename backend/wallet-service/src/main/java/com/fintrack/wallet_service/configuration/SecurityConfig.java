@@ -24,7 +24,8 @@ public class SecurityConfig {
     private final String[] PUBLIC_ENDPOINTS = {
             "/v3/api-docs/**",
             "/swagger-ui/**",
-            "/swagger-ui.html"
+            "/swagger-ui.html",
+            "/internal/**"
     };
 
     @Value("${jwt.signerKey}")
@@ -38,8 +39,9 @@ public class SecurityConfig {
 
         http.oauth2ResourceServer(oauth2 ->
                 oauth2.jwt(jwtConfigurer ->
-                        jwtConfigurer.decoder(jwtDecoder()) // Đăng ký bộ giải mã Token
-                                .jwtAuthenticationConverter(jwtAuthenticationConverter()))
+                                jwtConfigurer.decoder(jwtDecoder()) // Đăng ký bộ giải mã Token
+                                        .jwtAuthenticationConverter(jwtAuthenticationConverter()))
+                        .authenticationEntryPoint(new JwtAuthenticationEntryPoint())
         );
 
         http.csrf(AbstractHttpConfigurer::disable);
