@@ -35,3 +35,10 @@ feign:
       default:
         connectTimeout: 5000 # 5s
         readTimeout: 5000
+
+# Cau hinh Security
+jwt:
+  signerKey: "1234567890123456789012345678901234567890123456789012345678901234"
+
+app:
+  internal-secret: "bao-mat-noi-bo-123" # Phải khớp với Gateway

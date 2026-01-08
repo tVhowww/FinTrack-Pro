@@ -1,4 +1,4 @@
-package com.fintrack.wallet_service.configuration;
+package com.fintrack.transaction_service.configuration;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -25,7 +25,6 @@ public class SecurityConfig {
             "/v3/api-docs/**",
             "/swagger-ui/**",
             "/swagger-ui.html",
-            "/internal/**"
     };
 
     @Value("${jwt.signerKey}")
