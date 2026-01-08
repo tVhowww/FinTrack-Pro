@@ -15,13 +15,15 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(value = Exception.class)
-    ResponseEntity<ApiResponse> handlingRuntimeException(RuntimeException exception) {
+    ResponseEntity<ApiResponse> handlingUncategorizedException(Exception exception) {
         log.error("Exception: ", exception);
 
         ApiResponse apiResponse = new ApiResponse();
 
         apiResponse.setCode(ErrorCode.UNCATEGORIZED_EXCEPTION.getCode());
         apiResponse.setMessage(ErrorCode.UNCATEGORIZED_EXCEPTION.getMessage());
+        // Thêm dòng này để debug cho dễ nếu cần, khi production thì bỏ đi
+        // apiResponse.setMessage(exception.getMessage());
 
         return ResponseEntity.internalServerError().body(apiResponse);
     }
