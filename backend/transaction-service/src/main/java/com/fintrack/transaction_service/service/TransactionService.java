@@ -2,6 +2,7 @@ package com.fintrack.transaction_service.service;
 
 import com.fintrack.transaction_service.dto.request.TransactionCreationRequest;
 import com.fintrack.transaction_service.dto.request.WalletBalanceUpdateRequest;
+import com.fintrack.transaction_service.dto.response.MonthlyStatisticsResponse;
 import com.fintrack.transaction_service.dto.response.PageResponse;
 import com.fintrack.transaction_service.dto.response.TransactionResponse;
 import com.fintrack.transaction_service.entity.Transaction;
@@ -21,6 +22,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.YearMonth;
+import java.time.ZoneId;
 
 @Service
 @RequiredArgsConstructor
@@ -28,6 +31,45 @@ public class TransactionService {
     private final TransactionRepository transactionRepository;
     private final TransactionMapper transactionMapper;
     private final WalletClient walletClient;
+
+    public MonthlyStatisticsResponse getMonthlyStatistics(String walletId, int month, int year) {
+        // 1. Tính toán khoảng thời gian (Start - End) của tháng
+        // Lưu ý: Project đang dùng Instant (UTC), nên ta cần xử lý múi giờ cẩn thận.
+        // Ở đây giả sử ta tính theo giờ hệ thống (hoặc UTC mặc định)
+        YearMonth yearMonth = YearMonth.of(year, month);
+
+        // Ngày đầu tháng lúc 00:00:00
+        Instant start = yearMonth.atDay(1).atStartOfDay(ZoneId.systemDefault()).toInstant();
+        // Ngày cuối tháng lúc 23:59:59.999999
+        Instant end = yearMonth.atEndOfMonth().atTime(23, 59, 59).atZone(ZoneId.systemDefault()).toInstant();
+
+        // 2. Tính Tổng Thu (INCOME)
+        BigDecimal totalIncome = transactionRepository.sumAmountByWalletAndTypeAndDateBetween(
+                walletId, TransactionType.INCOME, start, end
+        );
+
+        // 3. Tính Tổng Chi (EXPENSE)
+        // Lưu ý: Trong DB, EXPENSE đang lưu số ÂM (ví dụ -50000).
+        // Khi hiển thị thống kê "Tổng chi tiêu", ta thường muốn hiện số dương (Chi tiêu: 50.000đ).
+        // Nên ta lấy giá trị tuyệt đối (abs) hoặc đảo dấu.
+        BigDecimal totalExpenseRaw = transactionRepository.sumAmountByWalletAndTypeAndDateBetween(
+                walletId, TransactionType.EXPENSE, start, end
+        );
+        // Đổi sang số dương để hiển thị cho đẹp: "Chi tiêu: 50.000"
+        BigDecimal totalExpense = totalExpenseRaw.abs();
+
+        // 4. Tính Số Dư (Net Savings) = Thu + Chi (Vì Chi là số âm nên cộng vào là trừ ra)
+        // Ví dụ: Thu 100 + (-30) = 70
+        BigDecimal netSavings = totalIncome.add(totalExpenseRaw);
+
+        return MonthlyStatisticsResponse.builder()
+                .month(month)
+                .year(year)
+                .totalIncome(totalIncome)
+                .totalExpense(totalExpense)
+                .netSavings(netSavings)
+                .build();
+    }
 
     public PageResponse<TransactionResponse> getTransactions(
             int page, int size,
