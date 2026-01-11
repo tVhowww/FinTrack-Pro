@@ -2,6 +2,7 @@ package com.fintrack.transaction_service.controller;
 
 import com.fintrack.transaction_service.dto.request.TransactionCreationRequest;
 import com.fintrack.transaction_service.dto.response.ApiResponse;
+import com.fintrack.transaction_service.dto.response.MonthlyStatisticsResponse;
 import com.fintrack.transaction_service.dto.response.PageResponse;
 import com.fintrack.transaction_service.dto.response.TransactionResponse;
 import com.fintrack.transaction_service.enums.TransactionType;
@@ -16,6 +17,19 @@ import java.time.Instant;
 @RequestMapping("transactions")
 public class TransactionController {
     private final TransactionService transactionService;
+
+    @GetMapping("/statistics/monthly")
+    public ApiResponse<MonthlyStatisticsResponse> getMonthlyStatistics(
+            @RequestParam String walletId,
+            @RequestParam int month,
+            @RequestParam int year
+    ) {
+        var result = transactionService.getMonthlyStatistics(walletId, month, year);
+
+        return ApiResponse.<MonthlyStatisticsResponse>builder()
+                .result(result)
+                .build();
+    }
 
     @GetMapping
     public ApiResponse<PageResponse<TransactionResponse>> getTransactions(
