@@ -5,9 +5,13 @@ import com.fintrack.transaction_service.dto.request.WalletBalanceUpdateRequest;
 import com.fintrack.transaction_service.dto.response.MonthlyStatisticsResponse;
 import com.fintrack.transaction_service.dto.response.PageResponse;
 import com.fintrack.transaction_service.dto.response.TransactionResponse;
+import com.fintrack.transaction_service.entity.Category;
 import com.fintrack.transaction_service.entity.Transaction;
 import com.fintrack.transaction_service.enums.TransactionType;
+import com.fintrack.transaction_service.exception.AppException;
+import com.fintrack.transaction_service.exception.ErrorCode;
 import com.fintrack.transaction_service.mapper.TransactionMapper;
+import com.fintrack.transaction_service.repository.CategoryRepository;
 import com.fintrack.transaction_service.repository.TransactionRepository;
 import com.fintrack.transaction_service.repository.httpclient.WalletClient;
 import com.fintrack.transaction_service.repository.specification.TransactionSpecification;
@@ -29,6 +33,7 @@ import java.time.ZoneId;
 @RequiredArgsConstructor
 public class TransactionService {
     private final TransactionRepository transactionRepository;
+    private final CategoryRepository categoryRepository;
     private final TransactionMapper transactionMapper;
     private final WalletClient walletClient;
 
@@ -99,8 +104,15 @@ public class TransactionService {
 
     @Transactional
     public TransactionResponse create(TransactionCreationRequest request) {
+        Category category = null;
+        if (request.getCategoryId() != null) {
+            category = categoryRepository.findById(request.getCategoryId())
+                    .orElseThrow(() -> new AppException(ErrorCode.CATEGORY_NOT_FOUND));
+        }
+
         // 1. Map và Lưu Transaction vào DB trước (Trạng thái Pending hoặc cứ lưu trước)
         Transaction transaction = transactionMapper.toTransaction(request);
+        transaction.setCategory(category);
         transaction = transactionRepository.save(transaction); // Có ID rồi
 
         // 2. Tính toán tiền
