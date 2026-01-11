@@ -19,6 +19,7 @@ public class TransactionResponse {
     private TransactionType type;
     private String walletId;
     private String categoryId;
+    private String categoryName;
     private String note;
     private Instant date;
     private Instant createdAt;

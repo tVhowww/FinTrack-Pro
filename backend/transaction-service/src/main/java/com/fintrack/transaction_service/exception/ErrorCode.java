@@ -12,7 +12,9 @@ public enum ErrorCode {
     UNAUTHORIZED(1007, "You do not have permission", HttpStatus.FORBIDDEN),
 
     // --- Lỗi nghiệp vụ (Bắt đầu từ 2xxx) ---
-    INSUFFICIENT_BALANCE(2005, "Insufficient balance", HttpStatus.BAD_REQUEST)
+    INSUFFICIENT_BALANCE(2005, "Insufficient balance", HttpStatus.BAD_REQUEST),
+    CATEGORY_PARENT_NOT_FOUND(2006, "Category Parent not found", HttpStatus.NOT_FOUND),
+    CATEGORY_NOT_FOUND(2007, "Category not found", HttpStatus.NOT_FOUND),
     ;
 
     ErrorCode(int code, String message, HttpStatusCode statusCode) {

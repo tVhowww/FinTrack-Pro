@@ -35,8 +35,9 @@ public class Transaction {
     @Column(name = "wallet_id", nullable = false)
     private String walletId;
 
-    @Column(name = "category_id")
-    private String categoryId; // ID danh mục (Ăn uống, lương...) - Sprint sau sẽ làm Category Service
+    @ManyToOne(fetch = FetchType.LAZY) // Lazy để tối ưu hiệu năng
+    @JoinColumn(name = "category_id") // Nó vẫn sẽ lưu vào cột 'category_id' trong DB
+    private Category category;
 
     private String note;
 
