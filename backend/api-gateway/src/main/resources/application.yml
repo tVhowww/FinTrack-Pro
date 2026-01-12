@@ -61,6 +61,18 @@ spring:
                 - Authentication
                 - AddRequestHeader=X-Internal-Secret, bao-mat-noi-bo-123
 
+            # ----------------------------------------------------
+            # 5. Route cho Notification Service
+            # Khớp: /notification/...
+            # ----------------------------------------------------
+            - id: notification_service
+              uri: lb://NOTIFICATION-SERVICE
+              predicates:
+                - Path=/notification/**
+              filters:
+                - Authentication
+                - AddRequestHeader=X-Internal-Secret, bao-mat-noi-bo-123
+
 eureka:
   client:
     service-url:

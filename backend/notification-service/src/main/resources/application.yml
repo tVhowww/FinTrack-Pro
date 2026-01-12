@@ -1,0 +1,37 @@
+server:
+  port: 8083
+  servlet:
+    context-path: /notification
+
+spring:
+  application:
+    name: notification-service
+
+  # C?u hình KAFKA
+  kafka:
+    bootstrap-servers: localhost:29092 # Ket noi vao port lo ra c?a Docker
+    consumer:
+      group-id: notification-group # Ten nhom consumer
+      auto-offset-reset: earliest # Doc tu tin nhan cu nhat neu bi mat ket noi
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "*" # Cho phep nhan moi object JSON
+
+  # C?u hình EMAIL (Gmail SMTP)
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: "haun4700@gmail.com"
+    password: "dien_app_password_vao_day" # <--- Update later
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
