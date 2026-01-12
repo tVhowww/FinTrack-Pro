@@ -15,6 +15,7 @@ import com.fintrack.transaction_service.repository.CategoryRepository;
 import com.fintrack.transaction_service.repository.TransactionRepository;
 import com.fintrack.transaction_service.repository.httpclient.WalletClient;
 import com.fintrack.transaction_service.repository.specification.TransactionSpecification;
+import com.fintrack.transaction_service.utils.ExcelHelper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -24,10 +25,12 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.ByteArrayInputStream;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.YearMonth;
 import java.time.ZoneId;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -36,6 +39,20 @@ public class TransactionService {
     private final CategoryRepository categoryRepository;
     private final TransactionMapper transactionMapper;
     private final WalletClient walletClient;
+
+    public ByteArrayInputStream exportToExcel(String walletId, TransactionType type, Instant startDate, Instant endDate) {
+        // 1. Tạo bộ lọc (giống hệt hàm getTransactions nhưng không phân trang)
+        Specification<Transaction> spec = Specification.where(TransactionSpecification.hasWalletId(walletId))
+                .and(TransactionSpecification.hasType(type))
+                .and(TransactionSpecification.createdBetween(startDate, endDate));
+
+        // 2. Lấy toàn bộ dữ liệu (không phân trang - findAll(spec))
+        // Lưu ý: Cần sort theo ngày giảm dần cho đẹp
+        List<Transaction> transactions = transactionRepository.findAll(spec, Sort.by("date").descending());
+
+        // 3. Gọi Helper để tạo file
+        return ExcelHelper.transactionsToExcel(transactions);
+    }
 
     public MonthlyStatisticsResponse getMonthlyStatistics(String walletId, int month, int year) {
         // 1. Tính toán khoảng thời gian (Start - End) của tháng
