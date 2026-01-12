@@ -41,6 +41,7 @@ services:
     volumes:
       - transaction_data:/var/lib/postgresql/data
 
+  # --- TOOLS ---
   # 1. Công cụ quản lý DB (pgAdmin) - Optional nhưng nên có để dễ debug
   pgadmin:
     image: dpage/pgadmin4
@@ -57,6 +58,38 @@ services:
       - identity-db
       - wallet-db
       - transaction-db
+
+  # --- MESSAGE BROKER (KAFKA) ---
+
+  # 1. Zookeeper (Quản lý Kafka Cluster)
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    hostname: zookeeper
+    container_name: fintrack-zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  # 2. Kafka Broker (Nơi chứa tin nhắn)
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    hostname: kafka
+    container_name: fintrack-kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "29092:29092" # Port cho Spring Boot (Host) kết nối vào
+      - "9092:9092"   # Port nội bộ
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      # Cấu hình để Kafka biết đường trả lời khi được gọi từ bên ngoài (localhost) và bên trong (docker)
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
 
 volumes:
   identity_data:
