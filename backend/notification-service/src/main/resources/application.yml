@@ -7,18 +7,19 @@ spring:
   application:
     name: notification-service
 
-  # C?u hình KAFKA
+  # Cau hinh KAFKA
   kafka:
-    bootstrap-servers: localhost:29092 # Ket noi vao port lo ra c?a Docker
+    bootstrap-servers: localhost:29092 # Ket noi vao port lo ra cua Docker
     consumer:
       group-id: notification-group # Ten nhom consumer
       auto-offset-reset: earliest # Doc tu tin nhan cu nhat neu bi mat ket noi
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       properties:
         spring.json.trusted.packages: "*" # Cho phep nhan moi object JSON
+        spring.json.type.mapping: event:com.fintrack.notification_service.dto.event.NotificationEvent
 
-  # C?u hình EMAIL (Gmail SMTP)
+  # Cau hinh EMAIL (Gmail SMTP)
   mail:
     host: smtp.gmail.com
     port: 587

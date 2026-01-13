@@ -1,5 +1,6 @@
 package com.fintrack.transaction_service.service;
 
+import com.fintrack.transaction_service.dto.event.NotificationEvent;
 import com.fintrack.transaction_service.dto.request.TransactionCreationRequest;
 import com.fintrack.transaction_service.dto.request.WalletBalanceUpdateRequest;
 import com.fintrack.transaction_service.dto.response.MonthlyStatisticsResponse;
@@ -13,20 +14,25 @@ import com.fintrack.transaction_service.exception.ErrorCode;
 import com.fintrack.transaction_service.mapper.TransactionMapper;
 import com.fintrack.transaction_service.repository.CategoryRepository;
 import com.fintrack.transaction_service.repository.TransactionRepository;
+import com.fintrack.transaction_service.repository.httpclient.IdentityClient;
 import com.fintrack.transaction_service.repository.httpclient.WalletClient;
 import com.fintrack.transaction_service.repository.specification.TransactionSpecification;
 import com.fintrack.transaction_service.utils.ExcelHelper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.ByteArrayInputStream;
 import java.math.BigDecimal;
+import java.text.NumberFormat;
 import java.time.Instant;
 import java.time.YearMonth;
 import java.time.ZoneId;
@@ -34,11 +40,14 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class TransactionService {
     private final TransactionRepository transactionRepository;
     private final CategoryRepository categoryRepository;
     private final TransactionMapper transactionMapper;
     private final WalletClient walletClient;
+    private final IdentityClient identityClient;
+    private final KafkaTemplate<String, Object> kafkaTemplate;
 
     public ByteArrayInputStream exportToExcel(String walletId, TransactionType type, Instant startDate, Instant endDate) {
         // 1. Tạo bộ lọc (giống hệt hàm getTransactions nhưng không phân trang)
@@ -145,6 +154,63 @@ public class TransactionService {
                 .build();
 
         walletClient.updateBalance(request.getWalletId(), balanceRequest);
+
+        // 4. Gửi Notification qua Kafka
+        String recipientEmail = "user@gmail.com"; // Email mặc định phòng hờ
+        String username = "Bạn"; // Tên mặc định phòng hờ
+
+        try {
+            // Gọi Identity Service (Token tự động được truyền theo nhờ Interceptor)
+            var userResponse = identityClient.getMyInfo();
+            if (userResponse != null && userResponse.getResult() != null) {
+                recipientEmail = userResponse.getResult().getEmail();
+                username = userResponse.getResult().getUsername();
+            }
+        } catch (Exception e) {
+            // Nếu lỗi kết nối Identity, ta log lại và vẫn cho giao dịch thành công
+            // (chỉ là không gửi mail được hoặc gửi sai)
+            // Tốt nhất là dùng Circuit Breaker, nhưng tạm thời try-catch cho đơn giản.
+            System.err.println("Không lấy được thông tin User từ Identity: " + e.getMessage());
+        }
+
+        // 1. Format số tiền (Ví dụ: 50000 -> 50.000)
+        NumberFormat formatter = NumberFormat.getInstance(new java.util.Locale("vi", "VN"));
+        String formattedNumber = formatter.format(transaction.getAmount());
+
+        // 2. Xử lý dấu +/- và màu sắc (tạm thời text chưa màu)
+        String amountString;
+        String actionString;
+
+        if (transaction.getType() == TransactionType.EXPENSE) {
+            amountString = "-" + formattedNumber + " VND";
+            actionString = "thanh toán cho";
+        } else {
+            amountString = "+" + formattedNumber + " VND";
+            actionString = "nhận tiền từ";
+        }
+
+        // 3. Tạo nội dung body
+        String emailBody = String.format(
+                "Xin chào %s, \n\n Giao dịch mới: %s\n" +
+                        "Nội dung: %s %s\n" +
+                        "Thời gian: %s",
+                username,
+                amountString,
+                actionString,
+                (category != null ? category.getName() : "Không phân loại"),
+                transaction.getDate().toString() // Hoặc format ngày đẹp hơn nếu muốn
+        );
+
+        // 4. Bắn Event
+        NotificationEvent event = NotificationEvent.builder()
+                .channel("EMAIL")
+                .recipient(recipientEmail)
+                .subject("Biến động số dư: " + amountString)
+                .body(emailBody)
+                .build();
+
+        // Gửi và log kết quả
+        kafkaTemplate.send("notification-delivery", event);
 
         // 4. Trả về kết quả
         return transactionMapper.toTransactionResponse(transaction);

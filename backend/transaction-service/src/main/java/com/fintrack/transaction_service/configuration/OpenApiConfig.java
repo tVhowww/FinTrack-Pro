@@ -20,12 +20,18 @@ public class OpenApiConfig {
                         .version("1.0.0")
                         .description("API Documentation for FinTrack Transaction Service")
                         .license(new License().name("Apache 2.9").url("http://springdoc.org")))
-                .addSecurityItem(new SecurityRequirement().addList("bearerAuth")) // Thêm nút Authorize cho toàn bộ API
+                .addSecurityItem(new SecurityRequirement()
+                        .addList("bearerAuth")
+                        .addList("internalSecret")) // Thêm nút Authorize cho toàn bộ API
                 .components(new Components()
                         .addSecuritySchemes("bearerAuth",
                                 new SecurityScheme()
                                         .type(SecurityScheme.Type.HTTP)
                                         .scheme("bearer")
-                                        .bearerFormat("JWT")));
+                                        .bearerFormat("JWT"))
+                        .addSecuritySchemes("internalSecret", new SecurityScheme()
+                            .type(SecurityScheme.Type.APIKEY)
+                            .in(SecurityScheme.In.HEADER)
+                            .name("X-Internal-Secret")));
     }
 }
