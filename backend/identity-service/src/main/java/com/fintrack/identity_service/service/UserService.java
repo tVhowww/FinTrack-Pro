@@ -9,6 +9,7 @@ import com.fintrack.identity_service.mapper.UserMapper;
 import com.fintrack.identity_service.repository.RoleRepository;
 import com.fintrack.identity_service.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -52,6 +53,17 @@ public class UserService {
 
     public UserResponse getUser(String userId) {
         User user = userRepository.findById(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        return userMapper.toUserResponse(user);
+    }
+
+    public UserResponse getMyInfo() {
+        // Lấy username từ SecurityContext (do JwtFilter đã decode token và bỏ vào đây)
+        var context = SecurityContextHolder.getContext();
+        String name = context.getAuthentication().getName();
+
+        User user = userRepository.findByUsername(name)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
 
         return userMapper.toUserResponse(user);

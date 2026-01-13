@@ -19,6 +19,19 @@ spring:
       hibernate:
         format_sql: true
         dialect: org.hibernate.dialect.PostgreSQLDialect
+  kafka:
+    bootstrap-servers: localhost:29092
+    producer:
+      # Key là String
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      # Value là Object (JSON)
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        spring.json.type.mapping: event:com.fintrack.transaction_service.dto.event.NotificationEvent
+  cloud:
+    openfeign:
+      circuitbreaker:
+        enabled: true
 
 # Cau hinh Eureka Client
 eureka:
