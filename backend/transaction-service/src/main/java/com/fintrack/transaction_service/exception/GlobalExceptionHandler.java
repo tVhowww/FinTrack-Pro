@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fintrack.transaction_service.dto.response.ApiResponse;
 import feign.FeignException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cloud.client.circuitbreaker.NoFallbackAvailableException;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -103,5 +105,32 @@ public class GlobalExceptionHandler {
                             .build()
             );
         }
+    }
+
+    // Xử lý khi Circuit Breaker ném lỗi vì không có Fallback
+    @ExceptionHandler(NoFallbackAvailableException.class)
+    public ResponseEntity<ApiResponse> handleNoFallbackException(NoFallbackAvailableException e) {
+        // Kiểm tra xem nguyên nhân gốc rễ có phải là FeignException (Lỗi từ service khác) không
+        if (e.getCause() instanceof FeignException feignException) {
+
+            // Đây là lỗi 400/404 từ Wallet trả về (ví dụ: Insufficient balance)
+            String content = feignException.contentUTF8();
+            int status = feignException.status();
+
+            // Bạn có thể parse JSON 'content' để lấy message đẹp hơn nếu muốn
+            // Ở đây mình trả về nguyên văn để bạn dễ debug
+            return ResponseEntity.status(status)
+                    .body(ApiResponse.builder()
+                            .code(status)
+                            .message("Lỗi từ Wallet Service: " + content)
+                            .build());
+        }
+
+        // Nếu không phải lỗi Feign thì là lỗi hệ thống thật sự
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.builder()
+                        .code(9999)
+                        .message("Service tạm thời không khả dụng (Circuit Breaker): " + e.getMessage())
+                        .build());
     }
 }
