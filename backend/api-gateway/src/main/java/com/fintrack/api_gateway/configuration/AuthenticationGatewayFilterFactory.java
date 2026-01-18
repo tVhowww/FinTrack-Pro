@@ -16,6 +16,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
+import java.util.List;
+
 @Component
 @Slf4j
 public class AuthenticationGatewayFilterFactory extends AbstractGatewayFilterFactory<AuthenticationGatewayFilterFactory.Config> {
@@ -32,6 +34,12 @@ public class AuthenticationGatewayFilterFactory extends AbstractGatewayFilterFac
     @Override
     public GatewayFilter apply(Config config) {
         return (exchange, chain) -> {
+            // KIỂM TRA PUBLIC ENDPOINTS (QUAN TRỌNG)
+            String path = exchange.getRequest().getURI().getPath();
+            if (isPublicEndpoint(path)) {
+                return chain.filter(exchange);
+            }
+
             // 1. Lấy giá trị Header Authorization ra
             // Thay vì kiểm tra containsKey, ta lấy thẳng ra xem có null không
             String authHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
@@ -61,6 +69,20 @@ public class AuthenticationGatewayFilterFactory extends AbstractGatewayFilterFac
                         return onError(exchange, "Identity Service Unreachable", HttpStatus.UNAUTHORIZED);
                     });
         };
+    }
+
+    private boolean isPublicEndpoint(String path) {
+        // Danh sách các API không cần token
+        List<String> publicPaths = List.of(
+                "/identity/auth/token",      // Login
+                "/identity/auth/introspect", // Check token
+                "/identity/auth/logout",     // Logout
+                "/identity/users"            // Register (Đăng ký)
+        );
+
+        // Kiểm tra xem path hiện tại có chứa đoạn nào trong list trên không
+        // Dùng contains vì path thực tế có thể có query params
+        return publicPaths.stream().anyMatch(path::contains);
     }
 
     // Trả về JSON body để Postman hiện lỗi
