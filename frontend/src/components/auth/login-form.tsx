@@ -30,6 +30,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { SocialAuth } from "./social-auth";
+import Cookies from "js-cookie";
 
 export function LoginForm() {
   const router = useRouter();
@@ -44,6 +45,7 @@ export function LoginForm() {
     onSuccess: (data) => {
       const token = data.result.token;
       localStorage.setItem("accessToken", token);
+      Cookies.set("accessToken", token, { expires: 1 / 24 });
       toast.success("Đăng nhập thành công!");
       router.push("/");
     },

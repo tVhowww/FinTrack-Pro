@@ -33,3 +33,8 @@ export interface UserResponse {
   fullName: string;
   dob: string;
 }
+
+// 3. Log out
+export interface LogoutRequest {
+  token: string;
+}
