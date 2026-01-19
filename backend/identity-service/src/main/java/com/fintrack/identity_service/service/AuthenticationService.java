@@ -235,14 +235,19 @@ public class AuthenticationService {
 
         var verified = signedJWT.verify(verifier);
 
-        // 1. Nếu token đã hết hạn hoặc chữ ký sai -> Lỗi
-        // Lưu ý: Nếu là Refresh Token, ta có thể muốn cho phép refresh kể cả khi hết hạn 1 chút (Grace period).
-        // Nhưng logic hiện tại cứ chặt chẽ: Hết hạn là vứt.
-        if (!(verified && expiryTime.after(new Date()))) {
+        // 1. Kiểm tra chữ ký (Luôn luôn phải đúng)
+        if (!verified) {
             throw new AppException(ErrorCode.UNAUTHENTICATED);
         }
 
-        // 2. Check Blacklist (Token đã logout hoặc đã refresh trước đó)
+        // 2. Kiểm tra hết hạn
+        // Logic: Nếu KHÔNG phải là refresh (isRefresh == false) VÀ đã hết hạn -> Thì mới lỗi
+        // Còn nếu là refresh (isRefresh == true) -> Cho phép hết hạn (miễn là chữ ký đúng)
+        if (!isRefresh && expiryTime.before(new Date())) {
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
+        }
+
+        // 3. Check Blacklist (Token đã logout hoặc đã refresh trước đó)
         if (invalidatedTokenRepository.existsById(signedJWT.getJWTClaimsSet().getJWTID())) {
             throw new AppException(ErrorCode.UNAUTHENTICATED);
         }
