@@ -12,6 +12,7 @@ import { RegisterBody, RegisterSchema } from "@/lib/schemas";
 import { authService } from "@/services/auth.service";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import {
   Card,
   CardContent,
@@ -28,11 +29,10 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { PasswordInput } from "../ui/password-input";
+import { SocialAuth } from "./social-auth";
 
 export function RegisterForm() {
   const router = useRouter();
-
   const form = useForm<RegisterBody>({
     resolver: zodResolver(RegisterSchema),
     defaultValues: {
@@ -58,24 +58,23 @@ export function RegisterForm() {
   });
 
   const onSubmit = (values: RegisterBody) => {
-    // Tách confirmPassword ra, chỉ gửi những gì Backend cần
     const { confirmPassword, ...requestData } = values;
-    // Nếu dob rỗng thì gửi undefined
     const payload = { ...requestData, dob: requestData.dob || undefined };
     mutation.mutate(payload);
   };
 
   return (
     <Card className="w-full max-w-md shadow-lg">
-      <CardHeader>
-        <CardTitle className="text-2xl font-bold text-center">
+      <CardHeader className="space-y-1 pb-2">
+        <CardTitle className="text-2xl font-bold text-center text-primary">
           Đăng Ký
         </CardTitle>
         <CardDescription className="text-center">
           Tạo tài khoản mới
         </CardDescription>
       </CardHeader>
-      <CardContent>
+
+      <CardContent className="space-y-4">
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
             <FormField
@@ -91,6 +90,7 @@ export function RegisterForm() {
                 </FormItem>
               )}
             />
+
             <FormField
               control={form.control}
               name="email"
@@ -108,7 +108,9 @@ export function RegisterForm() {
                 </FormItem>
               )}
             />
-            <div className="flex gap-3">
+
+            {/* Hàng 1: Họ tên + Ngày sinh */}
+            <div className="flex flex-col gap-3 sm:flex-row">
               <FormField
                 control={form.control}
                 name="fullName"
@@ -126,7 +128,7 @@ export function RegisterForm() {
                 control={form.control}
                 name="dob"
                 render={({ field }) => (
-                  <FormItem className="w-1/3">
+                  <FormItem className="w-full sm:w-1/3">
                     <FormLabel>Ngày sinh</FormLabel>
                     <FormControl>
                       <Input type="date" {...field} />
@@ -136,50 +138,74 @@ export function RegisterForm() {
                 )}
               />
             </div>
-            <FormField
-              control={form.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Mật khẩu (*)</FormLabel>
-                  <FormControl>
-                    <PasswordInput placeholder="••••••" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="confirmPassword"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Nhập lại mật khẩu (*)</FormLabel>
-                  <FormControl>
-                    <PasswordInput placeholder="••••••" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <Button
-              className="w-full mt-2 bg-blue-900"
-              type="submit"
-              disabled={mutation.isPending}
-            >
-              {mutation.isPending ? (
-                <Loader2 className="animate-spin mr-2 h-4 w-4" />
-              ) : (
-                "Đăng Ký"
-              )}
-            </Button>
+
+            {/* Hàng 2: Password + Confirm (Tiết kiệm diện tích) */}
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem className="flex-1">
+                    <FormLabel>Mật khẩu (*)</FormLabel>
+                    <FormControl>
+                      <PasswordInput placeholder="••••••" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="confirmPassword"
+                render={({ field }) => (
+                  <FormItem className="flex-1">
+                    <FormLabel>Nhập lại (*)</FormLabel>
+                    <FormControl>
+                      <PasswordInput placeholder="••••••" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="pt-2">
+              <Button
+                className="w-full"
+                type="submit"
+                disabled={mutation.isPending}
+              >
+                {mutation.isPending ? (
+                  <Loader2 className="animate-spin mr-2 h-4 w-4" />
+                ) : (
+                  "Đăng Ký"
+                )}
+              </Button>
+              <p className="text-[10px] text-center text-muted-foreground mt-2 px-4 leading-tight">
+                Bằng việc đăng ký, bạn đồng ý với{" "}
+                <Link href="/terms" className="underline hover:text-primary">
+                  Điều khoản
+                </Link>{" "}
+                và{" "}
+                <Link href="/privacy" className="underline hover:text-primary">
+                  Chính sách bảo mật
+                </Link>
+                .
+              </p>
+            </div>
           </form>
         </Form>
+
+        <SocialAuth />
       </CardContent>
-      <CardFooter className="justify-center">
+
+      <CardFooter className="justify-center py-2 pb-4">
         <p className="text-sm text-muted-foreground">
           Đã có tài khoản?{" "}
-          <Link href="/login" className="text-blue-500 hover:underline">
+          <Link
+            href="/login"
+            className="font-medium text-primary hover:underline"
+          >
             Đăng nhập
           </Link>
         </p>

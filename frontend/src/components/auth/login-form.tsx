@@ -1,11 +1,18 @@
 "use client";
 
-import { LoginBody, LoginSchema } from "@/lib/schemas";
-import { authService } from "@/services/auth.service";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import Link from "next/link";
+import { Loader2 } from "lucide-react";
+
+import { LoginBody, LoginSchema } from "@/lib/schemas";
+import { authService } from "@/services/auth.service";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import {
   Card,
   CardContent,
@@ -13,7 +20,7 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "../ui/card";
+} from "@/components/ui/card";
 import {
   Form,
   FormControl,
@@ -21,27 +28,8 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "../ui/form";
-import { Input } from "../ui/input";
-import { Button } from "../ui/button";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { Loader2 } from "lucide-react";
-import { PasswordInput } from "../ui/password-input";
-
-function GoogleIcon() {
-  return (
-    <svg
-      role="img"
-      viewBox="0 0 24 24"
-      className="mr-2 h-4 w-4"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <title>Google</title>
-      <path d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z" />
-    </svg>
-  );
-}
+} from "@/components/ui/form";
+import { SocialAuth } from "./social-auth";
 
 export function LoginForm() {
   const router = useRouter();
@@ -54,7 +42,6 @@ export function LoginForm() {
   const mutation = useMutation({
     mutationFn: authService.login,
     onSuccess: (data) => {
-      // Backend trả về: { code: 1000, result: { token: "...", authenticated: true } }
       const token = data.result.token;
       localStorage.setItem("accessToken", token);
       toast.success("Đăng nhập thành công!");
@@ -81,7 +68,7 @@ export function LoginForm() {
         </CardDescription>
       </CardHeader>
 
-      <CardContent>
+      <CardContent className="space-y-4">
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
@@ -103,9 +90,16 @@ export function LoginForm() {
               name="password"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Password</FormLabel>
+                  <div className="flex items-center justify-between">
+                    <FormLabel>Password</FormLabel>
+                    <Link
+                      href="/forgot-password"
+                      className="text-xs text-muted-foreground hover:text-primary hover:underline"
+                    >
+                      Quên mật khẩu?
+                    </Link>
+                  </div>
                   <FormControl>
-                    {/* <Input type="password" placeholder="••••••" {...field} /> */}
                     <PasswordInput placeholder="••••••" {...field} />
                   </FormControl>
                   <FormMessage />
@@ -114,7 +108,7 @@ export function LoginForm() {
             />
 
             <Button
-              className="w-full bg-blue-900"
+              className="w-full"
               type="submit"
               disabled={mutation.isPending}
             >
@@ -125,33 +119,18 @@ export function LoginForm() {
               )}
             </Button>
           </form>
-          <div>
-            <div className="relative my-4">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground">
-                  Hoặc tiếp tục với
-                </span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <Button variant="outline" type="button">
-                <GoogleIcon /> Google
-              </Button>
-              <Button variant="outline" type="button">
-                Facebook
-              </Button>
-            </div>
-          </div>
         </Form>
+
+        <SocialAuth />
       </CardContent>
+
       <CardFooter className="justify-center">
         <p className="text-sm text-muted-foreground">
           Chưa có tài khoản?{" "}
-          <Link href="/register" className="text-blue-500 hover:underline">
+          <Link
+            href="/register"
+            className="font-medium text-primary hover:underline"
+          >
             Đăng ký ngay
           </Link>
         </p>
