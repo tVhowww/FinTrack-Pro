@@ -1,5 +1,6 @@
 package com.fintrack.wallet_service.controller;
 
+import com.fintrack.wallet_service.dto.request.WalletBalanceAdjustmentRequest;
 import com.fintrack.wallet_service.dto.request.WalletCreationRequest;
 import com.fintrack.wallet_service.dto.request.WalletUpdateRequest;
 import com.fintrack.wallet_service.dto.response.ApiResponse;
@@ -38,6 +39,13 @@ public class WalletController {
     ApiResponse<WalletResponse> update(@PathVariable String id, @RequestBody @Valid WalletUpdateRequest request) {
         return ApiResponse.<WalletResponse>builder()
                 .result(walletService.update(id, request))
+                .build();
+    }
+
+    @PutMapping("/{id}/adjust-balance")
+    ApiResponse<WalletResponse> adjustBalance(@PathVariable String id, @RequestBody @Valid WalletBalanceAdjustmentRequest request) {
+        return ApiResponse.<WalletResponse>builder()
+                .result(walletService.adjustBalance(id, request))
                 .build();
     }
 

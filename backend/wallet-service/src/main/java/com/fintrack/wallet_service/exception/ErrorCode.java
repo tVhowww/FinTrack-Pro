@@ -16,7 +16,9 @@ public enum ErrorCode {
     WALLET_NOT_FOUND(2002, "Wallet not found", HttpStatus.NOT_FOUND),
     INVALID_BALANCE(2003, "Balance cannot be negative", HttpStatus.BAD_REQUEST),
     WALLET_NAME_INVALID(2004, "Wallet name is invalid", HttpStatus.BAD_REQUEST),
-    INSUFFICIENT_BALANCE(2005, "Insufficient balance", HttpStatus.BAD_REQUEST)
+    INSUFFICIENT_BALANCE(2005, "Insufficient balance", HttpStatus.BAD_REQUEST),
+    TRANSACTION_SERVICE_ERROR(2006, "Failed to create transaction history", HttpStatus.INTERNAL_SERVER_ERROR),
+    WALLET_HAS_TRANSACTIONS(2007, "Không thể đổi đơn vị tiền tệ vì ví đã có giao dịch phát sinh", HttpStatus.BAD_REQUEST),
     ;
 
     ErrorCode(int code, String message, HttpStatusCode statusCode) {

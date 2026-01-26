@@ -1,15 +1,19 @@
 package com.fintrack.wallet_service.service;
 
+import com.fintrack.wallet_service.dto.request.WalletBalanceAdjustmentRequest;
 import com.fintrack.wallet_service.dto.request.WalletBalanceUpdateRequest;
 import com.fintrack.wallet_service.dto.request.WalletCreationRequest;
 import com.fintrack.wallet_service.dto.request.WalletUpdateRequest;
 import com.fintrack.wallet_service.dto.response.WalletResponse;
 import com.fintrack.wallet_service.entity.Wallet;
+import com.fintrack.wallet_service.enums.TransactionType;
 import com.fintrack.wallet_service.exception.AppException;
 import com.fintrack.wallet_service.exception.ErrorCode;
 import com.fintrack.wallet_service.mapper.WalletMapper;
 import com.fintrack.wallet_service.repository.WalletRepository;
+import com.fintrack.wallet_service.repository.httpclient.TransactionClient;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -21,9 +25,75 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class WalletService {
     private final WalletRepository walletRepository;
     private final WalletMapper walletMapper;
+    private final TransactionClient transactionClient;
+
+    /**
+     * Điều chỉnh số dư ví thủ công
+     * Flow:
+     * 1. Cập nhật số dư ví
+     * 2. Tạo transaction lịch sử ở transaction-service
+     *
+     * Lưu ý: Nếu step 2 lỗi, step 1 sẽ được rollback
+     */
+    @Transactional
+    public WalletResponse adjustBalance(String walletId, WalletBalanceAdjustmentRequest request) {
+        // 1. Lấy ví hiện tại
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        Jwt jwt = (Jwt) authentication.getPrincipal();
+        String userId = jwt.getClaimAsString("userId");
+
+        Wallet wallet = walletRepository.findByIdAndUserId(walletId, userId)
+                .orElseThrow(() -> new AppException(ErrorCode.WALLET_NOT_FOUND));
+
+        BigDecimal currentBalance = wallet.getBalance();
+        BigDecimal newBalance = request.getNewBalance();
+
+        // 2. Nếu số dư không đổi thì return luôn
+        if (currentBalance.compareTo(newBalance) == 0) {
+            return walletMapper.toWalletResponse(wallet);
+        }
+
+        // 3. Tính chênh lệch (Diff)
+        BigDecimal diff = newBalance.subtract(currentBalance);
+
+        // Xác định loại giao dịch và số tiền dương
+        TransactionType type;
+        BigDecimal absAmount = diff.abs();
+
+        if (diff.compareTo(BigDecimal.ZERO) > 0) {
+            type = TransactionType.INCOME; // Tăng tiền
+        } else {
+            type = TransactionType.EXPENSE; // Giảm tiền
+        }
+
+        // 4. Cập nhật số dư ví TRƯỚC
+        wallet.setBalance(newBalance);
+        wallet = walletRepository.save(wallet);
+
+        // 5. Gọi Transaction Service để lưu lịch sử
+        // Nếu bước này lỗi -> @Transactional sẽ rollback việc cập nhật ví
+        var transactionRequest = com.fintrack.wallet_service.dto.request.TransactionCreationRequest.builder()
+                .walletId(walletId)
+                .amount(absAmount)
+                .type(type)
+                .note(request.getNote() != null ? request.getNote() : "Điều chỉnh số dư thủ công")
+                .date(java.time.Instant.now())
+                .build();
+
+        try {
+            transactionClient.createAdjustment(transactionRequest);
+        } catch (Exception e) {
+            log.error("Lỗi khi tạo adjustment transaction: {}", e.getMessage(), e);
+            // Throw lại exception để trigger rollback
+            throw new AppException(ErrorCode.TRANSACTION_SERVICE_ERROR);
+        }
+
+        return walletMapper.toWalletResponse(wallet);
+    }
 
     @Transactional // đảm bảo tính nhất quán
     public WalletResponse updateBalance(String walletId,  WalletBalanceUpdateRequest request) {
@@ -56,7 +126,7 @@ public class WalletService {
         }
 
         // 2. Check trùng tên ví (Optional)
-        if (walletRepository.existsByUserIdAndName(userId, request.getName())) {
+        if (walletRepository.existsByNameIgnoreCaseAndUserIdAndIsActive(request.getName(), userId, true)) {
             throw new AppException(ErrorCode.WALLET_EXISTED);
         }
 
@@ -82,15 +152,41 @@ public class WalletService {
 
     public WalletResponse update(String id, WalletUpdateRequest request) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-
         Jwt jwt = (Jwt) authentication.getPrincipal();
         String userId = jwt.getClaimAsString("userId");
 
         Wallet wallet = walletRepository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new AppException(ErrorCode.WALLET_NOT_FOUND));
 
-        wallet.setName(request.getName());
-        if (request.getCurrency() != null) {
+        // 1. Chỉ kiểm tra khi tên thay đổi
+        String newName = request.getName().trim();
+        if (!wallet.getName().equalsIgnoreCase(newName)) {
+            boolean isDuplicate = walletRepository.existsByNameIgnoreCaseAndUserIdAndIdNotAndIsActive(
+                    newName,
+                    userId,
+                    id,
+                    true
+            );
+
+            if (isDuplicate) {
+                throw new AppException(ErrorCode.WALLET_EXISTED);
+            }
+
+            wallet.setName(newName); // Lưu tên mới đã trim
+        }
+
+        // 2. Logic kiểm tra Currency (Nâng cao)
+        if (request.getCurrency() != null && !request.getCurrency().equals(wallet.getCurrency())) {
+            // Nếu người dùng cố tình đổi đơn vị tiền tệ khác với đơn vị hiện tại
+
+            // Gọi sang Transaction Service để kiểm tra
+            long transactionCount = transactionClient.countByWallet(id);
+
+            if (transactionCount > 0) {
+                throw new AppException(ErrorCode.WALLET_HAS_TRANSACTIONS);
+            }
+
+            // Nếu chưa có giao dịch (ví mới tạo) -> CHO PHÉP ĐỔI
             wallet.setCurrency(request.getCurrency());
         }
 
