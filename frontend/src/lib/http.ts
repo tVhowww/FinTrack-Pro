@@ -42,7 +42,7 @@ http.interceptors.response.use(
 
         // Gọi API Refresh Token (Lưu ý: Dùng axios gốc để tránh lặp interceptor)
         const response = await axios.post(
-          "http://localhost:8888/identity/auth/refresh",
+          `${process.env.NEXT_PUBLIC_API_BASE_URL}/identity/auth/refresh`,
           {
             token: currentToken,
           },
