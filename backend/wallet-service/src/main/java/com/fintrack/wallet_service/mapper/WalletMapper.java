@@ -8,7 +8,6 @@ import org.mapstruct.Mapping;
 
 @Mapper(componentModel = "spring")
 public interface WalletMapper {
-    @Mapping(target = "balance", source = "initialBalance")
     Wallet toWallet(WalletCreationRequest request);
 
     WalletResponse toWalletResponse(Wallet wallet);

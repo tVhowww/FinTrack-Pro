@@ -15,4 +15,6 @@ public interface CategoryRepository extends JpaRepository<Category, String> {
 
     // 2. Lấy danh mục gốc theo Loại (VD: Chỉ lấy gốc của EXPENSE)
     List<Category> findByTypeAndParentIsNull(TransactionType type);
+
+    Optional<Category> findByNameAndType(String name, TransactionType type);
 }

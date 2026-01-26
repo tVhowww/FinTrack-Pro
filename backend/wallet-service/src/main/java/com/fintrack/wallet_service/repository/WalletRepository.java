@@ -10,11 +10,13 @@ import java.util.Optional;
 @Repository
 public interface WalletRepository extends JpaRepository<Wallet, String> {
     // Kiểm tra ví trùng tên của user đó (Tránh 1 user tạo 2 ví "Tiền mặt")
-    boolean existsByUserIdAndName(String userId, String name);
+    boolean existsByNameIgnoreCaseAndUserIdAndIsActive(String name, String userId, boolean isActive);
 
     // Tìm ví của user và chưa bị xóa (Sắp xếp mới nhất lên đầu)
     List<Wallet> findByUserIdAndIsActiveTrueOrderByCreatedAtDesc(String userId);
 
     // Tìm ví theo ID và UserID (Quan trọng để check quyền sở hữu)
     Optional<Wallet> findByIdAndUserId(String id, String userId);
+
+    boolean existsByNameIgnoreCaseAndUserIdAndIdNotAndIsActive(String name, String userId, String id, boolean isActive);
 }

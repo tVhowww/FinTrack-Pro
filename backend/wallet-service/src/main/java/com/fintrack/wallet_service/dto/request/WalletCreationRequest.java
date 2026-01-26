@@ -20,5 +20,5 @@ public class WalletCreationRequest {
     private String currency;
 
     @Min(value = 0, message = "INVALID_BALANCE") // Số dư >= 0
-    private BigDecimal initialBalance;
+    private BigDecimal balance;
 }

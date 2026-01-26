@@ -25,4 +25,6 @@ public interface TransactionRepository extends JpaRepository<Transaction, String
                                                       @Param("type") TransactionType type,
                                                       @Param("startDate") Instant startDate,
                                                       @Param("endDate") Instant endDate);
+
+    long countByWalletId(String walletId);
 }

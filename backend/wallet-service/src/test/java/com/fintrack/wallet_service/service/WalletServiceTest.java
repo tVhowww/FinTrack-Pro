@@ -52,7 +52,7 @@ public class WalletServiceTest {
         creationRequest = WalletCreationRequest.builder()
                 .name("Ví test")
                 .currency("VND")
-                .initialBalance(new BigDecimal(1000000))
+                .balance(new BigDecimal(1000000))
                 .build();
 
         updateRequest = new WalletUpdateRequest();
@@ -113,7 +113,7 @@ public class WalletServiceTest {
     void createWallet_ExistedName_Fail() {
         // GIVEN:
         mockSecurityContext();
-        when(walletRepository.existsByUserIdAndName(userId, "Ví test")).thenReturn(true);
+        when(walletRepository.existsByNameIgnoreCaseAndUserIdAndIsActive("Ví test", userId, true)).thenReturn(true);
 
         // WHEN + THEN:
         // Mong đợi ném ra lỗi AppException với code WALLET_EXISTED
