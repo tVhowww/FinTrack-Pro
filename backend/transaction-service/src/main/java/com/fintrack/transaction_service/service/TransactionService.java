@@ -26,7 +26,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,6 +37,7 @@ import java.time.Instant;
 import java.time.YearMonth;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
@@ -48,6 +49,57 @@ public class TransactionService {
     private final WalletClient walletClient;
     private final IdentityClient identityClient;
     private final KafkaTemplate<String, Object> kafkaTemplate;
+
+    public long countTransactionsByWallet(String walletId) {
+        return transactionRepository.countByWalletId(walletId);
+    }
+
+    /**
+     * Hàm này dành riêng cho việc điều chỉnh số dư từ Wallet Service
+     * QUAN TRỌNG: Wallet Service đã cập nhật số dư rồi, đây chỉ là ghi lại lịch sử
+     */
+    @Transactional
+    public void createAdjustmentTransaction(TransactionCreationRequest request) {
+        log.info("Tạo adjustment transaction: walletId={}, amount={}, type={}",
+                request.getWalletId(), request.getAmount(), request.getType());
+
+        // 1. Tìm hoặc tạo Category "Điều chỉnh số dư" (System Category)
+        // Sử dụng synchronized để tránh duplicate khi nhiều request đồng thời
+        Category category = categoryRepository.findByNameAndType("Điều chỉnh số dư", request.getType())
+                .orElseGet(() -> createAdjustmentCategory(request.getType()));
+
+        // 2. Map và Lưu Transaction
+        Transaction transaction = transactionMapper.toTransaction(request);
+        transaction.setCategory(category);
+
+        // Đảm bảo có note rõ ràng
+        if (transaction.getNote() == null || transaction.getNote().isEmpty()) {
+            transaction.setNote("Điều chỉnh số dư thủ công");
+        }
+
+        transaction = transactionRepository.save(transaction);
+        log.info("Đã lưu adjustment transaction: id={}", transaction.getId());
+
+        // 3. Gửi thông báo ASYNC (Không block transaction)
+        sendTransactionNotification(transaction, category);
+    }
+
+    /**
+     * Helper method để tạo category điều chỉnh số dú, tránh duplicate
+     */
+    private synchronized Category createAdjustmentCategory(TransactionType type) {
+        // Double-check để tránh race condition
+        return categoryRepository.findByNameAndType("Điều chỉnh số dư", type)
+                .orElseGet(() -> {
+                    Category newCat = Category.builder()
+                            .name("Điều chỉnh số dư")
+                            .type(type)
+                            .description("Giao dịch tự động do điều chỉnh số dư thủ công")
+                            .build();
+                    log.info("Tạo category mới: Điều chỉnh số dư - {}", type);
+                    return categoryRepository.save(newCat);
+                });
+    }
 
     public ByteArrayInputStream exportToExcel(String walletId, TransactionType type, Instant startDate, Instant endDate) {
         // 1. Tạo bộ lọc (giống hệt hàm getTransactions nhưng không phân trang)
@@ -156,63 +208,88 @@ public class TransactionService {
         walletClient.updateBalance(request.getWalletId(), balanceRequest);
 
         // 4. Gửi Notification qua Kafka
-        String recipientEmail = "user@gmail.com"; // Email mặc định phòng hờ
-        String username = "Bạn"; // Tên mặc định phòng hờ
-
-        try {
-            // Gọi Identity Service (Token tự động được truyền theo nhờ Interceptor)
-            var userResponse = identityClient.getMyInfo();
-            if (userResponse != null && userResponse.getResult() != null) {
-                recipientEmail = userResponse.getResult().getEmail();
-                username = userResponse.getResult().getUsername();
-            }
-        } catch (Exception e) {
-            // Nếu lỗi kết nối Identity, ta log lại và vẫn cho giao dịch thành công
-            // (chỉ là không gửi mail được hoặc gửi sai)
-            // Tốt nhất là dùng Circuit Breaker, nhưng tạm thời try-catch cho đơn giản.
-            System.err.println("Không lấy được thông tin User từ Identity: " + e.getMessage());
-        }
-
-        // 1. Format số tiền (Ví dụ: 50000 -> 50.000)
-        NumberFormat formatter = NumberFormat.getInstance(new java.util.Locale("vi", "VN"));
-        String formattedNumber = formatter.format(transaction.getAmount());
-
-        // 2. Xử lý dấu +/- và màu sắc (tạm thời text chưa màu)
-        String amountString;
-        String actionString;
-
-        if (transaction.getType() == TransactionType.EXPENSE) {
-            amountString = "-" + formattedNumber + " VND";
-            actionString = "thanh toán cho";
-        } else {
-            amountString = "+" + formattedNumber + " VND";
-            actionString = "nhận tiền từ";
-        }
-
-        // 3. Tạo nội dung body
-        String emailBody = String.format(
-                "Xin chào %s, \n\n Giao dịch mới: %s\n" +
-                        "Nội dung: %s %s\n" +
-                        "Thời gian: %s",
-                username,
-                amountString,
-                actionString,
-                (category != null ? category.getName() : "Không phân loại"),
-                transaction.getDate().toString() // Hoặc format ngày đẹp hơn nếu muốn
-        );
-
-        // 4. Bắn Event
-        NotificationEvent event = NotificationEvent.builder()
-                .channel("EMAIL")
-                .recipient(recipientEmail)
-                .subject("Biến động số dư: " + amountString)
-                .body(emailBody)
-                .build();
-
-        // Gửi và log kết quả
-        kafkaTemplate.send("notification-delivery", event);
+        sendTransactionNotification(transaction, category);
 
         // 4. Trả về kết quả
         return transactionMapper.toTransactionResponse(transaction);
+    }
+
+    /**
+     * Gửi notification về giao dịch qua Kafka (ASYNC)
+     * Nếu lỗi sẽ không ảnh hưởng đến giao dịch chính
+     */
+    @Async
+    public void sendTransactionNotification(Transaction transaction, Category category) {
+        try {
+            String recipientEmail = null;
+            String username = "Người dùng";
+
+            // Lấy thông tin user từ Identity Service
+            try {
+                var userResponse = identityClient.getMyInfo();
+                if (userResponse != null && userResponse.getResult() != null) {
+                    recipientEmail = userResponse.getResult().getEmail();
+                    username = userResponse.getResult().getUsername();
+
+                    if (recipientEmail == null || recipientEmail.isEmpty()) {
+                        log.warn("User không có email, bỏ qua gửi thông báo cho transaction: {}", transaction.getId());
+                        return;
+                    }
+                }
+            } catch (Exception e) {
+                log.error("Không lấy được thông tin User từ Identity Service: {}", e.getMessage());
+                // Không gửi email nếu không lấy được thông tin user
+                return;
+            }
+
+            // Format số tiền
+            NumberFormat formatter = NumberFormat.getInstance(Locale.of("vi", "VN"));
+            String formattedNumber = formatter.format(transaction.getAmount().abs());
+
+            // Xử lý nội dung text
+            String amountString;
+            String actionString;
+
+            if (transaction.getType() == TransactionType.EXPENSE) {
+                amountString = "-" + formattedNumber + " VND";
+                actionString = "thanh toán cho";
+            } else {
+                amountString = "+" + formattedNumber + " VND";
+                actionString = "nhận tiền từ";
+            }
+
+            String categoryName = (category != null) ? category.getName() : "Không phân loại";
+
+            // Tạo nội dung email
+            String emailBody = String.format(
+                    "Xin chào %s,\n\n" +
+                    "Giao dịch mới: %s\n" +
+                    "Nội dung: %s %s\n" +
+                    "Ghi chú: %s\n" +
+                    "Thời gian: %s\n\n" +
+                    "Đây là email tự động, vui lòng không trả lời.",
+                    username,
+                    amountString,
+                    actionString,
+                    categoryName,
+                    transaction.getNote() != null ? transaction.getNote() : "Không có",
+                    transaction.getDate().toString()
+            );
+
+            // Tạo và gửi event
+            NotificationEvent event = NotificationEvent.builder()
+                    .channel("EMAIL")
+                    .recipient(recipientEmail)
+                    .subject("Biến động số dư: " + amountString)
+                    .body(emailBody)
+                    .build();
+
+            kafkaTemplate.send("notification-delivery", event);
+            log.info("Đã gửi notification event cho transaction: {}", transaction.getId());
+
+        } catch (Exception e) {
+            log.error("Lỗi khi gửi Kafka Notification cho transaction {}: {}",
+                    transaction.getId(), e.getMessage(), e);
+        }
     }
 }
