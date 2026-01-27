@@ -25,10 +25,25 @@ public class CategoryController {
 
     @GetMapping
     ApiResponse<java.util.List<CategoryResponse>> getAllCategories(
-            @RequestParam(value = "type", required = false) String type
+            @RequestParam(value = "type", required = false) TransactionType type
     ) {
         return ApiResponse.<List<CategoryResponse>>builder()
-                .result(categoryService.getAll(type == null ? null : TransactionType.valueOf(type)))
+                .result(categoryService.getAll(type))
+                .build();
+    }
+
+    @PutMapping("/{id}")
+    ApiResponse<CategoryResponse> updateCategory(@PathVariable String id, @RequestBody CategoryCreationRequest request) {
+        return ApiResponse.<CategoryResponse>builder()
+                .result(categoryService.update(id, request))
+                .build();
+    }
+
+    @DeleteMapping("/{id}")
+    ApiResponse<String> deleteCategory(@PathVariable String id) {
+        categoryService.delete(id);
+        return ApiResponse.<String>builder()
+                .result("Category has been deleted")
                 .build();
     }
 }

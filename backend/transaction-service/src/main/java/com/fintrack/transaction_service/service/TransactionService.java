@@ -65,8 +65,7 @@ public class TransactionService {
 
         // 1. Tìm hoặc tạo Category "Điều chỉnh số dư" (System Category)
         // Sử dụng synchronized để tránh duplicate khi nhiều request đồng thời
-        Category category = categoryRepository.findByNameAndType("Điều chỉnh số dư", request.getType())
-                .orElseGet(() -> createAdjustmentCategory(request.getType()));
+        Category category = getOrCreateSystemCategory("Điều chỉnh số dư", request.getType());
 
         // 2. Map và Lưu Transaction
         Transaction transaction = transactionMapper.toTransaction(request);
@@ -85,18 +84,20 @@ public class TransactionService {
     }
 
     /**
-     * Helper method để tạo category điều chỉnh số dú, tránh duplicate
+     * Helper method: Tìm hoặc tạo System Category (UserId = null)
+     * synchronized: Để tạm thời tránh race condition khi chạy 1 instance
      */
-    private synchronized Category createAdjustmentCategory(TransactionType type) {
-        // Double-check để tránh race condition
-        return categoryRepository.findByNameAndType("Điều chỉnh số dư", type)
+    private synchronized Category getOrCreateSystemCategory(String name, TransactionType type) {
+        return categoryRepository.findByNameAndTypeAndUserIdIsNull(name, type)
                 .orElseGet(() -> {
                     Category newCat = Category.builder()
-                            .name("Điều chỉnh số dư")
+                            .name(name)
                             .type(type)
-                            .description("Giao dịch tự động do điều chỉnh số dư thủ công")
+                            .userId(null)
+                            .description("Danh mục hệ thống tự động tạo")
                             .build();
-                    log.info("Tạo category mới: Điều chỉnh số dư - {}", type);
+
+                    log.info("Khởi tạo System Category mới: {} - {}", name, type);
                     return categoryRepository.save(newCat);
                 });
     }
