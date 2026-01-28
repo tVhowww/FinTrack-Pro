@@ -29,7 +29,7 @@ public interface CategoryRepository extends JpaRepository<Category, String> {
     List<Category> findAllRootCategoriesByType(String userId, TransactionType type);
 
     // 3. Check trùng tên (Trong phạm vi User hoặc System)
-    boolean existsByNameAndUserIdAndType(String name, String userId, TransactionType type);
+    boolean existsByNameAndUserIdAndTypeAndDeletedFalse(String name, String userId, TransactionType type);
 
     // Check trùng cho danh mục hệ thống (userId null)
     boolean existsByNameAndUserIdIsNullAndType(String name, TransactionType type);

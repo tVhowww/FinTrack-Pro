@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fintrack.transaction_service.enums.TransactionType;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.SQLRestriction;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.util.List;
@@ -16,6 +17,7 @@ import java.util.List;
 @Table(name = "categories")
 @EntityListeners(AuditingEntityListener.class)
 @Builder
+@SQLRestriction("is_deleted = false")
 public class Category {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)

@@ -27,7 +27,7 @@ public class CategoryService {
         String userId = SecurityUtils.getCurrentUserId();
 
         // 1. Check trùng tên
-        boolean exists = categoryRepository.existsByNameAndUserIdAndType(request.getName(), userId, request.getType());
+        boolean exists = categoryRepository.existsByNameAndUserIdAndTypeAndDeletedFalse(request.getName(), userId, request.getType());
         if (exists) throw new AppException(ErrorCode.CATEGORY_EXISTED);
 
         Category category = categoryMapper.toCategory(request);
@@ -82,27 +82,46 @@ public class CategoryService {
         Category category = categoryRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.CATEGORY_NOT_FOUND));
 
-        // 1. Nếu là danh mục hệ thống (userId == null) -> KHÔNG CHO SỬA
-        if (category.getUserId() == null) {
-            throw new AppException(ErrorCode.CATEGORY_SYSTEM_READONLY); // Cần định nghĩa lỗi này
-        }
+        // Security Check
+        if (category.getUserId() == null) throw new AppException(ErrorCode.CATEGORY_SYSTEM_READONLY);
+        if (!userId.equals(category.getUserId())) throw new AppException(ErrorCode.CATEGORY_NOT_FOUND);
 
-        // 2. Nếu là danh mục của người khác -> KHÔNG CHO SỬA
-        if (!userId.equals(category.getUserId())) {
-            throw new AppException(ErrorCode.CATEGORY_NOT_FOUND);
-        }
-
-        // 3. Logic update
-        // Check trùng tên (nếu tên thay đổi)
+        // 1. Update Tên & Mô tả
         if (!category.getName().equalsIgnoreCase(request.getName())) {
-            boolean exists = categoryRepository.existsByNameAndUserIdAndType(request.getName(), userId, category.getType());
+            // Check trùng (loại trừ chính nó thì không cần, vì tên đã khác thì mới check)
+            boolean exists = categoryRepository.existsByNameAndUserIdAndTypeAndDeletedFalse(
+                    request.getName(), userId, category.getType());
             if (exists) throw new AppException(ErrorCode.CATEGORY_EXISTED);
             category.setName(request.getName());
         }
-
         category.setDescription(request.getDescription());
-        // Lưu ý: Thường thì ít khi cho đổi Type (Thu -> Chi) vì sẽ làm hỏng lịch sử giao dịch cũ
-        // category.setType(request.getType()); <--- Cân nhắc kỹ nếu muốn bật cái này
+
+        // 2. Update Danh mục Cha (Di chuyển danh mục)
+        // Nếu request có gửi parentId và nó KHÁC với parent hiện tại
+        String oldParentId = category.getParent() != null ? category.getParent().getId() : null;
+        String newParentId = request.getParentId();
+
+        // Chỉ xử lý khi có sự thay đổi cha
+        if (newParentId != null && !newParentId.equals(oldParentId)) {
+            // Tìm cha mới
+            Category newParent = categoryRepository.findById(newParentId)
+                    .orElseThrow(() -> new AppException(ErrorCode.CATEGORY_NOT_FOUND));
+
+            // Validate: Cha mới phải cùng Type
+            if (newParent.getType() != category.getType()) {
+                throw new AppException(ErrorCode.CATEGORY_TYPE_MISMATCH);
+            }
+            // Validate: Không được chọn chính mình hoặc con cháu làm cha (Tránh vòng lặp)
+            if (newParent.getId().equals(category.getId())) {
+                throw new AppException(ErrorCode.CATEGORY_INVALID_PARENT);
+            }
+
+            category.setParent(newParent);
+        }
+        else if (newParentId == null && oldParentId != null) {
+            // Trường hợp user muốn chuyển từ Con thành Gốc (Bỏ cha)
+            category.setParent(null);
+        }
 
         return categoryMapper.toCategoryResponse(categoryRepository.save(category));
     }
