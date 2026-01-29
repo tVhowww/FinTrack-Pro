@@ -6,6 +6,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.SQLRestriction;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
@@ -20,6 +21,7 @@ import java.time.Instant;
 @AllArgsConstructor
 @Builder
 @EntityListeners(AuditingEntityListener.class) // Tự động cập nhật ngày tạo/sửa
+@SQLRestriction("is_deleted = false")
 public class Transaction {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -43,6 +45,9 @@ public class Transaction {
 
     @Column(nullable = false)
     private Instant date;
+
+    @Column(name = "is_deleted", nullable = false, columnDefinition = "boolean default false")
+    private boolean deleted = false;
 
     @CreatedDate
     @Column(nullable = false, updatable = false)

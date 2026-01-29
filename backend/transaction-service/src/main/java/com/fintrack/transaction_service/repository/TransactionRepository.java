@@ -4,6 +4,7 @@ import com.fintrack.transaction_service.entity.Transaction;
 import com.fintrack.transaction_service.enums.TransactionType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -27,4 +28,10 @@ public interface TransactionRepository extends JpaRepository<Transaction, String
                                                       @Param("endDate") Instant endDate);
 
     long countByWalletId(String walletId);
+
+    long countByCategoryIdInAndDeletedFalse(List<String> categoryIds);
+
+    @Modifying
+    @Query("UPDATE Transaction t SET t.deleted = true WHERE t.category.id IN :categoryIds")
+    void softDeleteByCategoryIds(List<String> categoryIds);
 }

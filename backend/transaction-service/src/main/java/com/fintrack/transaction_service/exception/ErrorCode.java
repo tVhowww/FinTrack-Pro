@@ -15,6 +15,10 @@ public enum ErrorCode {
     INSUFFICIENT_BALANCE(2005, "Insufficient balance", HttpStatus.BAD_REQUEST),
     CATEGORY_PARENT_NOT_FOUND(2006, "Category Parent not found", HttpStatus.NOT_FOUND),
     CATEGORY_NOT_FOUND(2007, "Category not found", HttpStatus.NOT_FOUND),
+    CATEGORY_TYPE_MISMATCH(2008, "Category type mismatch", HttpStatus.BAD_REQUEST),
+    CATEGORY_EXISTED(2009, "Category with the same name already exists", HttpStatus.BAD_REQUEST),
+    CATEGORY_SYSTEM_READONLY(2010, "Cannot modify default system categories", HttpStatus.FORBIDDEN),
+    CATEGORY_INVALID_PARENT(2011, "Invalid parent category", HttpStatus.BAD_REQUEST),
     ;
 
     ErrorCode(int code, String message, HttpStatusCode statusCode) {

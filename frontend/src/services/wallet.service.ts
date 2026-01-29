@@ -1,5 +1,5 @@
 import http from "@/lib/http";
-import { ApiResponse } from "@/types/auth.dto";
+import { ApiResponse } from "@/types/api";
 import { Wallet, WalletFormValues } from "@/types/wallet.dto";
 
 export const walletService = {

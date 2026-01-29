@@ -36,6 +36,7 @@ import java.text.NumberFormat;
 import java.time.Instant;
 import java.time.YearMonth;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
@@ -65,8 +66,7 @@ public class TransactionService {
 
         // 1. Tìm hoặc tạo Category "Điều chỉnh số dư" (System Category)
         // Sử dụng synchronized để tránh duplicate khi nhiều request đồng thời
-        Category category = categoryRepository.findByNameAndType("Điều chỉnh số dư", request.getType())
-                .orElseGet(() -> createAdjustmentCategory(request.getType()));
+        Category category = getOrCreateSystemCategory("Điều chỉnh số dư", request.getType());
 
         // 2. Map và Lưu Transaction
         Transaction transaction = transactionMapper.toTransaction(request);
@@ -85,18 +85,20 @@ public class TransactionService {
     }
 
     /**
-     * Helper method để tạo category điều chỉnh số dú, tránh duplicate
+     * Helper method: Tìm hoặc tạo System Category (UserId = null)
+     * synchronized: Để tạm thời tránh race condition khi chạy 1 instance
      */
-    private synchronized Category createAdjustmentCategory(TransactionType type) {
-        // Double-check để tránh race condition
-        return categoryRepository.findByNameAndType("Điều chỉnh số dư", type)
+    private synchronized Category getOrCreateSystemCategory(String name, TransactionType type) {
+        return categoryRepository.findByNameAndTypeAndUserIdIsNull(name, type)
                 .orElseGet(() -> {
                     Category newCat = Category.builder()
-                            .name("Điều chỉnh số dư")
+                            .name(name)
                             .type(type)
-                            .description("Giao dịch tự động do điều chỉnh số dư thủ công")
+                            .userId(null)
+                            .description("Danh mục hệ thống tự động tạo")
                             .build();
-                    log.info("Tạo category mới: Điều chỉnh số dư - {}", type);
+
+                    log.info("Khởi tạo System Category mới: {} - {}", name, type);
                     return categoryRepository.save(newCat);
                 });
     }
@@ -157,15 +159,29 @@ public class TransactionService {
     public PageResponse<TransactionResponse> getTransactions(
             int page, int size,
             String walletId, TransactionType type,
-            Instant startDate, Instant endDate) {
+            Instant startDate, Instant endDate, String categoryId) {
 
         // 1. Tạo Pageable (Sắp xếp mới nhất lên đầu)
         Pageable pageable = PageRequest.of(page - 1, size, Sort.by("createdAt").descending());
 
+        List<String> categoryIdsToFilter = null;
+        if (categoryId != null) {
+            Category category = categoryRepository.findById(categoryId).orElse(null);
+            if (category != null) {
+                categoryIdsToFilter = new ArrayList<>();
+                // Tái sử dụng hàm đệ quy collectCategoryIds bạn đã viết ở hàm delete
+                collectCategoryIds(category, categoryIdsToFilter);
+            } else {
+                // Nếu gửi ID tào lao lên thì cho list rỗng để không ra kết quả nào
+                categoryIdsToFilter = List.of("non-existent-id");
+            }
+        }
+
         // 2. Tạo Specification (Dynamic Query)
         Specification<Transaction> spec = Specification.where(TransactionSpecification.hasWalletId(walletId))
                 .and(TransactionSpecification.hasType(type))
-                .and(TransactionSpecification.createdBetween(startDate, endDate));
+                .and(TransactionSpecification.createdBetween(startDate, endDate))
+                .and(TransactionSpecification.hasCategoryIn(categoryIdsToFilter));
 
         // 3. Gọi Repository
         Page<Transaction> pageData = transactionRepository.findAll(spec, pageable);
@@ -178,6 +194,15 @@ public class TransactionService {
                 .totalElements(pageData.getTotalElements())
                 .data(pageData.getContent().stream().map(transactionMapper::toTransactionResponse).toList())
                 .build();
+    }
+
+    private void collectCategoryIds(Category category, List<String> ids) {
+        ids.add(category.getId());
+        if (category.getSubCategories() != null) {
+            for (Category child : category.getSubCategories()) {
+                collectCategoryIds(child, ids);
+            }
+        }
     }
 
     @Transactional

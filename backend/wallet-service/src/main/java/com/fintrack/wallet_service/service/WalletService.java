@@ -12,6 +12,7 @@ import com.fintrack.wallet_service.exception.ErrorCode;
 import com.fintrack.wallet_service.mapper.WalletMapper;
 import com.fintrack.wallet_service.repository.WalletRepository;
 import com.fintrack.wallet_service.repository.httpclient.TransactionClient;
+import com.fintrack.wallet_service.utils.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
@@ -42,9 +43,7 @@ public class WalletService {
     @Transactional
     public WalletResponse adjustBalance(String walletId, WalletBalanceAdjustmentRequest request) {
         // 1. Lấy ví hiện tại
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        Jwt jwt = (Jwt) authentication.getPrincipal();
-        String userId = jwt.getClaimAsString("userId");
+        String userId = SecurityUtils.getCurrentUserId();
 
         Wallet wallet = walletRepository.findByIdAndUserId(walletId, userId)
                 .orElseThrow(() -> new AppException(ErrorCode.WALLET_NOT_FOUND));
@@ -117,9 +116,7 @@ public class WalletService {
 
     public WalletResponse create(WalletCreationRequest request) {
         // 1. Lấy userId từ Token (Claim "userId" mà Identity Service đã bỏ vào)
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        Jwt jwt = (Jwt) authentication.getPrincipal();
-        String userId = jwt.getClaimAsString("userId"); // <--- Magic is here
+        String userId = SecurityUtils.getCurrentUserId();
 
         if (userId == null) {
             throw new AppException(ErrorCode.UNAUTHENTICATED);
@@ -138,10 +135,7 @@ public class WalletService {
     }
 
     public List<WalletResponse> getMyWallets() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-
-        Jwt jwt = (Jwt) authentication.getPrincipal();
-        String userId = jwt.getClaimAsString("userId");
+        String userId = SecurityUtils.getCurrentUserId();
 
         var wallets = walletRepository.findByUserIdAndIsActiveTrueOrderByCreatedAtDesc(userId);
 
@@ -151,9 +145,7 @@ public class WalletService {
     }
 
     public WalletResponse update(String id, WalletUpdateRequest request) {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        Jwt jwt = (Jwt) authentication.getPrincipal();
-        String userId = jwt.getClaimAsString("userId");
+        String userId = SecurityUtils.getCurrentUserId();
 
         Wallet wallet = walletRepository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new AppException(ErrorCode.WALLET_NOT_FOUND));
@@ -194,10 +186,7 @@ public class WalletService {
     }
 
     public void delete(String id) {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-
-        Jwt jwt = (Jwt) authentication.getPrincipal();
-        String userId = jwt.getClaimAsString("userId");
+        String userId = SecurityUtils.getCurrentUserId();
 
         Wallet wallet = walletRepository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new AppException(ErrorCode.WALLET_NOT_FOUND));

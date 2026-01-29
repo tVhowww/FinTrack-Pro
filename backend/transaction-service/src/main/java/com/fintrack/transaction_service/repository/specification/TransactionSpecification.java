@@ -5,6 +5,7 @@ import com.fintrack.transaction_service.enums.TransactionType;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.time.Instant;
+import java.util.List;
 
 public class TransactionSpecification {
 
@@ -35,6 +36,15 @@ public class TransactionSpecification {
                 return criteriaBuilder.greaterThanOrEqualTo(root.get("createdAt"), startDate);
             }
             return criteriaBuilder.lessThanOrEqualTo(root.get("createdAt"), endDate);
+        };
+    }
+
+
+    public static Specification<Transaction> hasCategoryIn(List<String> categoryIds) {
+        return (root, query, criteriaBuilder) -> {
+            if (categoryIds == null || categoryIds.isEmpty()) return null;
+            // Dùng IN thay vì EQUAL
+            return root.get("category").get("id").in(categoryIds);
         };
     }
 }
