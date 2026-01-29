@@ -8,11 +8,13 @@ import com.fintrack.transaction_service.exception.AppException;
 import com.fintrack.transaction_service.exception.ErrorCode;
 import com.fintrack.transaction_service.mapper.CategoryMapper;
 import com.fintrack.transaction_service.repository.CategoryRepository;
+import com.fintrack.transaction_service.repository.TransactionRepository;
 import com.fintrack.transaction_service.utils.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -20,6 +22,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class CategoryService {
     private final CategoryRepository categoryRepository;
+    private final TransactionRepository transactionRepository;
     private final CategoryMapper categoryMapper;
 
     public CategoryResponse create(CategoryCreationRequest request) {
@@ -136,19 +139,30 @@ public class CategoryService {
         Category category = categoryRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.CATEGORY_NOT_FOUND));
 
-        // 1. Không được xóa danh mục hệ thống
-        if (category.getUserId() == null) {
-            throw new AppException(ErrorCode.CATEGORY_SYSTEM_READONLY);
-        }
-        // 2. Không được xóa danh mục người khác
-        if (!userId.equals(category.getUserId())) {
-            throw new AppException(ErrorCode.CATEGORY_NOT_FOUND);
-        }
+        // Security Check
+        if (category.getUserId() == null) throw new AppException(ErrorCode.CATEGORY_SYSTEM_READONLY);
+        if (!userId.equals(category.getUserId())) throw new AppException(ErrorCode.CATEGORY_NOT_FOUND);
 
-        // SOFT DELETE logic
+        // 1. Lấy danh sách ID của chính nó và tất cả con cháu
+        List<String> allRelatedIds = new ArrayList<>();
+        collectCategoryIds(category, allRelatedIds);
+
+        // 2. Xóa mềm tất cả GIAO DỊCH thuộc các category này
+        transactionRepository.softDeleteByCategoryIds(allRelatedIds);
+
+        // 3. Xóa mềm tất cả DANH MỤC (Logic cũ)
         softDeleteCategoryRecursive(category);
-
         categoryRepository.save(category);
+    }
+
+    // Hàm đệ quy lấy ID
+    private void collectCategoryIds(Category category, List<String> ids) {
+        ids.add(category.getId());
+        if (category.getSubCategories() != null) {
+            for (Category child : category.getSubCategories()) {
+                collectCategoryIds(child, ids);
+            }
+        }
     }
 
     /**
