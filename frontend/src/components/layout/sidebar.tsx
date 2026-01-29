@@ -11,10 +11,12 @@ import {
   Settings,
   User,
   Command,
+  ChartBarStacked,
 } from "lucide-react";
 
 const sidebarItems = [
   { name: "Tổng quan", href: "/", icon: LayoutDashboard },
+  { name: "Nhóm", href: "/categories", icon: ChartBarStacked },
   { name: "Ví của tôi", href: "/wallets", icon: Wallet },
   { name: "Giao dịch", href: "/transactions", icon: ArrowRightLeft },
   { name: "Ngân sách", href: "/budgets", icon: PiggyBank },

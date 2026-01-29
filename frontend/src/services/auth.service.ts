@@ -1,13 +1,13 @@
 import http from "@/lib/http";
 import Cookies from "js-cookie";
 import {
-  ApiResponse,
   AuthResponse,
   LoginRequest,
   LogoutRequest,
   RegisterRequest,
   UserResponse,
 } from "@/types/auth.dto";
+import { ApiResponse } from "@/types/api";
 
 export const authService = {
   // Đăng nhập: POST /identity/auth/token

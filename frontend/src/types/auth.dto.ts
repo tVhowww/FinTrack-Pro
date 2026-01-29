@@ -1,10 +1,3 @@
-// Định dạng chung cho mọi response từ Backend (Wrapper)
-export interface ApiResponse<T> {
-  code: number;
-  message?: string;
-  result: T;
-}
-
 // 1. Login
 export interface LoginRequest {
   username: string;
