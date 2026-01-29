@@ -36,6 +36,7 @@ import java.text.NumberFormat;
 import java.time.Instant;
 import java.time.YearMonth;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
@@ -158,15 +159,29 @@ public class TransactionService {
     public PageResponse<TransactionResponse> getTransactions(
             int page, int size,
             String walletId, TransactionType type,
-            Instant startDate, Instant endDate) {
+            Instant startDate, Instant endDate, String categoryId) {
 
         // 1. Tạo Pageable (Sắp xếp mới nhất lên đầu)
         Pageable pageable = PageRequest.of(page - 1, size, Sort.by("createdAt").descending());
 
+        List<String> categoryIdsToFilter = null;
+        if (categoryId != null) {
+            Category category = categoryRepository.findById(categoryId).orElse(null);
+            if (category != null) {
+                categoryIdsToFilter = new ArrayList<>();
+                // Tái sử dụng hàm đệ quy collectCategoryIds bạn đã viết ở hàm delete
+                collectCategoryIds(category, categoryIdsToFilter);
+            } else {
+                // Nếu gửi ID tào lao lên thì cho list rỗng để không ra kết quả nào
+                categoryIdsToFilter = List.of("non-existent-id");
+            }
+        }
+
         // 2. Tạo Specification (Dynamic Query)
         Specification<Transaction> spec = Specification.where(TransactionSpecification.hasWalletId(walletId))
                 .and(TransactionSpecification.hasType(type))
-                .and(TransactionSpecification.createdBetween(startDate, endDate));
+                .and(TransactionSpecification.createdBetween(startDate, endDate))
+                .and(TransactionSpecification.hasCategoryIn(categoryIdsToFilter));
 
         // 3. Gọi Repository
         Page<Transaction> pageData = transactionRepository.findAll(spec, pageable);
@@ -179,6 +194,15 @@ public class TransactionService {
                 .totalElements(pageData.getTotalElements())
                 .data(pageData.getContent().stream().map(transactionMapper::toTransactionResponse).toList())
                 .build();
+    }
+
+    private void collectCategoryIds(Category category, List<String> ids) {
+        ids.add(category.getId());
+        if (category.getSubCategories() != null) {
+            for (Category child : category.getSubCategories()) {
+                collectCategoryIds(child, ids);
+            }
+        }
     }
 
     @Transactional
