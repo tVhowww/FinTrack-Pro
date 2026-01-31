@@ -12,7 +12,8 @@ export function useWallets() {
   const { data, isLoading, error } = useQuery({
     queryKey: ["wallets"],
     queryFn: walletService.getAll,
-    staleTime: 1000 * 60 * 5, // Cache 5 phút
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   });
 
   // 2. Mutation: Tạo ví mới
