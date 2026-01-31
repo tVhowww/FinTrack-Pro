@@ -1,6 +1,7 @@
 package com.fintrack.transaction_service.controller;
 
 import com.fintrack.transaction_service.dto.request.TransactionCreationRequest;
+import com.fintrack.transaction_service.dto.request.TransactionUpdateRequest;
 import com.fintrack.transaction_service.dto.response.ApiResponse;
 import com.fintrack.transaction_service.dto.response.MonthlyStatisticsResponse;
 import com.fintrack.transaction_service.dto.response.PageResponse;
@@ -73,6 +74,28 @@ public class TransactionController {
     ApiResponse<TransactionResponse> createTransaction(@RequestBody TransactionCreationRequest request) {
         return ApiResponse.<TransactionResponse>builder()
                 .result(transactionService.create(request))
+                .build();
+    }
+
+    @GetMapping("/{id}")
+    public ApiResponse<TransactionResponse> getTransaction(@PathVariable String id) {
+        return ApiResponse.<TransactionResponse>builder()
+                .result(transactionService.getTransaction(id))
+                .build();
+    }
+
+    @PutMapping("/{id}")
+    public ApiResponse<TransactionResponse> updateTransaction(@PathVariable String id, @RequestBody TransactionUpdateRequest request) {
+        return ApiResponse.<TransactionResponse>builder()
+                .result(transactionService.update(id, request))
+                .build();
+    }
+
+    @DeleteMapping("/{id}")
+    public ApiResponse<String> deleteTransaction(@PathVariable String id) {
+        transactionService.delete(id);
+        return ApiResponse.<String>builder()
+                .result("Giao dịch đã được xóa thành công")
                 .build();
     }
 }
