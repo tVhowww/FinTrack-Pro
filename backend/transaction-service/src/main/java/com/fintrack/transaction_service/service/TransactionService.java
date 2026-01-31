@@ -2,6 +2,7 @@ package com.fintrack.transaction_service.service;
 
 import com.fintrack.transaction_service.dto.event.NotificationEvent;
 import com.fintrack.transaction_service.dto.request.TransactionCreationRequest;
+import com.fintrack.transaction_service.dto.request.TransactionUpdateRequest;
 import com.fintrack.transaction_service.dto.request.WalletBalanceUpdateRequest;
 import com.fintrack.transaction_service.dto.response.MonthlyStatisticsResponse;
 import com.fintrack.transaction_service.dto.response.PageResponse;
@@ -203,6 +204,76 @@ public class TransactionService {
                 collectCategoryIds(child, ids);
             }
         }
+    }
+
+    public TransactionResponse getTransaction(String id) {
+        Transaction transaction = transactionRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.TRANSACTION_NOT_FOUND));
+        return transactionMapper.toTransactionResponse(transaction);
+    }
+
+    @Transactional
+    public TransactionResponse update(String id, TransactionUpdateRequest request) {
+        Transaction transaction = transactionRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.TRANSACTION_NOT_FOUND));
+
+        // 1. HOÀN TÁC SỐ DƯ CŨ TRÊN VÍ (Revert Old Balance)
+        // Nếu là EXPENSE (Chi): Cũ là -100k -> Giờ phải +100k để bù lại
+        // Nếu là INCOME (Thu): Cũ là +100k -> Giờ phải -100k để bù lại
+        BigDecimal revertAmount = transaction.getAmount();
+        if (transaction.getType() == TransactionType.INCOME) {
+            revertAmount = revertAmount.negate(); // Đảo dấu thành âm để trừ đi
+        }
+        // Nếu là Expense thì revertAmount giữ nguyên dương (để cộng bù vào)
+
+        // Gọi Wallet Service để hoàn tiền cũ
+        walletClient.updateBalance(transaction.getWalletId(),
+                WalletBalanceUpdateRequest.builder().amount(revertAmount).build());
+
+        // 2. CẬP NHẬT THÔNG TIN MỚI
+        if (request.getCategoryId() != null) {
+            Category category = categoryRepository.findById(request.getCategoryId())
+                    .orElseThrow(() -> new AppException(ErrorCode.CATEGORY_NOT_FOUND));
+            transaction.setCategory(category);
+        }
+        if (request.getAmount() != null) transaction.setAmount(request.getAmount());
+        if (request.getNote() != null) transaction.setNote(request.getNote());
+        if (request.getDate() != null) transaction.setDate(request.getDate());
+
+        // Lưu tạm để lấy data mới nhất
+        transaction = transactionRepository.save(transaction);
+
+        // 3. ÁP DỤNG SỐ DƯ MỚI VÀO VÍ (Apply New Balance)
+        BigDecimal newUpdateAmount = transaction.getAmount();
+        if (transaction.getType() == TransactionType.EXPENSE) {
+            newUpdateAmount = newUpdateAmount.negate(); // Chi tiêu thì trừ tiền
+        }
+
+        walletClient.updateBalance(transaction.getWalletId(),
+                WalletBalanceUpdateRequest.builder().amount(newUpdateAmount).build());
+
+        return transactionMapper.toTransactionResponse(transaction);
+    }
+
+    @Transactional
+    public void delete(String id) {
+        Transaction transaction = transactionRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.TRANSACTION_NOT_FOUND));
+
+        // 1. HOÀN TÁC SỐ DƯ (Trả lại tiền cho ví trước khi xóa)
+        BigDecimal revertAmount = transaction.getAmount();
+        if (transaction.getType() == TransactionType.INCOME) {
+            revertAmount = revertAmount.negate();
+        }
+        // Gọi Wallet Service
+        walletClient.updateBalance(transaction.getWalletId(),
+                WalletBalanceUpdateRequest.builder().amount(revertAmount).build());
+
+        // 2. XÓA MỀM (Soft Delete)
+        transaction.setDeleted(true);
+        transactionRepository.save(transaction);
+
+        log.info("Đã xóa giao dịch {} và hoàn tiền lại ví {}", id, transaction.getWalletId());
     }
 
     @Transactional

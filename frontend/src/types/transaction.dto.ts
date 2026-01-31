@@ -1,20 +1,47 @@
+import { Category } from "./category.dto";
+
 export enum TransactionType {
   INCOME = "INCOME",
   EXPENSE = "EXPENSE",
 }
 
-// Chỉ cần những thông tin cơ bản để hiện lên list preview
 export interface TransactionResponse {
   id: string;
   amount: number;
   type: TransactionType;
-  note?: string; // Để hiện tên giao dịch (Ví dụ: "Ăn sáng")
+  walletId: string;
+  categoryId: string;
+  categoryName?: string;
+  category: Category | null;
+  note?: string;
   date: string;
+  createdAt: string;
 }
 
-// Params để lọc (chủ yếu dùng categoryId)
+// Form cập nhật
+export interface TransactionUpdateRequest {
+  amount: number;
+  categoryId?: string;
+  note?: string;
+  date: Date;
+}
+
+// Form tạo mới
+export interface TransactionCreationRequest {
+  amount: number;
+  type: TransactionType;
+  walletId: string;
+  categoryId?: string;
+  note?: string;
+  date: Date;
+}
+
 export interface TransactionQueryParams {
   page?: number;
   size?: number;
-  categoryId?: string; 
+  walletId?: string;
+  type?: TransactionType;
+  startDate?: string;
+  endDate?: string;
+  categoryId?: string;
 }

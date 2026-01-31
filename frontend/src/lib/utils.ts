@@ -17,3 +17,38 @@ export function formatCurrency(amount: number | string | undefined | null) {
     maximumFractionDigits: 0, // Tiền Việt không dùng số lẻ thập phân
   }).format(value);
 }
+
+export function generatePagination(currentPage: number, totalPages: number) {
+  // Nếu tổng số trang ít (<= 7), hiện tất cả
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, i) => i + 1);
+  }
+
+  // Nếu đang ở mấy trang đầu (1, 2, 3)
+  if (currentPage <= 3) {
+    return [1, 2, 3, 4, "...", totalPages];
+  }
+
+  // Nếu đang ở mấy trang cuối
+  if (currentPage >= totalPages - 2) {
+    return [
+      1,
+      "...",
+      totalPages - 3,
+      totalPages - 2,
+      totalPages - 1,
+      totalPages,
+    ];
+  }
+
+  // Nếu đang ở giữa
+  return [
+    1,
+    "...",
+    currentPage - 1,
+    currentPage,
+    currentPage + 1,
+    "...",
+    totalPages,
+  ];
+}
