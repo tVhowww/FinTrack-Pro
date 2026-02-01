@@ -1,30 +1,12 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { WalletDialog } from "@/components/wallet/wallet-dialog";
+import { WalletCard } from "@/components/wallet/wallet-card";
 import { useWallets } from "@/hooks/use-wallets";
 import { Wallet } from "@/types/wallet.dto";
-import {
-  Edit,
-  MoreVertical,
-  Plus,
-  Trash,
-  Wallet as WalletIcon,
-} from "lucide-react";
+import { Plus } from "lucide-react";
 import { useState } from "react";
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
 
@@ -42,10 +24,6 @@ export default function WalletsPage() {
   const handleEdit = (wallet: Wallet) => {
     setSelectedWallet(wallet);
     setIsDialogOpen(true);
-  };
-
-  const confirmDelete = (id: string) => {
-    setDeleteId(id);
   };
 
   const handleDeleteExecute = () => {
@@ -73,58 +51,29 @@ export default function WalletsPage() {
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {wallets.length === 0 && (
-            <div className="col-span-full text-center text-muted-foreground py-10">
-              Bạn chưa có ví nào. Hãy tạo ví đầu tiên!
-            </div>
-          )}
-
           {wallets.map((wallet) => (
-            <Card
+            <WalletCard
               key={wallet.id}
-              className="relative overflow-hidden transition-all hover:shadow-md"
-            >
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  {wallet.name}
-                </CardTitle>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="h-8 w-8 p-0">
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => handleEdit(wallet)}>
-                      <Edit className="mr-2 h-4 w-4" /> Sửa thông tin
-                    </DropdownMenuItem>
-
-                    <DropdownMenuItem
-                      onClick={() => confirmDelete(wallet.id)}
-                      className="text-red-600 focus:text-red-600"
-                    >
-                      <Trash className="mr-2 h-4 w-4" /> Xóa
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </CardHeader>
-
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {new Intl.NumberFormat("vi-VN", {
-                    style: "currency",
-                    currency: wallet.currency || "VND",
-                  }).format(wallet.balance)}
-                </div>
-              </CardContent>
-
-              <CardFooter className="text-xs text-muted-foreground">
-                <WalletIcon className="mr-1 h-3 w-3" /> Tài khoản cá nhân
-              </CardFooter>
-
-              <div className="absolute left-0 top-0 h-full w-1 bg-primary" />
-            </Card>
+              wallet={wallet}
+              onEdit={handleEdit}
+              onDelete={(id) => setDeleteId(id)}
+            />
           ))}
+
+          <button
+            onClick={handleCreate}
+            className="group flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-muted-foreground/25 p-8 text-center hover:bg-accent/50 hover:text-accent-foreground transition-all h-full min-h-[150px]"
+          >
+            <div className="rounded-full bg-background p-3 shadow-sm group-hover:scale-110 transition-transform">
+              <Plus className="h-6 w-6 text-muted-foreground" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="font-semibold">Thêm ví mới</h3>
+              <p className="text-xs text-muted-foreground">
+                Tạo ví để quản lý nguồn tiền
+              </p>
+            </div>
+          </button>
         </div>
       )}
 
@@ -135,8 +84,8 @@ export default function WalletsPage() {
       />
 
       <ConfirmDialog
-        open={!!deleteId} // Có ID thì mở, null thì đóng
-        onOpenChange={(open) => !open && setDeleteId(null)} // Đóng thì reset ID về null
+        open={!!deleteId}
+        onOpenChange={(open) => !open && setDeleteId(null)}
         title="Xóa ví này?"
         description="Ví này sẽ bị vô hiệu hóa và ẩn khỏi danh sách của bạn. Bạn sẽ không thể thực hiện giao dịch mới trên ví này nữa."
         onConfirm={handleDeleteExecute}
