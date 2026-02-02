@@ -34,4 +34,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, String
     @Modifying
     @Query("UPDATE Transaction t SET t.deleted = true WHERE t.category.id IN :categoryIds")
     void softDeleteByCategoryIds(List<String> categoryIds);
+
+    @Query("SELECT SUM(t.amount) FROM Transaction t WHERE t.walletId = :walletId AND t.category.id = :categoryId AND t.type = 'EXPENSE' AND t.date BETWEEN :startDate AND :endDate")
+    BigDecimal sumAmountByWalletAndCategoryAndTypeAndDateBetween(String walletId, String categoryId, Instant startDate, Instant endDate);
 }
