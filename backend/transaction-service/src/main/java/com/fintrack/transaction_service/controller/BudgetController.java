@@ -24,7 +24,7 @@ public class BudgetController {
 
     @GetMapping
     public ApiResponse<List<BudgetResponse>> getBudgets(
-            @RequestParam String walletId,
+            @RequestParam(required = false) String walletId,
             @RequestParam int month,
             @RequestParam int year
     ) {
