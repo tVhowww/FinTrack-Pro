@@ -37,4 +37,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, String
 
     @Query("SELECT SUM(t.amount) FROM Transaction t WHERE t.walletId = :walletId AND t.category.id = :categoryId AND t.type = 'EXPENSE' AND t.date BETWEEN :startDate AND :endDate")
     BigDecimal sumAmountByWalletAndCategoryAndTypeAndDateBetween(String walletId, String categoryId, Instant startDate, Instant endDate);
+
+    @Query("SELECT SUM(t.amount) FROM Transaction t WHERE t.category.id = :categoryId AND t.type = 'EXPENSE' AND t.date BETWEEN :startDate AND :endDate")
+    BigDecimal sumAmountByCategoryAndTypeAndDateBetween(String categoryId, Instant startDate, Instant endDate);
 }

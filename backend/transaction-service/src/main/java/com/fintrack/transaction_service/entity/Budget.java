@@ -30,7 +30,7 @@ public class Budget {
     @Column(nullable = false)
     private BigDecimal amount;
 
-    @Column(name = "wallet_id", nullable = false)
+    @Column(name = "wallet_id", nullable = true)
     private String walletId;
 
     @Column(name = "category_id", nullable = false)

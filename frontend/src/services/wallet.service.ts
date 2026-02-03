@@ -2,26 +2,25 @@ import http from "@/lib/http";
 import { ApiResponse } from "@/types/api";
 import { Wallet, WalletFormValues } from "@/types/wallet.dto";
 
+const BASE_URL = "/wallet/wallets";
+
 export const walletService = {
   // GET /wallet/wallets
   getAll: async () => {
-    const response = await http.get<ApiResponse<Wallet[]>>("/wallet/wallets");
+    const response = await http.get<ApiResponse<Wallet[]>>(BASE_URL);
     return response.data;
   },
 
   // POST /wallet/wallets
   create: async (data: WalletFormValues) => {
-    const response = await http.post<ApiResponse<Wallet>>(
-      "/wallet/wallets",
-      data,
-    );
+    const response = await http.post<ApiResponse<Wallet>>(BASE_URL, data);
     return response.data;
   },
 
   // PUT /wallet/wallets/{id}
   update: async (id: string, data: WalletFormValues) => {
     const response = await http.put<ApiResponse<Wallet>>(
-      `/wallet/wallets/${id}`,
+      `${BASE_URL}/${id}`,
       data,
     );
     return response.data;
@@ -35,7 +34,7 @@ export const walletService = {
     newBalance: number;
   }) => {
     const response = await http.put<ApiResponse<Wallet>>(
-      `/wallet/wallets/${id}/adjust-balance`,
+      `${BASE_URL}/${id}/adjust-balance`,
       {
         newBalance,
       },
@@ -46,7 +45,7 @@ export const walletService = {
   // DELETE /wallet/wallets/{id}
   delete: async (id: string) => {
     const response = await http.delete<ApiResponse<string>>(
-      `/wallet/wallets/${id}`,
+      `${BASE_URL}/${id}`,
     );
     return response.data;
   },
