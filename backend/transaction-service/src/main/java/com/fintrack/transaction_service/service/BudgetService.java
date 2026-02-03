@@ -28,25 +28,40 @@ public class BudgetService {
 
     @Transactional
     public BudgetResponse create(BudgetCreationRequest request) {
-        // 1. Validate
-        if (budgetRepository.findByWalletIdAndCategoryIdAndMonthAndYear(
-                request.getWalletId(), request.getCategoryId(), request.getMonth(), request.getYear()).isPresent()) {
+        // 1. Validate: Kiểm tra trùng
+        // Lưu ý: Cần xử lý trường hợp walletId null trong Repository nếu dùng Global Budget
+        if (budgetRepository.existsByWalletIdAndCategoryIdAndMonthAndYear(
+                request.getWalletId(), request.getCategoryId(), request.getMonth(), request.getYear())) {
             throw new RuntimeException("Ngân sách cho danh mục này đã tồn tại trong tháng " + request.getMonth());
         }
 
-        // 2. Dùng Mapper để convert Request -> Entity (Code gọn hơn hẳn)
+        // 2. Map & Save
         Budget budget = budgetMapper.toBudget(request);
 
-        // 3. Save
+        // Đảm bảo nếu frontend gửi chuỗi rỗng "" thì lưu là null để đúng logic Global
+        if (budget.getWalletId() != null && budget.getWalletId().isEmpty()) {
+            budget.setWalletId(null);
+        }
+
         budget = budgetRepository.save(budget);
 
-        // 4. Return dùng hàm tính toán thủ công
+        // 3. Return
         return toBudgetResponse(budget);
     }
 
     public List<BudgetResponse> getBudgets(String walletId, int month, int year) {
-        List<Budget> budgets = budgetRepository.findByWalletIdAndMonthAndYear(walletId, month, year);
-        // Map từng phần tử dùng hàm tính toán
+        // Nếu walletId được truyền vào: Lấy budget của ví đó + budget Global (null)
+        // Nếu walletId null/rỗng: Chỉ lấy Global hoặc lấy tất cả (Tùy logic bạn muốn).
+        // Ở đây giả định: Lấy budget của ví này + budget chung.
+
+        List<Budget> budgets;
+        if (walletId != null && !walletId.isEmpty()) {
+            budgets = budgetRepository.findBudgetsForWallet(walletId, month, year);
+        } else {
+            // Lấy toàn bộ budget global
+            budgets = budgetRepository.findByWalletIdIsNullAndMonthAndYear(month, year);
+        }
+
         return budgets.stream().map(this::toBudgetResponse).toList();
     }
 
@@ -56,15 +71,26 @@ public class BudgetService {
     }
 
     private BudgetResponse toBudgetResponse(Budget budget) {
-        // 1. Xác định thời gian trong tháng
+        // 1. Xác định thời gian
         YearMonth yearMonth = YearMonth.of(budget.getYear(), budget.getMonth());
         var start = yearMonth.atDay(1).atStartOfDay(ZoneId.systemDefault()).toInstant();
         var end = yearMonth.atEndOfMonth().atTime(23, 59, 59).atZone(ZoneId.systemDefault()).toInstant();
 
-        // 2. Tính tổng tiền đã tiêu (spentAmount)
-        BigDecimal spentAmountRaw = transactionRepository.sumAmountByWalletAndCategoryAndTypeAndDateBetween(
-                budget.getWalletId(), budget.getCategoryId(), start, end
-        );
+        // 2. Tính tổng tiền đã tiêu
+        BigDecimal spentAmountRaw;
+
+        if (budget.getWalletId() != null && !budget.getWalletId().isEmpty()) {
+            // Tính theo ví cụ thể
+            spentAmountRaw = transactionRepository.sumAmountByWalletAndCategoryAndTypeAndDateBetween(
+                    budget.getWalletId(), budget.getCategoryId(), start, end
+            );
+        } else {
+            // Tính Global (tất cả ví)
+            spentAmountRaw = transactionRepository.sumAmountByCategoryAndTypeAndDateBetween(
+                    budget.getCategoryId(), start, end
+            );
+        }
+
         BigDecimal spentAmount = (spentAmountRaw == null) ? BigDecimal.ZERO : spentAmountRaw.abs();
 
         // 3. Tính phần trăm (%)
@@ -77,7 +103,7 @@ public class BudgetService {
         String categoryName = categoryRepository.findById(budget.getCategoryId())
                 .map(Category::getName).orElse("Unknown");
 
-        // 5. Build Response thủ công (Vì chứa dữ liệu tính toán)
+        // 5. Build Response
         return BudgetResponse.builder()
                 .id(budget.getId())
                 .name(budget.getName())
