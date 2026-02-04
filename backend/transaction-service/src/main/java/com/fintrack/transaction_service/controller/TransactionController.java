@@ -2,10 +2,7 @@ package com.fintrack.transaction_service.controller;
 
 import com.fintrack.transaction_service.dto.request.TransactionCreationRequest;
 import com.fintrack.transaction_service.dto.request.TransactionUpdateRequest;
-import com.fintrack.transaction_service.dto.response.ApiResponse;
-import com.fintrack.transaction_service.dto.response.MonthlyStatisticsResponse;
-import com.fintrack.transaction_service.dto.response.PageResponse;
-import com.fintrack.transaction_service.dto.response.TransactionResponse;
+import com.fintrack.transaction_service.dto.response.*;
 import com.fintrack.transaction_service.enums.TransactionType;
 import com.fintrack.transaction_service.service.TransactionService;
 import lombok.RequiredArgsConstructor;
@@ -17,12 +14,35 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
+import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("transactions")
 public class TransactionController {
     private final TransactionService transactionService;
+
+    // Biểu đồ cột (Trend)
+    @GetMapping("/statistics/trend")
+    public ApiResponse<List<BalanceTrendResponse>> getBalanceTrend(
+            @RequestParam(required = false) String walletId // Cho phép null để xem Global
+    ) {
+        return ApiResponse.<List<BalanceTrendResponse>>builder()
+                .result(transactionService.getBalanceTrend(walletId))
+                .build();
+    }
+
+    // Biểu đồ tròn (Cơ cấu)
+    @GetMapping("/statistics/structure")
+    public ApiResponse<List<ExpenseStructureResponse>> getExpenseStructure(
+            @RequestParam(required = false) String walletId, // Cho phép null
+            @RequestParam int month,
+            @RequestParam int year
+    ) {
+        return ApiResponse.<List<ExpenseStructureResponse>>builder()
+                .result(transactionService.getExpenseStructure(walletId, month, year))
+                .build();
+    }
 
     @GetMapping("/export")
     public ResponseEntity<Resource> exportTransactions(
