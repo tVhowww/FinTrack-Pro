@@ -55,6 +55,19 @@ public class TransactionService {
         return transactionRepository.countByWalletId(walletId);
     }
 
+    public List<TransactionResponse> getHighestExpenses(String walletId, int month, int year) {
+        YearMonth yearMonth = YearMonth.of(year, month);
+        Instant start = yearMonth.atDay(1).atStartOfDay(ZoneId.systemDefault()).toInstant();
+        Instant end = yearMonth.atEndOfMonth().atTime(23, 59, 59).atZone(ZoneId.systemDefault()).toInstant();
+
+        // Gọi hàm Query vừa viết
+        List<Transaction> transactions = transactionRepository.findHighestExpenses(walletId, start, end);
+
+        return transactions.stream()
+                .map(transactionMapper::toTransactionResponse)
+                .toList();
+    }
+
     /**
      * Lấy xu hướng dòng tiền 6 tháng gần nhất (Balance Trend)
      */
@@ -210,7 +223,7 @@ public class TransactionService {
         Instant end = yearMonth.atEndOfMonth().atTime(23, 59, 59).atZone(ZoneId.systemDefault()).toInstant();
 
         // 2. Tính Tổng Thu (INCOME)
-        BigDecimal totalIncome = transactionRepository.sumAmountByWalletAndTypeAndDateBetween(
+        BigDecimal totalIncome = transactionRepository.sumAmountByWalletIdAndTypeAndDate(
                 walletId, TransactionType.INCOME, start, end
         );
 
@@ -218,7 +231,7 @@ public class TransactionService {
         // Lưu ý: Trong DB, EXPENSE đang lưu số ÂM (ví dụ -50000).
         // Khi hiển thị thống kê "Tổng chi tiêu", ta thường muốn hiện số dương (Chi tiêu: 50.000đ).
         // Nên ta lấy giá trị tuyệt đối (abs) hoặc đảo dấu.
-        BigDecimal totalExpenseRaw = transactionRepository.sumAmountByWalletAndTypeAndDateBetween(
+        BigDecimal totalExpenseRaw = transactionRepository.sumAmountByWalletIdAndTypeAndDate(
                 walletId, TransactionType.EXPENSE, start, end
         );
         // Đổi sang số dương để hiển thị cho đẹp: "Chi tiêu: 50.000"
@@ -226,7 +239,8 @@ public class TransactionService {
 
         // 4. Tính Số Dư (Net Savings) = Thu + Chi (Vì Chi là số âm nên cộng vào là trừ ra)
         // Ví dụ: Thu 100 + (-30) = 70
-        BigDecimal netSavings = totalIncome.add(totalExpenseRaw);
+        // do expense lưu trong db là số dương nên dùng subtract
+        BigDecimal netSavings = totalIncome.subtract(totalExpenseRaw);
 
         return MonthlyStatisticsResponse.builder()
                 .month(month)

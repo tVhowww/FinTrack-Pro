@@ -22,6 +22,17 @@ import java.util.List;
 public class TransactionController {
     private final TransactionService transactionService;
 
+    @GetMapping("/statistics/highest-expenses")
+    public ApiResponse<List<TransactionResponse>> getHighestExpenses(
+            @RequestParam(required = false) String walletId,
+            @RequestParam int month,
+            @RequestParam int year
+    ) {
+        return ApiResponse.<List<TransactionResponse>>builder()
+                .result(transactionService.getHighestExpenses(walletId, month, year))
+                .build();
+    }
+
     // Biểu đồ cột (Trend)
     @GetMapping("/statistics/trend")
     public ApiResponse<List<BalanceTrendResponse>> getBalanceTrend(
@@ -62,7 +73,7 @@ public class TransactionController {
 
     @GetMapping("/statistics/monthly")
     public ApiResponse<MonthlyStatisticsResponse> getMonthlyStatistics(
-            @RequestParam String walletId,
+            @RequestParam(required = false) String walletId,
             @RequestParam int month,
             @RequestParam int year
     ) {

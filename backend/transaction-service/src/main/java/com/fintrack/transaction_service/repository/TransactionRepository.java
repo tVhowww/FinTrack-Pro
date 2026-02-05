@@ -57,4 +57,18 @@ public interface TransactionRepository extends JpaRepository<Transaction, String
             "AND t.date BETWEEN :startDate AND :endDate " +
             "GROUP BY t.category")
     List<Object[]> findExpenseStructure(String walletId, Instant startDate, Instant endDate);
+
+    // Tìm Top 5 giao dịch chi tiêu lớn nhất trong khoảng thời gian
+    List<Transaction> findTop5ByWalletIdAndTypeAndDateBetweenOrderByAmountDesc(
+            String walletId, TransactionType type, Instant startDate, Instant endDate
+    );
+
+    // Phiên bản Global (bỏ qua walletId - Cái này JPA hơi khó tự generate nếu tham số null)
+    @Query("SELECT t FROM Transaction t " +
+            "WHERE (:walletId IS NULL OR t.walletId = :walletId) " +
+            "AND t.type = 'EXPENSE' " +
+            "AND t.date BETWEEN :startDate AND :endDate " +
+            "ORDER BY t.amount DESC " +
+            "LIMIT 5")
+    List<Transaction> findHighestExpenses(String walletId, Instant startDate, Instant endDate);
 }
