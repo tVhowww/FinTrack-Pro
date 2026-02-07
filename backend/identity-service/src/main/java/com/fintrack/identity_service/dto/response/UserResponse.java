@@ -18,5 +18,8 @@ public class UserResponse {
     private String email;
     private String fullName;
     private LocalDate dob;
+    private String phoneNumber;
+    private String city;
+    private String avatar;
     private Set<RoleResponse> roles;
 }

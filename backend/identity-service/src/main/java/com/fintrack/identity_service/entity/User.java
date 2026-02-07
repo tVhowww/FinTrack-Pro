@@ -35,6 +35,13 @@ public class User {
 
     private LocalDate dob;
 
+    @Column(name = "phone_number")
+    private String phoneNumber;
+
+    private String city;
+
+    private String avatar;
+
     @Column(name = "current_jwt_id")
     private String currentJwtId; // Lưu JTI của token hợp lệ cuối cùng
 

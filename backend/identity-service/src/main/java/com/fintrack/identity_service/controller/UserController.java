@@ -1,5 +1,7 @@
 package com.fintrack.identity_service.controller;
 
+import com.fintrack.identity_service.dto.request.PasswordChangeRequest;
+import com.fintrack.identity_service.dto.request.ProfileUpdateRequest;
 import com.fintrack.identity_service.dto.request.UserCreationRequest;
 import com.fintrack.identity_service.dto.response.ApiResponse;
 import com.fintrack.identity_service.dto.response.UserResponse;
@@ -7,8 +9,10 @@ import com.fintrack.identity_service.entity.User;
 import com.fintrack.identity_service.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -17,6 +21,33 @@ import java.util.List;
 @RequiredArgsConstructor
 public class UserController {
     private final UserService userService;
+
+    @PutMapping("/my-profile")
+    ApiResponse<UserResponse> updateProfile(@RequestBody ProfileUpdateRequest request) {
+        return ApiResponse.<UserResponse>builder()
+                .result(userService.updateProfile(request))
+                .build();
+    }
+
+    @PatchMapping("/change-password")
+    ApiResponse<String> changePassword(@RequestBody @Valid PasswordChangeRequest request) {
+        userService.changePassword(request);
+        return ApiResponse.<String>builder()
+                .result("Đổi mật khẩu thành công")
+                .build();
+    }
+
+    @PostMapping(value = "/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    ApiResponse<UserResponse> uploadAvatar(@RequestParam("file") MultipartFile file) {
+        // Mock: Giả sử đã upload file và có URL
+        // String fileUrl = storageService.upload(file);
+        // Tạm thời hardcode để test flow DB
+        String mockUrl = "https://example.com/avatars/" + file.getOriginalFilename();
+
+        return ApiResponse.<UserResponse>builder()
+                .result(userService.updateAvatar(mockUrl))
+                .build();
+    }
 
     @GetMapping
     @PreAuthorize("hasAuthority('USER_READ')")
