@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -35,6 +36,24 @@ public class UserService {
 
     public List<User> getUsers() {
         return userRepository.findAll();
+    }
+
+    @Transactional
+    public void deleteAccount() {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        user.setDeleted(true);
+
+        // Sử dụng UUID để đảm bảo không bao giờ trùng lặp
+        String uniqueId = UUID.randomUUID().toString();
+        user.setEmail("deleted_" + uniqueId + "_" + user.getEmail());
+        user.setUsername("deleted_" + uniqueId + "_" + user.getUsername());
+
+        userRepository.save(user);
+
+        // TODO: producer -> gửi message xóa dữ liệu liên quan trong các service khác nếu cần
     }
 
     @Transactional

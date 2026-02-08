@@ -22,7 +22,17 @@ import java.util.List;
 public class UserController {
     private final UserService userService;
 
+    @DeleteMapping("/my-account")
+    @PreAuthorize("isAuthenticated()")
+    ApiResponse<String> deleteAccount() {
+        userService.deleteAccount();
+        return ApiResponse.<String>builder()
+                .result("Tài khoản đã được xóa thành công.")
+                .build();
+    }
+
     @PutMapping("/my-profile")
+    @PreAuthorize("isAuthenticated()")
     ApiResponse<UserResponse> updateProfile(@RequestBody ProfileUpdateRequest request) {
         return ApiResponse.<UserResponse>builder()
                 .result(userService.updateProfile(request))
@@ -30,6 +40,7 @@ public class UserController {
     }
 
     @PatchMapping("/change-password")
+    @PreAuthorize("isAuthenticated()")
     ApiResponse<String> changePassword(@RequestBody @Valid PasswordChangeRequest request) {
         userService.changePassword(request);
         return ApiResponse.<String>builder()
@@ -38,6 +49,7 @@ public class UserController {
     }
 
     @PostMapping(value = "/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("isAuthenticated()")
     ApiResponse<UserResponse> uploadAvatar(@RequestParam("file") MultipartFile file) {
         // Mock: Giả sử đã upload file và có URL
         // String fileUrl = storageService.upload(file);
@@ -73,6 +85,7 @@ public class UserController {
     }
 
     @GetMapping("/my-info")
+    @PreAuthorize("isAuthenticated()")
     ApiResponse<UserResponse> getMyInfo() {
         return ApiResponse.<UserResponse>builder()
                 .result(userService.getMyInfo())
