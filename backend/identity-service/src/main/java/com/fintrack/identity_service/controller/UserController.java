@@ -6,6 +6,7 @@ import com.fintrack.identity_service.dto.request.UserCreationRequest;
 import com.fintrack.identity_service.dto.response.ApiResponse;
 import com.fintrack.identity_service.dto.response.UserResponse;
 import com.fintrack.identity_service.entity.User;
+import com.fintrack.identity_service.service.CloudinaryService;
 import com.fintrack.identity_service.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +22,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class UserController {
     private final UserService userService;
+    private final CloudinaryService cloudinaryService;
 
     @DeleteMapping("/my-account")
     @PreAuthorize("isAuthenticated()")
@@ -51,13 +53,12 @@ public class UserController {
     @PostMapping(value = "/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("isAuthenticated()")
     ApiResponse<UserResponse> uploadAvatar(@RequestParam("file") MultipartFile file) {
-        // Mock: Giả sử đã upload file và có URL
-        // String fileUrl = storageService.upload(file);
-        // Tạm thời hardcode để test flow DB
-        String mockUrl = "https://example.com/avatars/" + file.getOriginalFilename();
+        // 1. Upload lên Cloudinary để lấy URL thật
+        String imageUrl = cloudinaryService.uploadImage(file);
 
+        // 2. Lưu URL vào Database
         return ApiResponse.<UserResponse>builder()
-                .result(userService.updateAvatar(mockUrl))
+                .result(userService.updateAvatar(imageUrl))
                 .build();
     }
 
