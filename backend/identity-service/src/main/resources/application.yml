@@ -1,20 +1,18 @@
 server:
-  port: 8080 # Service nay se chay o cong 8080
+  port: 8080
   servlet:
-    context-path: /identity # Them dong nay: Tu dong thêm /identity vao truoc moi API
+    context-path: /identity
 
 spring:
   application:
     name: identity-service
 
-  # Cau hinh ket noi Database
   datasource:
-    url: jdbc:postgresql://localhost:5432/identity_service_db
-    username: postgres
-    password: password
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/identity_service_db}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:password}
     driver-class-name: org.postgresql.Driver
 
-  # Cau hinh JPA (Hibernate)
   jpa:
     hibernate:
       ddl-auto: update
@@ -25,12 +23,17 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
 jwt:
-  signerKey: "1234567890123456789012345678901234567890123456789012345678901234" # 64 digits - Key nay phai DU DAI (it nhat 32 ky tu) neu khong se loi
+  signerKey: ${JWT_SIGNER_KEY}
 
 eureka:
   client:
     service-url:
-      defaultZone: http://localhost:8761/eureka/
+      defaultZone: ${EUREKA_URI:http://localhost:8761/eureka/}
 
 app:
-  internal-secret: "bao-mat-noi-bo-123" # Phải khớp với Gateway
+  internal-secret: ${INTERNAL_SECRET}
+
+cloudinary:
+  cloud-name: ${CLOUDINARY_CLOUD_NAME}
+  api-key: ${CLOUDINARY_API_KEY}
+  api-secret: ${CLOUDINARY_API_SECRET}

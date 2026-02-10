@@ -1,14 +1,19 @@
 package com.fintrack.identity_service.controller;
 
+import com.fintrack.identity_service.dto.request.PasswordChangeRequest;
+import com.fintrack.identity_service.dto.request.ProfileUpdateRequest;
 import com.fintrack.identity_service.dto.request.UserCreationRequest;
 import com.fintrack.identity_service.dto.response.ApiResponse;
 import com.fintrack.identity_service.dto.response.UserResponse;
 import com.fintrack.identity_service.entity.User;
+import com.fintrack.identity_service.service.CloudinaryService;
 import com.fintrack.identity_service.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -17,6 +22,45 @@ import java.util.List;
 @RequiredArgsConstructor
 public class UserController {
     private final UserService userService;
+    private final CloudinaryService cloudinaryService;
+
+    @DeleteMapping("/my-account")
+    @PreAuthorize("isAuthenticated()")
+    ApiResponse<String> deleteAccount() {
+        userService.deleteAccount();
+        return ApiResponse.<String>builder()
+                .result("Tài khoản đã được xóa thành công.")
+                .build();
+    }
+
+    @PutMapping("/my-profile")
+    @PreAuthorize("isAuthenticated()")
+    ApiResponse<UserResponse> updateProfile(@RequestBody ProfileUpdateRequest request) {
+        return ApiResponse.<UserResponse>builder()
+                .result(userService.updateProfile(request))
+                .build();
+    }
+
+    @PatchMapping("/change-password")
+    @PreAuthorize("isAuthenticated()")
+    ApiResponse<String> changePassword(@RequestBody @Valid PasswordChangeRequest request) {
+        userService.changePassword(request);
+        return ApiResponse.<String>builder()
+                .result("Đổi mật khẩu thành công")
+                .build();
+    }
+
+    @PostMapping(value = "/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("isAuthenticated()")
+    ApiResponse<UserResponse> uploadAvatar(@RequestParam("file") MultipartFile file) {
+        // 1. Upload lên Cloudinary để lấy URL thật
+        String imageUrl = cloudinaryService.uploadImage(file);
+
+        // 2. Lưu URL vào Database
+        return ApiResponse.<UserResponse>builder()
+                .result(userService.updateAvatar(imageUrl))
+                .build();
+    }
 
     @GetMapping
     @PreAuthorize("hasAuthority('USER_READ')")
@@ -42,6 +86,7 @@ public class UserController {
     }
 
     @GetMapping("/my-info")
+    @PreAuthorize("isAuthenticated()")
     ApiResponse<UserResponse> getMyInfo() {
         return ApiResponse.<UserResponse>builder()
                 .result(userService.getMyInfo())

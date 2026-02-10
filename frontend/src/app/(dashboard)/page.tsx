@@ -1,82 +1,149 @@
 "use client";
 
-import { useUser } from "@/hooks/use-user";
+import { BalanceChart } from "@/components/dashboard/balance-chart";
+import { ExpensePieChart } from "@/components/dashboard/expense-pie-chart";
+import { HighestSpend } from "@/components/dashboard/highest-spend";
+import { RecentTransactions } from "@/components/dashboard/recent-transactions";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, CreditCard, Activity, Users } from "lucide-react";
+import { useStatistics } from "@/hooks/use-statistics";
+import { useUser } from "@/hooks/use-user";
+import { useWallets } from "@/hooks/use-wallets";
+import { formatCurrency } from "@/lib/utils";
+import { format } from "date-fns";
+import { vi } from "date-fns/locale";
+import { Activity, ArrowDown, ArrowUp, DollarSign, Wallet } from "lucide-react";
 
 export default function DashboardPage() {
   const { user } = useUser();
 
-  // Đây là dữ liệu giả (Hardcode) để lên UI trước, sau này sẽ gọi API thật
-  const stats = [
-    {
-      title: "Tổng số dư",
-      value: "120.000.000 ₫",
-      icon: DollarSign,
-      desc: "+20.1% so với tháng trước",
-    },
-    {
-      title: "Chi tiêu tháng này",
-      value: "15.400.000 ₫",
-      icon: CreditCard,
-      desc: "+4% so với tháng trước",
-    },
-    {
-      title: "Thu nhập tháng này",
-      value: "45.000.000 ₫",
-      icon: Activity,
-      desc: "Lương + Thưởng",
-    },
-    {
-      title: "Tiết kiệm",
-      value: "29.600.000 ₫",
-      icon: Users,
-      desc: "Đạt 85% mục tiêu",
-    },
-  ];
+  // 1. Lấy dữ liệu thống kê (Trend & Structure)
+  const {
+    trendData,
+    structureData,
+    isLoadingTrend,
+    isLoadingStructure,
+    isLoadingRecent,
+    recentTransactions,
+    monthlyStats,
+    highestExpenses,
+    isLoadingHighest,
+  } = useStatistics();
+
+  // 2. Lấy dữ liệu Ví (để tính tổng số dư hiện tại)
+  const { wallets } = useWallets();
+
+  // Tính toán số liệu cho Cards Summary
+  // Dữ liệu trendData trả về từ cũ đến mới (Backend loop 5->0 và add vào list),
+  // nên phần tử cuối cùng là tháng hiện tại.
+  const currentMonthData =
+    trendData.length > 0
+      ? trendData[trendData.length - 1]
+      : { income: 0, expense: 0, netSavings: 0 };
+
+  // Tính tổng số dư của tất cả các ví
+  const totalBalance = wallets.reduce((acc, w) => acc + w.balance, 0);
 
   return (
-    <div className="space-y-8">
-      {/* Header của Dashboard */}
+    <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between space-y-2">
         <h2 className="text-3xl font-bold tracking-tight">
           Xin chào, {user?.fullName || "bạn"}!
         </h2>
-        <div className="flex items-center space-x-2">
-          {/* Chỗ này sau để nút "Thêm giao dịch nhanh" */}
-        </div>
       </div>
 
-      {/* Grid thống kê */}
+      {/* Grid thống kê (Cards) */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {stats.map((item, index) => (
-          <Card key={index}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                {item.title}
-              </CardTitle>
-              <item.icon className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{item.value}</div>
-              <p className="text-xs text-muted-foreground mt-1">{item.desc}</p>
-            </CardContent>
-          </Card>
-        ))}
+        {/* Card 1: Tổng số dư */}
+        <Card className="shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Tổng số dư</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-primary">
+              {formatCurrency(totalBalance)}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Trên {wallets.length} ví đang hoạt động
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Card 2: Thu nhập tháng này */}
+        <Card className="shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              Thu nhập (Tháng này)
+            </CardTitle>
+            <ArrowUp className="h-4 w-4 text-emerald-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-emerald-600">
+              {formatCurrency(monthlyStats.totalIncome)}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">Dòng tiền vào</p>
+          </CardContent>
+        </Card>
+
+        {/* Card 3: Chi tiêu tháng này */}
+        <Card className="shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              Chi tiêu (Tháng này)
+            </CardTitle>
+            <ArrowDown className="h-4 w-4 text-red-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">
+              {formatCurrency(monthlyStats.totalExpense)}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">Dòng tiền ra</p>
+          </CardContent>
+        </Card>
+
+        {/* Card 4: Số dư trong tháng (Net Savings) */}
+        <Card className="shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              Tiết kiệm (Tháng này)
+            </CardTitle>
+            <Activity className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {formatCurrency(monthlyStats.netSavings)}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Thu nhập - Chi tiêu
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Khu vực Biểu đồ hoặc Giao dịch gần đây (Để trống chờ Task sau) */}
+      {/* Khu vực Biểu đồ */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        <Card className="col-span-4 h-[300px] flex items-center justify-center bg-muted/20 border-dashed">
-          <p className="text-muted-foreground">
-            Khu vực Biểu đồ chi tiêu (Coming soon)
-          </p>
-        </Card>
-        <Card className="col-span-3 h-[300px] flex items-center justify-center bg-muted/20 border-dashed">
-          <p className="text-muted-foreground">
-            Khu vực Giao dịch gần đây (Coming soon)
-          </p>
-        </Card>
+        {/* Biểu đồ cột chiếm 4 phần */}
+        <BalanceChart data={trendData} isLoading={isLoadingTrend} />
+
+        {/* Biểu đồ tròn chiếm 3 phần */}
+        <ExpensePieChart data={structureData} isLoading={isLoadingStructure} />
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+        {/* Cột trái: Giao dịch gần đây (Chiếm 4 phần) */}
+        <div className="lg:col-span-4 h-full">
+          <RecentTransactions
+            data={recentTransactions}
+            isLoading={isLoadingRecent}
+          />
+        </div>
+
+        {/* Cột phải: Top chi tiêu (Chiếm 3 phần) */}
+        <div className="lg:col-span-3 h-full">
+          <HighestSpend data={highestExpenses} isLoading={isLoadingHighest} />
+        </div>
       </div>
     </div>
   );

@@ -40,4 +40,35 @@ public interface TransactionRepository extends JpaRepository<Transaction, String
 
     @Query("SELECT SUM(t.amount) FROM Transaction t WHERE t.category.id = :categoryId AND t.type = 'EXPENSE' AND t.date BETWEEN :startDate AND :endDate")
     BigDecimal sumAmountByCategoryAndTypeAndDateBetween(String categoryId, Instant startDate, Instant endDate);
+
+    // Statistics
+    // 1. Hàm tính tổng tiền theo Type (Hỗ trợ Global: Nếu walletId null thì tính hết)
+    @Query("SELECT COALESCE(SUM(t.amount), 0) FROM Transaction t " +
+            "WHERE (:walletId IS NULL OR t.walletId = :walletId) " +
+            "AND t.type = :type " +
+            "AND t.date BETWEEN :startDate AND :endDate")
+    BigDecimal sumAmountByWalletIdAndTypeAndDate(String walletId, TransactionType type, Instant startDate, Instant endDate);
+
+    // 2. Query lấy cơ cấu chi tiêu (Group By Category)
+    // Trả về: [Category, TotalAmount]
+    @Query("SELECT t.category, SUM(t.amount) FROM Transaction t " +
+            "WHERE (:walletId IS NULL OR t.walletId = :walletId) " +
+            "AND t.type = 'EXPENSE' " +
+            "AND t.date BETWEEN :startDate AND :endDate " +
+            "GROUP BY t.category")
+    List<Object[]> findExpenseStructure(String walletId, Instant startDate, Instant endDate);
+
+    // Tìm Top 5 giao dịch chi tiêu lớn nhất trong khoảng thời gian
+    List<Transaction> findTop5ByWalletIdAndTypeAndDateBetweenOrderByAmountDesc(
+            String walletId, TransactionType type, Instant startDate, Instant endDate
+    );
+
+    // Phiên bản Global (bỏ qua walletId - Cái này JPA hơi khó tự generate nếu tham số null)
+    @Query("SELECT t FROM Transaction t " +
+            "WHERE (:walletId IS NULL OR t.walletId = :walletId) " +
+            "AND t.type = 'EXPENSE' " +
+            "AND t.date BETWEEN :startDate AND :endDate " +
+            "ORDER BY t.amount DESC " +
+            "LIMIT 5")
+    List<Transaction> findHighestExpenses(String walletId, Instant startDate, Instant endDate);
 }

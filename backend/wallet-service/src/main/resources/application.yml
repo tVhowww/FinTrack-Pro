@@ -8,9 +8,9 @@ spring:
     name: wallet-service
 
   datasource:
-    url: jdbc:postgresql://localhost:5433/wallet_service_db
-    username: postgres
-    password: password
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/wallet_service_db}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:password}
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -27,7 +27,7 @@ eureka:
   client:
     enabled: true
     serviceUrl:
-      defaultZone: http://localhost:8761/eureka/
+      defaultZone: ${EUREKA_URI:http://localhost:8761/eureka/}
 
 feign:
   client:
@@ -38,7 +38,7 @@ feign:
 
 # Cau hinh Security
 jwt:
-  signerKey: "1234567890123456789012345678901234567890123456789012345678901234"
+  signerKey: ${JWT_SIGNER_KEY}
 
 app:
-  internal-secret: "bao-mat-noi-bo-123" # Phải khớp với Gateway
+  internal-secret: ${INTERNAL_SECRET}

@@ -1,5 +1,5 @@
 server:
-  port: 8888 # Cong chuan cua Gateway
+  port: ${GATEWAY_PORT:8888}
 
 spring:
   application:
@@ -10,60 +10,51 @@ spring:
         webflux:
           routes:
             # ----------------------------------------------------
-            # 1. Route Public (Ưu tiên chạy trước)
-            # Khớp: /identity/auth/login, /identity/auth/token...
+            # 1. Route Public
             # ----------------------------------------------------
             - id: identity_public
               uri: lb://IDENTITY-SERVICE
               predicates:
                 - Path=/identity/auth/**
-              # Không có filters -> Ai vào cũng được
               filters:
-                - AddRequestHeader=X-Internal-Secret, bao-mat-noi-bo-123
+                # Dùng biến config thay vì hardcode
+                - AddRequestHeader=X-Internal-Secret, ${app.internal-secret}
 
             # ----------------------------------------------------
-            # 2. Route Private (Hốt tất cả những gì còn lại)
-            # Khớp: /identity/users, /identity/admin, /identity/bat-ky-cai-gi...
+            # 2. Route Private (Identity)
             # ----------------------------------------------------
             - id: identity_private
               uri: lb://IDENTITY-SERVICE
               predicates:
-                - Path=/identity/** # <--- Bắt tất cả prefix /identity
+                - Path=/identity/**
               filters:
-                - Authentication # <--- Bắt buộc phải có token mới cho qua
-                - AddRequestHeader=X-Internal-Secret, bao-mat-noi-bo-123
+                - Authentication
+                - AddRequestHeader=X-Internal-Secret, ${app.internal-secret}
 
             # ----------------------------------------------------
-            # 3. Route cho Wallet Service
-            # Khớp: /wallet/wallets, /wallet/...
+            # 3. Route Wallet Service
             # ----------------------------------------------------
             - id: wallet_service
-              uri: lb://WALLET-SERVICE # Tên service đăng ký trên Eureka (viết hoa thường không quan trọng nhưng nên khớp)
+              uri: lb://WALLET-SERVICE
               predicates:
-                - Path=/wallet/wallets/**, /wallet/users/** # chặn đi vào internal
-#                - Path=/wallet/** # Khớp với context-path bạn đã cấu hình bên Wallet Service
+                - Path=/wallet/wallets/**, /wallet/users/**
               filters:
-              # Bạn có thể bật Authentication Filter ở đây nếu muốn Gateway chặn ngay từ vòng gửi xe.
-              # Tuy nhiên, vì Wallet Service đã là Resource Server (tự check token),
-              # nên tạm thời không cần filter này cũng được, để Wallet tự lo.
-               - Authentication
-               - AddRequestHeader=X-Internal-Secret, bao-mat-noi-bo-123
+                - Authentication
+                - AddRequestHeader=X-Internal-Secret, ${app.internal-secret}
 
-              # ----------------------------------------------------
-              # 4. Route cho Transaction Service
-              # Khớp: /transaction/transactions, /transaction/...
-              # ----------------------------------------------------
+            # ----------------------------------------------------
+            # 4. Route Transaction Service
+            # ----------------------------------------------------
             - id: transaction_service
               uri: lb://TRANSACTION-SERVICE
               predicates:
                 - Path=/transaction/**
               filters:
                 - Authentication
-                - AddRequestHeader=X-Internal-Secret, bao-mat-noi-bo-123
+                - AddRequestHeader=X-Internal-Secret, ${app.internal-secret}
 
             # ----------------------------------------------------
-            # 5. Route cho Notification Service
-            # Khớp: /notification/...
+            # 5. Route Notification Service
             # ----------------------------------------------------
             - id: notification_service
               uri: lb://NOTIFICATION-SERVICE
@@ -71,14 +62,15 @@ spring:
                 - Path=/notification/**
               filters:
                 - Authentication
-                - AddRequestHeader=X-Internal-Secret, bao-mat-noi-bo-123
+                - AddRequestHeader=X-Internal-Secret, ${app.internal-secret}
 
 eureka:
   client:
     service-url:
-      defaultZone: http://localhost:8761/eureka/
+      defaultZone: ${EUREKA_URI:http://localhost:8761/eureka/}
     register-with-eureka: true
     fetch-registry: true
 
 app:
-  internal-secret: "bao-mat-noi-bo-123"
+  # Lấy giá trị từ biến môi trường vào đây
+  internal-secret: ${INTERNAL_SECRET}

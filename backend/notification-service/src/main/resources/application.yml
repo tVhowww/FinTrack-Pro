@@ -1,5 +1,5 @@
 server:
-  port: 8083
+  port: ${NOTIFICATION_PORT:8083}
   servlet:
     context-path: /notification
 
@@ -9,22 +9,23 @@ spring:
 
   # Cau hinh KAFKA
   kafka:
-    bootstrap-servers: localhost:29092 # Ket noi vao port lo ra cua Docker
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:29092} # <--- Dùng biến môi trường
     consumer:
-      group-id: notification-group # Ten nhom consumer
-      auto-offset-reset: earliest # Doc tu tin nhan cu nhat neu bi mat ket noi
+      group-id: notification-group
+      auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       properties:
-        spring.json.trusted.packages: "*" # Cho phep nhan moi object JSON
+        spring.json.trusted.packages: "*"
         spring.json.type.mapping: event:com.fintrack.notification_service.dto.event.NotificationEvent
 
   # Cau hinh EMAIL (Gmail SMTP)
   mail:
     host: smtp.gmail.com
     port: 587
-    username: "haun4700@gmail.com"
-    password: "hcaj ocvd ruzf szaa" # <--- Update later
+    # Lấy từ biến môi trường, không để lộ email/pass trong code
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
     properties:
       mail:
         smtp:
@@ -35,4 +36,4 @@ spring:
 eureka:
   client:
     service-url:
-      defaultZone: http://localhost:8761/eureka/
+      defaultZone: ${EUREKA_URI:http://localhost:8761/eureka/}

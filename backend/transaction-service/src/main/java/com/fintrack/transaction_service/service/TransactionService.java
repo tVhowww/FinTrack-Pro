@@ -4,9 +4,7 @@ import com.fintrack.transaction_service.dto.event.NotificationEvent;
 import com.fintrack.transaction_service.dto.request.TransactionCreationRequest;
 import com.fintrack.transaction_service.dto.request.TransactionUpdateRequest;
 import com.fintrack.transaction_service.dto.request.WalletBalanceUpdateRequest;
-import com.fintrack.transaction_service.dto.response.MonthlyStatisticsResponse;
-import com.fintrack.transaction_service.dto.response.PageResponse;
-import com.fintrack.transaction_service.dto.response.TransactionResponse;
+import com.fintrack.transaction_service.dto.response.*;
 import com.fintrack.transaction_service.entity.Category;
 import com.fintrack.transaction_service.entity.Transaction;
 import com.fintrack.transaction_service.enums.TransactionType;
@@ -33,6 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.io.ByteArrayInputStream;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.text.NumberFormat;
 import java.time.Instant;
 import java.time.YearMonth;
@@ -54,6 +53,100 @@ public class TransactionService {
 
     public long countTransactionsByWallet(String walletId) {
         return transactionRepository.countByWalletId(walletId);
+    }
+
+    public List<TransactionResponse> getHighestExpenses(String walletId, int month, int year) {
+        YearMonth yearMonth = YearMonth.of(year, month);
+        Instant start = yearMonth.atDay(1).atStartOfDay(ZoneId.systemDefault()).toInstant();
+        Instant end = yearMonth.atEndOfMonth().atTime(23, 59, 59).atZone(ZoneId.systemDefault()).toInstant();
+
+        // Gọi hàm Query vừa viết
+        List<Transaction> transactions = transactionRepository.findHighestExpenses(walletId, start, end);
+
+        return transactions.stream()
+                .map(transactionMapper::toTransactionResponse)
+                .toList();
+    }
+
+    /**
+     * Lấy xu hướng dòng tiền 6 tháng gần nhất (Balance Trend)
+     */
+    public List<BalanceTrendResponse> getBalanceTrend(String walletId) {
+        List<BalanceTrendResponse> trends = new ArrayList<>();
+        YearMonth currentMonth = YearMonth.now();
+
+        // Lặp 6 lần cho 6 tháng gần nhất (từ quá khứ -> hiện tại)
+        for (int i = 5; i >= 0; i--) {
+            YearMonth targetMonth = currentMonth.minusMonths(i);
+
+            // Tính ngày đầu tháng và cuối tháng
+            Instant start = targetMonth.atDay(1).atStartOfDay(ZoneId.systemDefault()).toInstant();
+            Instant end = targetMonth.atEndOfMonth().atTime(23, 59, 59).atZone(ZoneId.systemDefault()).toInstant();
+
+            // Gọi Repo tính tổng (Repo đã xử lý walletId null)
+            BigDecimal income = transactionRepository.sumAmountByWalletIdAndTypeAndDate(
+                    walletId, TransactionType.INCOME, start, end
+            );
+
+            BigDecimal expenseRaw = transactionRepository.sumAmountByWalletIdAndTypeAndDate(
+                    walletId, TransactionType.EXPENSE, start, end
+            );
+            BigDecimal expense = expenseRaw.abs(); // Chuyển số âm thành dương
+
+            trends.add(BalanceTrendResponse.builder()
+                    .month(targetMonth.getMonthValue())
+                    .year(targetMonth.getYear())
+                    .income(income)
+                    .expense(expense)
+                    .netSavings(income.subtract(expense)) // Thu - Chi
+                    .build());
+        }
+        return trends;
+    }
+
+    /**
+     * Lấy cơ cấu chi tiêu theo danh mục (Expense Structure)
+     */
+    public List<ExpenseStructureResponse> getExpenseStructure(String walletId, int month, int year) {
+        // 1. Xác định thời gian
+        YearMonth yearMonth = YearMonth.of(year, month);
+        Instant start = yearMonth.atDay(1).atStartOfDay(ZoneId.systemDefault()).toInstant();
+        Instant end = yearMonth.atEndOfMonth().atTime(23, 59, 59).atZone(ZoneId.systemDefault()).toInstant();
+
+        // 2. Lấy dữ liệu gom nhóm từ DB
+        List<Object[]> rawData = transactionRepository.findExpenseStructure(walletId, start, end);
+
+        // 3. Tính tổng chi tiêu (để chia phần trăm)
+        BigDecimal totalExpense = rawData.stream()
+                .map(obj -> (BigDecimal) obj[1])
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .abs();
+
+        List<ExpenseStructureResponse> result = new ArrayList<>();
+
+        // 4. Map sang DTO và tính %
+        for (Object[] row : rawData) {
+            Category category = (Category) row[0];
+            BigDecimal amountRaw = (BigDecimal) row[1];
+            BigDecimal amount = amountRaw.abs();
+
+            double percentage = 0;
+            if (totalExpense.compareTo(BigDecimal.ZERO) > 0) {
+                percentage = amount.divide(totalExpense, 4, RoundingMode.HALF_UP).doubleValue() * 100;
+            }
+
+            result.add(ExpenseStructureResponse.builder()
+                    .categoryId(category != null ? category.getId() : "uncategorized")
+                    .categoryName(category != null ? category.getName() : "Khác")
+                    .amount(amount)
+                    .percentage(percentage)
+                    .build());
+        }
+
+        // Sắp xếp giảm dần theo số tiền
+        result.sort((a, b) -> b.getAmount().compareTo(a.getAmount()));
+
+        return result;
     }
 
     /**
@@ -130,7 +223,7 @@ public class TransactionService {
         Instant end = yearMonth.atEndOfMonth().atTime(23, 59, 59).atZone(ZoneId.systemDefault()).toInstant();
 
         // 2. Tính Tổng Thu (INCOME)
-        BigDecimal totalIncome = transactionRepository.sumAmountByWalletAndTypeAndDateBetween(
+        BigDecimal totalIncome = transactionRepository.sumAmountByWalletIdAndTypeAndDate(
                 walletId, TransactionType.INCOME, start, end
         );
 
@@ -138,7 +231,7 @@ public class TransactionService {
         // Lưu ý: Trong DB, EXPENSE đang lưu số ÂM (ví dụ -50000).
         // Khi hiển thị thống kê "Tổng chi tiêu", ta thường muốn hiện số dương (Chi tiêu: 50.000đ).
         // Nên ta lấy giá trị tuyệt đối (abs) hoặc đảo dấu.
-        BigDecimal totalExpenseRaw = transactionRepository.sumAmountByWalletAndTypeAndDateBetween(
+        BigDecimal totalExpenseRaw = transactionRepository.sumAmountByWalletIdAndTypeAndDate(
                 walletId, TransactionType.EXPENSE, start, end
         );
         // Đổi sang số dương để hiển thị cho đẹp: "Chi tiêu: 50.000"
@@ -146,7 +239,8 @@ public class TransactionService {
 
         // 4. Tính Số Dư (Net Savings) = Thu + Chi (Vì Chi là số âm nên cộng vào là trừ ra)
         // Ví dụ: Thu 100 + (-30) = 70
-        BigDecimal netSavings = totalIncome.add(totalExpenseRaw);
+        // do expense lưu trong db là số dương nên dùng subtract
+        BigDecimal netSavings = totalIncome.subtract(totalExpenseRaw);
 
         return MonthlyStatisticsResponse.builder()
                 .month(month)

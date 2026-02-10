@@ -11,6 +11,17 @@ import {
 const BASE_URL = "/transaction/transactions";
 
 export const transactionService = {
+  getRecent: async (walletId?: string) => {
+    const params: any = { page: 1, size: 5 }; // Lấy 5 cái mới nhất
+    if (walletId && walletId !== "all") params.walletId = walletId;
+
+    // Gọi API getTransactions đã có sẵn
+    const response = await http.get<
+      ApiResponse<PageResponse<TransactionResponse>>
+    >(BASE_URL, { params });
+    return response.data?.result?.data || [];
+  },
+
   // Lấy danh sách (Có phân trang & Filter)
   getTransactions: async (params?: TransactionQueryParams) => {
     const response = await http.get<
