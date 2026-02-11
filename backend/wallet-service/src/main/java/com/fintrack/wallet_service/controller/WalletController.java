@@ -19,6 +19,14 @@ import java.util.List;
 public class WalletController {
     private final WalletService walletService;
 
+    @GetMapping("/{id}")
+    @ResponseStatus(HttpStatus.OK)
+    ApiResponse<WalletResponse> getWallet(@PathVariable String id) {
+        return ApiResponse.<WalletResponse>builder()
+                .result(walletService.getWallet(id))
+                .build();
+    }
+
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     ApiResponse<WalletResponse> createWallet(@RequestBody @Valid WalletCreationRequest request) {

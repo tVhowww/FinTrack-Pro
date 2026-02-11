@@ -20,6 +20,7 @@ public enum ErrorCode {
     CATEGORY_SYSTEM_READONLY(2010, "Cannot modify default system categories", HttpStatus.FORBIDDEN),
     CATEGORY_INVALID_PARENT(2011, "Invalid parent category", HttpStatus.BAD_REQUEST),
     TRANSACTION_NOT_FOUND(2015, "Transaction not found", HttpStatus.NOT_FOUND),
+    WALLET_NOT_FOUND(2020, "Wallet not found", HttpStatus.NOT_FOUND)
     ;
 
     ErrorCode(int code, String message, HttpStatusCode statusCode) {

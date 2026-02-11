@@ -195,4 +195,14 @@ public class WalletService {
         wallet.setActive(false);
         walletRepository.save(wallet);
     }
+
+    public WalletResponse getWallet(String id) {
+        String userId = SecurityUtils.getCurrentUserId();
+
+        Wallet wallet = walletRepository.findByIdAndUserId(id, userId)
+                .orElseThrow(() -> new AppException(ErrorCode.WALLET_NOT_FOUND));
+
+        // Quan trọng: Mapper phải map được cả userId để Transaction Service check quyền
+        return walletMapper.toWalletResponse(wallet);
+    }
 }

@@ -30,12 +30,12 @@ public class TransactionSpecification {
         return (root, query, criteriaBuilder) -> {
             if (startDate == null && endDate == null) return null;
             if (startDate != null && endDate != null) {
-                return criteriaBuilder.between(root.get("createdAt"), startDate, endDate);
+                return criteriaBuilder.between(root.get("date"), startDate, endDate);
             }
             if (startDate != null) {
-                return criteriaBuilder.greaterThanOrEqualTo(root.get("createdAt"), startDate);
+                return criteriaBuilder.greaterThanOrEqualTo(root.get("date"), startDate);
             }
-            return criteriaBuilder.lessThanOrEqualTo(root.get("createdAt"), endDate);
+            return criteriaBuilder.lessThanOrEqualTo(root.get("date"), endDate);
         };
     }
 
@@ -45,6 +45,15 @@ public class TransactionSpecification {
             if (categoryIds == null || categoryIds.isEmpty()) return null;
             // Dùng IN thay vì EQUAL
             return root.get("category").get("id").in(categoryIds);
+        };
+    }
+
+    public static Specification<Transaction> hasWalletIdIn(List<String> walletIds) {
+        return (root, query, criteriaBuilder) -> {
+            if (walletIds == null || walletIds.isEmpty()) {
+                return null;
+            }
+            return root.get("walletId").in(walletIds);
         };
     }
 }
