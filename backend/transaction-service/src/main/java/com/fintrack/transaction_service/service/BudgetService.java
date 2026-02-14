@@ -76,7 +76,7 @@ public class BudgetService {
         // 1. Validate trùng
         if (budgetRepository.existsByWalletIdAndCategoryIdAndMonthAndYearAndUserId(
                 request.getWalletId(), request.getCategoryId(), request.getMonth(), request.getYear(), userId)) {
-            throw new RuntimeException("Ngân sách cho danh mục này đã tồn tại trong tháng " + request.getMonth());
+            throw new AppException(ErrorCode.BUDGET_ALREADY_EXISTS);
         }
 
         // 2. Map & Save

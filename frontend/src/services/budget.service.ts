@@ -1,5 +1,6 @@
 import http from "@/lib/http";
-import { Budget, BudgetCreationRequest } from "@/types/budget.dto";
+import { ApiResponse } from "@/types/api";
+import { BudgetCreationRequest, BudgetResponse } from "@/types/budget.dto";
 
 const BASE_URL = "/transaction/budgets";
 
@@ -20,18 +21,28 @@ export const budgetService = {
       queryParams.walletId = params.walletId;
     }
 
-    const response = await http.get<any>(`${BASE_URL}`, {
-      params: queryParams,
-    });
+    const response = await http.get<ApiResponse<BudgetResponse[]>>(
+      `${BASE_URL}`,
+      {
+        params: queryParams,
+      },
+    );
 
     return response.data?.result || [];
   },
 
   create: async (data: BudgetCreationRequest) => {
-    return await http.post(`${BASE_URL}`, data);
+    const response = await http.post<ApiResponse<BudgetResponse>>(
+      BASE_URL,
+      data,
+    );
+    return response.data.result;
   },
 
   delete: async (id: string) => {
-    return await http.delete(`${BASE_URL}/${id}`);
+    const response = await http.delete<ApiResponse<string>>(
+      `${BASE_URL}/${id}`,
+    );
+    return response.data;
   },
 };

@@ -20,3 +20,17 @@ export interface BudgetCreationRequest {
   month: number;
   year: number;
 }
+
+export interface BudgetResponse {
+  id: string;
+  name: string;
+  amount: number;
+  spentAmount: number; // Backend trả về
+  percentage: number; // Backend trả về
+  walletId?: string | null; // Có thể null nếu là Global Budget
+  walletName?: string;
+  categoryId: string;
+  categoryName: string;
+  month: number;
+  year: number;
+}
