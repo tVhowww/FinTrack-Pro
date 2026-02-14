@@ -151,19 +151,14 @@ export function BudgetDialog({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Áp dụng cho ví</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                    >
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Chọn ví" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="all">
-                          Tất cả các ví (Chung)
-                        </SelectItem>
+                        <SelectItem value="all">Ngân sách chung</SelectItem>
                         {wallets.map((w) => (
                           <SelectItem key={w.id} value={w.id}>
                             {w.name}

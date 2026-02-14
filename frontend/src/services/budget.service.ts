@@ -10,13 +10,13 @@ export const budgetService = {
     month: number;
     year: number;
   }) => {
-    // Nếu walletId là "all" hoặc rỗng, ta bỏ qua param đó để BE hiểu là lấy Global + All
     const queryParams: any = {
       month: params.month,
       year: params.year,
     };
 
-    if (params.walletId && params.walletId !== "all") {
+    // Gửi thẳng param walletId lên (all, global, hoặc id ví)
+    if (params.walletId) {
       queryParams.walletId = params.walletId;
     }
 

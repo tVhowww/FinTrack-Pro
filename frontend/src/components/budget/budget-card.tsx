@@ -11,18 +11,12 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { formatCurrency } from "@/lib/utils";
 import { Budget } from "@/types/budget.dto";
-import {
-  Badge,
-  Edit,
-  Globe,
-  MoreVertical,
-  Trash,
-  WalletIcon,
-} from "lucide-react";
+import { Edit, Globe, MoreVertical, Trash, WalletIcon } from "lucide-react";
+import { Badge } from "../ui/badge";
 
 interface BudgetCardProps {
   budget: Budget;
-  walletName: string;
+  walletName: string; // Truyền vào từ component cha (BudgetsPage)
   onEdit: (budget: Budget) => void;
   onDelete: (id: string) => void;
 }
@@ -33,12 +27,12 @@ export function BudgetCard({
   onEdit,
   onDelete,
 }: BudgetCardProps) {
-  // Nếu BE đã tính sẵn percentage thì dùng luôn, nếu không thì tự tính fallback
   const currentSpent = budget.spentAmount || 0;
-
   const percentage =
     budget.percentage ?? Math.min((currentSpent / budget.amount) * 100, 100);
   const isOverBudget = currentSpent > budget.amount;
+
+  // Xác định xem đây có phải là ngân sách chung (không thuộc ví nào cụ thể) không
   const isGlobal = !budget.walletId;
 
   // Logic màu sắc
@@ -66,14 +60,13 @@ export function BudgetCard({
                 variant="secondary"
                 className="text-[10px] px-2 h-5 gap-1 bg-blue-100 text-blue-700 hover:bg-blue-200"
               >
-                <Globe className="h-3 w-3" /> Tất cả ví
+                <Globe className="h-3 w-3" /> Ngân sách chung
               </Badge>
             ) : (
               <Badge
                 variant="outline"
                 className="text-[10px] px-2 h-5 gap-1 border-muted-foreground/40 text-muted-foreground"
               >
-                {/* 👇 Hiển thị tên ví được truyền từ Props */}
                 <WalletIcon className="h-3 w-3" /> {walletName}
               </Badge>
             )}

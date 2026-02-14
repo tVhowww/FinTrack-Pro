@@ -5,6 +5,7 @@ export interface Budget {
   spentAmount: number; // Backend trả về
   percentage: number; // Backend trả về
   walletId?: string | null; // Có thể null nếu là Global Budget
+  walletName?: string;
   categoryId: string;
   categoryName: string;
   month: number;
