@@ -10,13 +10,17 @@ import java.util.Optional;
 
 @Repository
 public interface BudgetRepository extends JpaRepository<Budget, String> {
-    // 1. Validate trùng: Check xem đã có budget nào cho (wallet + category + month + year) chưa
-    boolean existsByWalletIdAndCategoryIdAndMonthAndYear(String walletId, String categoryId, Integer month, Integer year);
+    boolean existsByWalletIdAndCategoryIdAndMonthAndYearAndUserId(String walletId, String categoryId, Integer month, Integer year, String userId);
 
-    // 2. Lấy danh sách cho Global (khi không chọn ví)
-    List<Budget> findByWalletIdIsNullAndMonthAndYear(Integer month, Integer year);
+    // 1. Cho "Ví chung" (Global): Chỉ lấy budget có walletId IS NULL
+    List<Budget> findByWalletIdIsNullAndMonthAndYearAndUserId(Integer month, Integer year, String userId);
 
-    // 3. Lấy danh sách cho ví cụ thể + Global
-    @Query("SELECT b FROM Budget b WHERE (b.walletId = :walletId OR b.walletId IS NULL) AND b.month = :month AND b.year = :year")
-    List<Budget> findBudgetsForWallet(String walletId, int month, int year);
+    // 2. Cho "Tất cả các ví" (All): Lấy TẤT CẢ (không quan tâm ví nào)
+    List<Budget> findByMonthAndYearAndUserId(Integer month, Integer year, String userId);
+
+    // 3. Cho "Ví cụ thể": Lấy của ví đó + Ví chung
+    @Query("SELECT b FROM Budget b WHERE (b.walletId = :walletId) AND b.month = :month AND b.year = :year AND b.userId = :userId")
+    List<Budget> findBudgetsForWallet(String walletId, int month, int year, String userId);
+
+    Optional<Budget> findByIdAndUserId(String id, String userId);
 }

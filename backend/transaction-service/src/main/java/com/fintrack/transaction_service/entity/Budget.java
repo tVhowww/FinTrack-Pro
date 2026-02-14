@@ -33,6 +33,9 @@ public class Budget {
     @Column(name = "wallet_id", nullable = true)
     private String walletId;
 
+    @Column(name = "user_id", nullable = false)
+    private String userId;
+
     @Column(name = "category_id", nullable = false)
     private String categoryId;
 
