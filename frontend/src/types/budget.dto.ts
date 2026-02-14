@@ -21,6 +21,11 @@ export interface BudgetCreationRequest {
   year: number;
 }
 
+export interface BudgetUpdateRequest {
+  name: string;
+  amount: number;
+}
+
 export interface BudgetResponse {
   id: string;
   name: string;

@@ -23,6 +23,8 @@ export default function BudgetsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
+  const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
+
   const currentYear = new Date().getFullYear();
   const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [year, setYear] = useState(currentYear);
@@ -30,15 +32,35 @@ export default function BudgetsPage() {
 
   const { wallets } = useWallets();
 
-  const { budgets, isLoading, createBudget, deleteBudget, isDeleting } =
-    useBudgets({
-      month,
-      year,
-      walletId: selectedWalletId,
-    });
+  const {
+    budgets,
+    isLoading,
+    createBudget,
+    deleteBudget,
+    updateBudget,
+    isDeleting,
+  } = useBudgets({
+    month,
+    year,
+    walletId: selectedWalletId,
+  });
 
-  const handleCreateSubmit = async (data: BudgetCreationRequest) => {
-    await createBudget(data);
+  const handleSubmit = async (values: any) => {
+    if (editingBudget) {
+      // Nếu là edit -> Chỉ gửi name và amount
+      await updateBudget({
+        id: editingBudget.id,
+        data: { name: values.name, amount: values.amount },
+      });
+    } else {
+      // Nếu là create -> Gửi toàn bộ payload
+      await createBudget(values);
+    }
+  };
+
+  const handleOpenChange = (open: boolean) => {
+    setIsDialogOpen(open);
+    if (!open) setEditingBudget(null);
   };
 
   const handleDeleteExecute = async () => {
@@ -156,7 +178,10 @@ export default function BudgetsPage() {
                   key={budget.id}
                   budget={budget}
                   walletName={finalWalletName as string} // Truyền tên ví đã được chốt hạ vào đây
-                  onEdit={() => toast.info("Tính năng đang phát triển")}
+                  onEdit={() => {
+                    setEditingBudget(budget);
+                    setIsDialogOpen(true);
+                  }}
                   onDelete={(id) => setDeleteId(id)}
                 />
               );
@@ -182,8 +207,9 @@ export default function BudgetsPage() {
 
       <BudgetDialog
         open={isDialogOpen}
-        onOpenChange={setIsDialogOpen}
-        onSubmit={handleCreateSubmit}
+        onOpenChange={handleOpenChange}
+        onSubmit={handleSubmit}
+        budgetToEdit={editingBudget}
       />
 
       <ConfirmDialog

@@ -1,6 +1,7 @@
 package com.fintrack.transaction_service.service;
 
 import com.fintrack.transaction_service.dto.request.BudgetCreationRequest;
+import com.fintrack.transaction_service.dto.request.BudgetUpdateRequest;
 import com.fintrack.transaction_service.dto.response.BudgetResponse;
 import com.fintrack.transaction_service.dto.response.WalletResponse;
 import com.fintrack.transaction_service.entity.Budget;
@@ -91,6 +92,28 @@ public class BudgetService {
         budget = budgetRepository.save(budget);
 
         // 3. Return (Tính toán luôn số tiền đã chi tiêu nếu có)
+        return mapToBudgetResponse(budget, getAllMyWallets());
+    }
+
+    @Transactional
+    public BudgetResponse update(String id, BudgetUpdateRequest request) {
+        String userId = SecurityUtils.getCurrentUserId();
+
+        // 1. Tìm ngân sách và kiểm tra quyền sở hữu
+        Budget budget = budgetRepository.findByIdAndUserId(id, userId)
+                .orElseThrow(() -> new AppException(ErrorCode.BUDGET_NOT_FOUND));
+
+        // 2. Cập nhật thông tin cho phép sửa
+        if (request.getName() != null && !request.getName().trim().isEmpty()) {
+            budget.setName(request.getName());
+        }
+        if (request.getAmount() != null && request.getAmount().compareTo(BigDecimal.ZERO) > 0) {
+            budget.setAmount(request.getAmount());
+        }
+
+        budget = budgetRepository.save(budget);
+
+        // 3. Trả về Response (tính toán lại % dựa trên số tiền mới)
         return mapToBudgetResponse(budget, getAllMyWallets());
     }
 

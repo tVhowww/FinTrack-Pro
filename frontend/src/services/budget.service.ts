@@ -1,6 +1,10 @@
 import http from "@/lib/http";
 import { ApiResponse } from "@/types/api";
-import { BudgetCreationRequest, BudgetResponse } from "@/types/budget.dto";
+import {
+  BudgetCreationRequest,
+  BudgetResponse,
+  BudgetUpdateRequest,
+} from "@/types/budget.dto";
 
 const BASE_URL = "/transaction/budgets";
 
@@ -34,6 +38,14 @@ export const budgetService = {
   create: async (data: BudgetCreationRequest) => {
     const response = await http.post<ApiResponse<BudgetResponse>>(
       BASE_URL,
+      data,
+    );
+    return response.data.result;
+  },
+
+  update: async (id: string, data: BudgetUpdateRequest) => {
+    const response = await http.put<ApiResponse<BudgetResponse>>(
+      `${BASE_URL}/${id}`,
       data,
     );
     return response.data.result;
