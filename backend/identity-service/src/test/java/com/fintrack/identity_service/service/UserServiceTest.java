@@ -80,8 +80,8 @@ public class UserServiceTest {
     @Test
     void createUser_ValidRequest_Success() {
         // GIVEN
-        when(userRepository.existsByUsername(anyString())).thenReturn(false);
-        when(userRepository.existsByEmail(any())).thenReturn(false);
+        when(userRepository.existsByUsernameAndDeletedFalse(anyString())).thenReturn(false);
+        when(userRepository.existsByEmailAndDeletedFalse(any())).thenReturn(false);
         when(userMapper.toUser(any(UserCreationRequest.class))).thenReturn(user);
         when(passwordEncoder.encode(anyString())).thenReturn("encodedPassword123");
 
@@ -104,7 +104,7 @@ public class UserServiceTest {
     @Test
     void createUser_UserExisted_Fail() {
         // GIVEN
-        when(userRepository.existsByUsername(anyString())).thenReturn(true);
+        when(userRepository.existsByUsernameAndDeletedFalse(anyString())).thenReturn(true);
 
         // WHEN & THEN
         var exception = assertThrows(AppException.class, () -> userService.createUser(request));

@@ -61,7 +61,7 @@ public class AuthenticationServiceTest {
     @Test
     void authenticate_Success() {
         // GIVEN
-        when(userRepository.findByUsername(anyString())).thenReturn(Optional.of(user));
+        when(userRepository.findByUsernameAndDeletedFalse(anyString())).thenReturn(Optional.of(user));
         // Giả lập pass nhập vào khớp với pass trong DB
         when(passwordEncoder.matches(anyString(), anyString())).thenReturn(true);
         // Giả lập lưu user (để update currentJwtId)
@@ -79,7 +79,7 @@ public class AuthenticationServiceTest {
     @Test
     void authenticate_UserNotFound_Fail() {
         // GIVEN
-        when(userRepository.findByUsername(anyString())).thenReturn(Optional.empty());
+        when(userRepository.findByUsernameAndDeletedFalse(anyString())).thenReturn(Optional.empty());
 
         // WHEN & THEN
         AppException exception = assertThrows(AppException.class,
@@ -91,7 +91,7 @@ public class AuthenticationServiceTest {
     @Test
     void authenticate_WrongPassword_Fail() {
         // GIVEN
-        when(userRepository.findByUsername(anyString())).thenReturn(Optional.of(user));
+        when(userRepository.findByUsernameAndDeletedFalse(anyString())).thenReturn(Optional.of(user));
         // Giả lập pass nhập vào KHÔNG khớp
         when(passwordEncoder.matches(anyString(), anyString())).thenReturn(false);
 

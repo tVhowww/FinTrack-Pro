@@ -19,9 +19,9 @@ public interface TransactionRepository extends JpaRepository<Transaction, String
     List<Transaction> findByWalletIdOrderByDateDesc(String walletId);
 
     @Query("SELECT COALESCE(SUM(t.amount), 0) FROM Transaction t " +
-    "WHERE t.walletId = :walletId " +
-    "AND t.type = :type " +
-    "AND t.createdAt BETWEEN :startDate AND :endDate")
+            "WHERE t.walletId = :walletId " +
+            "AND t.type = :type " +
+            "AND t.createdAt BETWEEN :startDate AND :endDate")
     BigDecimal sumAmountByWalletAndTypeAndDateBetween(@Param("walletId") String walletId,
                                                       @Param("type") TransactionType type,
                                                       @Param("startDate") Instant startDate,
@@ -90,4 +90,8 @@ public interface TransactionRepository extends JpaRepository<Transaction, String
             @Param("startDate") Instant startDate,
             @Param("endDate") Instant endDate
     );
+
+    @Modifying
+    @Query("DELETE FROM Transaction t WHERE t.walletId IN :walletIds")
+    void deleteByWalletIdIn(List<String> walletIds);
 }

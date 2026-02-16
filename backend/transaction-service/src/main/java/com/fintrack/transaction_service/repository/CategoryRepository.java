@@ -3,6 +3,7 @@ package com.fintrack.transaction_service.repository;
 import com.fintrack.transaction_service.entity.Category;
 import com.fintrack.transaction_service.enums.TransactionType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
@@ -35,4 +36,8 @@ public interface CategoryRepository extends JpaRepository<Category, String> {
     boolean existsByNameAndUserIdIsNullAndType(String name, TransactionType type);
 
     Optional<Category> findByNameAndTypeAndUserIdIsNull(String name, TransactionType type);
+
+    @Modifying
+    @Query("DELETE FROM Category c WHERE c.userId = :userId")
+    void deleteByUserId(String userId);
 }

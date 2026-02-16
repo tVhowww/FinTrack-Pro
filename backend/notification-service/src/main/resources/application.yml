@@ -9,15 +9,15 @@ spring:
 
   # Cau hinh KAFKA
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:29092} # <--- Dùng biến môi trường
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:29092}
     consumer:
-      group-id: notification-group
-      auto-offset-reset: earliest
+      group-id: notification-group-v3
+      auto-offset-reset: latest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
         spring.json.trusted.packages: "*"
-        spring.json.type.mapping: event:com.fintrack.notification_service.dto.event.NotificationEvent
+        spring.json.use.type.headers: false
 
   # Cau hinh EMAIL (Gmail SMTP)
   mail:
