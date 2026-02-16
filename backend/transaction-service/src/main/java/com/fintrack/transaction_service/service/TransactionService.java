@@ -159,15 +159,11 @@ public class TransactionService {
         log.info("Tạo adjustment transaction: walletId={}, amount={}, type={}",
                 request.getWalletId(), request.getAmount(), request.getType());
 
-        // 1. Tìm hoặc tạo Category "Điều chỉnh số dư" (System Category)
-        // Sử dụng synchronized để tránh duplicate khi nhiều request đồng thời
         Category category = getOrCreateSystemCategory("Điều chỉnh số dư", request.getType());
 
-        // 2. Map và Lưu Transaction
         Transaction transaction = transactionMapper.toTransaction(request);
         transaction.setCategory(category);
 
-        // Đảm bảo có note rõ ràng
         if (transaction.getNote() == null || transaction.getNote().isEmpty()) {
             transaction.setNote("Điều chỉnh số dư thủ công");
         }
@@ -175,8 +171,21 @@ public class TransactionService {
         transaction = transactionRepository.save(transaction);
         log.info("Đã lưu adjustment transaction: id={}", transaction.getId());
 
-        // 3. Gửi thông báo ASYNC (Không block transaction)
-        sendTransactionNotification(transaction, category);
+        // LẤY INFO TRƯỚC KHI XUỐNG ASYNC
+        String recipientEmail = null;
+        String username = "Người dùng";
+        try {
+            var userResponse = identityClient.getMyInfo();
+            if (userResponse != null && userResponse.getResult() != null) {
+                recipientEmail = userResponse.getResult().getEmail();
+                username = userResponse.getResult().getUsername();
+            }
+        } catch (Exception e) {
+            log.error("Lỗi lấy thông tin user để gửi email: {}", e.getMessage());
+        }
+
+        // 3. Gửi thông báo ASYNC (Truyền thêm Email và Tên)
+        sendTransactionNotification(transaction, category, recipientEmail, username);
     }
 
     /**
@@ -472,29 +481,37 @@ public class TransactionService {
                     .orElseThrow(() -> new AppException(ErrorCode.CATEGORY_NOT_FOUND));
         }
 
-        // 1. Map và Lưu Transaction vào DB trước (Trạng thái Pending hoặc cứ lưu trước)
         Transaction transaction = transactionMapper.toTransaction(request);
         transaction.setCategory(category);
-        transaction = transactionRepository.save(transaction); // Có ID rồi
+        transaction = transactionRepository.save(transaction);
 
-        // 2. Tính toán tiền
         BigDecimal updateAmount = request.getAmount();
         if (request.getType() == TransactionType.EXPENSE) {
             updateAmount = updateAmount.negate();
         }
 
-        // 3. Gọi sang Wallet
-        // Nếu dòng này lỗi -> Exception -> Spring tự Rollback bước 1 (Xóa transaction khỏi DB) -> An toàn
         WalletBalanceUpdateRequest balanceRequest = WalletBalanceUpdateRequest.builder()
                 .amount(updateAmount)
                 .build();
 
         walletClient.updateBalance(request.getWalletId(), balanceRequest);
 
-        // 4. Gửi Notification qua Kafka
-        sendTransactionNotification(transaction, category);
+        // LẤY INFO TRƯỚC KHI XUỐNG ASYNC
+        String recipientEmail = null;
+        String username = "Người dùng";
+        try {
+            var userResponse = identityClient.getMyInfo();
+            if (userResponse != null && userResponse.getResult() != null) {
+                recipientEmail = userResponse.getResult().getEmail();
+                username = userResponse.getResult().getUsername();
+            }
+        } catch (Exception e) {
+            log.error("Lỗi lấy thông tin user để gửi email: {}", e.getMessage());
+        }
 
-        // 4. Trả về kết quả
+        // 4. Gửi Notification qua Kafka (Truyền thêm Email và Tên)
+        sendTransactionNotification(transaction, category, recipientEmail, username);
+
         return transactionMapper.toTransactionResponse(transaction);
     }
 
@@ -503,34 +520,16 @@ public class TransactionService {
      * Nếu lỗi sẽ không ảnh hưởng đến giao dịch chính
      */
     @Async
-    public void sendTransactionNotification(Transaction transaction, Category category) {
+    public void sendTransactionNotification(Transaction transaction, Category category, String recipientEmail, String username) { // 👇 ĐÃ THÊM THAM SỐ
         try {
-            String recipientEmail = null;
-            String username = "Người dùng";
-
-            // Lấy thông tin user từ Identity Service
-            try {
-                var userResponse = identityClient.getMyInfo();
-                if (userResponse != null && userResponse.getResult() != null) {
-                    recipientEmail = userResponse.getResult().getEmail();
-                    username = userResponse.getResult().getUsername();
-
-                    if (recipientEmail == null || recipientEmail.isEmpty()) {
-                        log.warn("User không có email, bỏ qua gửi thông báo cho transaction: {}", transaction.getId());
-                        return;
-                    }
-                }
-            } catch (Exception e) {
-                log.error("Không lấy được thông tin User từ Identity Service: {}", e.getMessage());
-                // Không gửi email nếu không lấy được thông tin user
+            if (recipientEmail == null || recipientEmail.isEmpty()) {
+                log.warn("User không có email, bỏ qua gửi thông báo cho transaction: {}", transaction.getId());
                 return;
             }
 
-            // Format số tiền
             NumberFormat formatter = NumberFormat.getInstance(Locale.of("vi", "VN"));
             String formattedNumber = formatter.format(transaction.getAmount().abs());
 
-            // Xử lý nội dung text
             String amountString;
             String actionString;
 
@@ -544,14 +543,13 @@ public class TransactionService {
 
             String categoryName = (category != null) ? category.getName() : "Không phân loại";
 
-            // Tạo nội dung email
             String emailBody = String.format(
                     "Xin chào %s,\n\n" +
-                    "Giao dịch mới: %s\n" +
-                    "Nội dung: %s %s\n" +
-                    "Ghi chú: %s\n" +
-                    "Thời gian: %s\n\n" +
-                    "Đây là email tự động, vui lòng không trả lời.",
+                            "Giao dịch mới: %s\n" +
+                            "Nội dung: %s %s\n" +
+                            "Ghi chú: %s\n" +
+                            "Thời gian: %s\n\n" +
+                            "Đây là email tự động, vui lòng không trả lời.",
                     username,
                     amountString,
                     actionString,
@@ -560,7 +558,6 @@ public class TransactionService {
                     transaction.getDate().toString()
             );
 
-            // Tạo và gửi event
             NotificationEvent event = NotificationEvent.builder()
                     .channel("EMAIL")
                     .recipient(recipientEmail)

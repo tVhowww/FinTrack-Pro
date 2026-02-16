@@ -2,6 +2,7 @@ package com.fintrack.transaction_service.repository;
 
 import com.fintrack.transaction_service.entity.Budget;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
@@ -23,4 +24,8 @@ public interface BudgetRepository extends JpaRepository<Budget, String> {
     List<Budget> findBudgetsForWallet(String walletId, int month, int year, String userId);
 
     Optional<Budget> findByIdAndUserId(String id, String userId);
+
+    @Modifying
+    @Query("DELETE FROM Budget b WHERE b.userId = :userId")
+    void deleteByUserId(String userId);
 }
