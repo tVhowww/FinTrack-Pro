@@ -1,5 +1,6 @@
 package com.fintrack.identity_service.service;
 
+import com.fintrack.identity_service.dto.event.UserDeletedEvent;
 import com.fintrack.identity_service.dto.request.PasswordChangeRequest;
 import com.fintrack.identity_service.dto.request.ProfileUpdateRequest;
 import com.fintrack.identity_service.dto.request.UserCreationRequest;
@@ -13,6 +14,7 @@ import com.fintrack.identity_service.repository.RoleRepository;
 import com.fintrack.identity_service.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -32,6 +34,9 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
     private final RoleRepository roleRepository;
 
+    private final KafkaTemplate<String, Object> kafkaTemplate;
+    private final CloudinaryService cloudinaryService;
+
     private static final String DEFAULT_ROLE = "USER";
 
     public List<User> getUsers() {
@@ -41,25 +46,43 @@ public class UserService {
     @Transactional
     public void deleteAccount() {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
-        User user = userRepository.findByUsername(username)
+        User user = userRepository.findByUsernameAndDeletedFalse(username)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
 
-        user.setDeleted(true);
+        // 1. LƯU LẠI EMAIL THẬT TRƯỚC KHI XÓA
+        String originalEmail = user.getEmail();
 
-        // Sử dụng UUID để đảm bảo không bao giờ trùng lặp
+        // 2. Soft Delete & Randomize
+        user.setDeleted(true);
         String uniqueId = UUID.randomUUID().toString();
         user.setEmail("deleted_" + uniqueId + "_" + user.getEmail());
         user.setUsername("deleted_" + uniqueId + "_" + user.getUsername());
 
-        userRepository.save(user);
+        userRepository.save(user); // Transactional sẽ tự flush, gán save cho chắc ăn
 
-        // TODO: producer -> gửi message xóa dữ liệu liên quan trong các service khác nếu cần
+        // 3. GỬI SỰ KIỆN QUA KAFKA ĐỂ CÁC SERVICE KHÁC DỌN RÁC
+        UserDeletedEvent event = UserDeletedEvent.builder()
+                .userId(user.getId())
+                .email(originalEmail) // Gửi email thật cho Notification Service
+                .build();
+
+        kafkaTemplate.send("user-deleted-topic", event);
+        log.info("Đã gửi event xóa tài khoản cho userId: {}", user.getId());
+
+        // 4. Xóa ảnh trên Cloudinary
+        if (user.getAvatar() != null && !user.getAvatar().isEmpty()) {
+            try {
+                cloudinaryService.deleteImage(user.getAvatar());
+            } catch (Exception e) {
+                log.error("Lỗi khi xóa avatar của user {} trên Cloudinary: {}", user.getId(), e.getMessage());
+            }
+        }
     }
 
     @Transactional
     public UserResponse updateProfile(ProfileUpdateRequest request) {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
-        User user = userRepository.findByUsername(username)
+        User user = userRepository.findByUsernameAndDeletedFalse(username)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
 
         userMapper.updateUser(user, request);
@@ -70,7 +93,7 @@ public class UserService {
     @Transactional
     public void changePassword(PasswordChangeRequest request) {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
-        User user = userRepository.findByUsername(username)
+        User user = userRepository.findByUsernameAndDeletedFalse(username)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
 
         // 1. Kiểm tra mật khẩu cũ
@@ -88,7 +111,7 @@ public class UserService {
     @Transactional
     public UserResponse updateAvatar(String avatarUrl) {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
-        User user = userRepository.findByUsername(username)
+        User user = userRepository.findByUsernameAndDeletedFalse(username)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
 
         user.setAvatar(avatarUrl);
@@ -98,8 +121,8 @@ public class UserService {
     @Transactional
     public UserResponse createUser(UserCreationRequest request) {
         // 1. Validate input
-        if (userRepository.existsByUsername(request.getUsername()) ||
-                userRepository.existsByEmail(request.getEmail())) {
+        if (userRepository.existsByUsernameAndDeletedFalse(request.getUsername()) ||
+                userRepository.existsByEmailAndDeletedFalse(request.getEmail())) {
             throw new AppException(ErrorCode.USER_EXISTED);
         }
 
@@ -150,7 +173,7 @@ public class UserService {
         var context = SecurityContextHolder.getContext();
         String name = context.getAuthentication().getName();
 
-        User user = userRepository.findByUsername(name)
+        User user = userRepository.findByUsernameAndDeletedFalse(name)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
 
         return userMapper.toUserResponse(user);

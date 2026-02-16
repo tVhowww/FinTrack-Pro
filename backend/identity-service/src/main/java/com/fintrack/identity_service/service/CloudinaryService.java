@@ -31,4 +31,13 @@ public class CloudinaryService {
             throw new RuntimeException("Lỗi upload ảnh lên Cloudinary: " + e.getMessage());
         }
     }
+
+    public void deleteImage(String avatar) {
+        try {
+            String publicId = avatar.substring(avatar.lastIndexOf("/") + 1, avatar.lastIndexOf("."));
+            cloudinary.uploader().destroy("fintrack_avatars/" + publicId, ObjectUtils.emptyMap());
+        } catch (IOException e) {
+            throw new RuntimeException("Lỗi xóa ảnh trên Cloudinary: " + e.getMessage());
+        }
+    }
 }

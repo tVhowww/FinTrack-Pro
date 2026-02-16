@@ -59,7 +59,7 @@ public class AuthenticationService {
 
         // Check xem token này có phải là token hiện hành không?
         var username = signedJWT.getJWTClaimsSet().getSubject();
-        var user = userRepository.findByUsername(username)
+        var user = userRepository.findByUsernameAndDeletedFalse(username)
                 .orElseThrow(() -> new AppException(ErrorCode.UNAUTHENTICATED));
 
         if (user.getCurrentJwtId() != null && !user.getCurrentJwtId().equals(jit)) {
@@ -108,7 +108,7 @@ public class AuthenticationService {
 
             // [LOGIC MỚI] Xóa dấu vết trong bảng User
             var username = signToken.getJWTClaimsSet().getSubject();
-            var user = userRepository.findByUsername(username).orElse(null);
+            var user = userRepository.findByUsernameAndDeletedFalse(username).orElse(null);
             if (user != null) {
                 user.setCurrentJwtId(null); // Không còn phiên nào active
                 userRepository.save(user);
@@ -140,7 +140,7 @@ public class AuthenticationService {
     @Transactional
     public AuthenticationResponse authenticate(AuthenticationRequest request) {
         // 1. Tìm user theo username
-        var user = userRepository.findByUsername(request.getUsername())
+        var user = userRepository.findByUsernameAndDeletedFalse(request.getUsername())
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
 
         // 2. Khớp mật khẩu (Pass chưa hash của người dùng vs Pass đã hash trong DB)
