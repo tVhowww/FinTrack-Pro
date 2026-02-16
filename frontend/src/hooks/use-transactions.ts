@@ -10,7 +10,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useState } from "react";
 
-// Params mặc định để tránh lỗi undefined khi khởi tạo
 const defaultParams: TransactionQueryParams = {
   page: 1,
   size: 10,
@@ -20,20 +19,20 @@ export function useTransactions(
   params: TransactionQueryParams = defaultParams,
 ) {
   const queryClient = useQueryClient();
-
-  // State riêng cho việc check related transactions (dùng cho Category Page)
   const [isCheckingRelated, setIsCheckingRelated] = useState(false);
 
   // =================================================================
   // 1. QUERY: Lấy danh sách giao dịch
   // =================================================================
   const { data, isLoading, isPlaceholderData } = useQuery({
-    // Khi params thay đổi (page, size, filter...), queryKey đổi -> Tự động gọi lại API
     queryKey: ["transactions", params],
     queryFn: () => transactionService.getTransactions(params),
-    // Giữ data cũ trong khi đang fetch trang mới -> Giúp bảng không bị nhấp nháy (UX tốt hơn)
+
+    // Nếu trang của bạn cho phép xem "Tất cả ví" (không có walletId), bạn có thể bỏ check này hoặc điều chỉnh logic backend
+    enabled: params.walletId !== "undefined",
+
     placeholderData: (previousData) => previousData,
-    staleTime: 0,
+    staleTime: 1000 * 60, // Cache 1 phút để tránh gọi lại liên tục
     refetchOnWindowFocus: true,
   });
 
@@ -45,14 +44,13 @@ export function useTransactions(
       transactionService.create(data),
     onSuccess: () => {
       toast.success("Tạo giao dịch thành công");
-      // Refresh danh sách giao dịch
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
-      // QUAN TRỌNG: Refresh lại số dư ví (vì giao dịch làm thay đổi tiền)
+      // Invalidate cả statistics để biểu đồ cập nhật ngay
+      queryClient.invalidateQueries({ queryKey: ["statistics"] });
       queryClient.invalidateQueries({ queryKey: ["wallets"] });
     },
     onError: (error: any) => {
       const msg = error?.response?.data?.message || "Tạo thất bại";
-      // Xử lý thông báo lỗi số dư tiếng Việt cho thân thiện
       if (msg.includes("Insufficient balance") || msg.includes("2005")) {
         toast.error("Số dư ví không đủ để thực hiện giao dịch này!");
       } else {
@@ -75,6 +73,7 @@ export function useTransactions(
     onSuccess: () => {
       toast.success("Cập nhật thành công");
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["statistics"] });
       queryClient.invalidateQueries({ queryKey: ["wallets"] });
     },
     onError: (error: any) => {
@@ -91,6 +90,7 @@ export function useTransactions(
     onSuccess: () => {
       toast.success("Đã xóa giao dịch và hoàn tiền lại ví");
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["statistics"] });
       queryClient.invalidateQueries({ queryKey: ["wallets"] });
     },
     onError: (error: any) => {
@@ -99,21 +99,20 @@ export function useTransactions(
   });
 
   // =================================================================
-  // 5. HELPER: Kiểm tra giao dịch liên quan (Dùng cho module Category)
+  // 5. HELPER: Kiểm tra giao dịch liên quan
   // =================================================================
   const checkRelatedTransactions = async (categoryId: string) => {
     setIsCheckingRelated(true);
     try {
-      // Lấy 5 giao dịch mới nhất thuộc category này để preview
       const res = await transactionService.getTransactions({
         page: 1,
         size: 5,
         categoryId: categoryId,
+        // Lưu ý: Ở đây có thể cần truyền thêm walletId nếu backend bắt buộc
       });
       return res?.data || [];
     } catch (error) {
       console.error("Lỗi check giao dịch:", error);
-      toast.error("Không thể kiểm tra dữ liệu liên quan.");
       return [];
     } finally {
       setIsCheckingRelated(false);
@@ -121,26 +120,17 @@ export function useTransactions(
   };
 
   return {
-    // Data list
     data: data?.data || [],
     totalPages: data?.totalPages || 0,
     totalElements: data?.totalElements || 0,
-
-    // Status
-    isLoading, // Loading của Query (Get List)
-    isPlaceholderData, // Đang load trang tiếp theo nhưng vẫn hiện data cũ
-
-    // Actions (Mutations)
+    isLoading,
+    isPlaceholderData,
     createTransaction: createMutation.mutateAsync,
     updateTransaction: updateMutation.mutateAsync,
     deleteTransaction: deleteMutation.mutateAsync,
-
-    // Loading states của actions
     isCreating: createMutation.isPending,
     isUpdating: updateMutation.isPending,
     isDeleting: deleteMutation.isPending,
-
-    // Helper cho Category
     checkRelatedTransactions,
     isCheckingRelated,
   };

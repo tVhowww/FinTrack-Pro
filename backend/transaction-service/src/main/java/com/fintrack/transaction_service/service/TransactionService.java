@@ -17,6 +17,7 @@ import com.fintrack.transaction_service.repository.httpclient.IdentityClient;
 import com.fintrack.transaction_service.repository.httpclient.WalletClient;
 import com.fintrack.transaction_service.repository.specification.TransactionSpecification;
 import com.fintrack.transaction_service.utils.ExcelHelper;
+import com.fintrack.transaction_service.utils.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -37,6 +38,7 @@ import java.time.Instant;
 import java.time.YearMonth;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 
@@ -56,12 +58,14 @@ public class TransactionService {
     }
 
     public List<TransactionResponse> getHighestExpenses(String walletId, int month, int year) {
+        List<String> walletIds = resolveWalletIds(walletId);
+        if (walletIds.isEmpty()) return new ArrayList<>();
+
         YearMonth yearMonth = YearMonth.of(year, month);
         Instant start = yearMonth.atDay(1).atStartOfDay(ZoneId.systemDefault()).toInstant();
         Instant end = yearMonth.atEndOfMonth().atTime(23, 59, 59).atZone(ZoneId.systemDefault()).toInstant();
 
-        // Gọi hàm Query vừa viết
-        List<Transaction> transactions = transactionRepository.findHighestExpenses(walletId, start, end);
+        List<Transaction> transactions = transactionRepository.findHighestExpensesByWalletIds(walletIds, start, end);
 
         return transactions.stream()
                 .map(transactionMapper::toTransactionResponse)
@@ -72,33 +76,35 @@ public class TransactionService {
      * Lấy xu hướng dòng tiền 6 tháng gần nhất (Balance Trend)
      */
     public List<BalanceTrendResponse> getBalanceTrend(String walletId) {
+        List<String> walletIds = resolveWalletIds(walletId);
+        if (walletIds.isEmpty()) return new ArrayList<>(); // User mới -> Trả về mảng rỗng
+
         List<BalanceTrendResponse> trends = new ArrayList<>();
         YearMonth currentMonth = YearMonth.now();
 
-        // Lặp 6 lần cho 6 tháng gần nhất (từ quá khứ -> hiện tại)
         for (int i = 5; i >= 0; i--) {
             YearMonth targetMonth = currentMonth.minusMonths(i);
-
-            // Tính ngày đầu tháng và cuối tháng
             Instant start = targetMonth.atDay(1).atStartOfDay(ZoneId.systemDefault()).toInstant();
             Instant end = targetMonth.atEndOfMonth().atTime(23, 59, 59).atZone(ZoneId.systemDefault()).toInstant();
 
-            // Gọi Repo tính tổng (Repo đã xử lý walletId null)
-            BigDecimal income = transactionRepository.sumAmountByWalletIdAndTypeAndDate(
-                    walletId, TransactionType.INCOME, start, end
+            BigDecimal income = transactionRepository.sumAmountByWalletIdInAndTypeAndDate(
+                    walletIds, TransactionType.INCOME, start, end
             );
+            if (income == null) income = BigDecimal.ZERO;
 
-            BigDecimal expenseRaw = transactionRepository.sumAmountByWalletIdAndTypeAndDate(
-                    walletId, TransactionType.EXPENSE, start, end
+            BigDecimal expenseRaw = transactionRepository.sumAmountByWalletIdInAndTypeAndDate(
+                    walletIds, TransactionType.EXPENSE, start, end
             );
-            BigDecimal expense = expenseRaw.abs(); // Chuyển số âm thành dương
+            if (expenseRaw == null) expenseRaw = BigDecimal.ZERO;
+
+            BigDecimal expense = expenseRaw.abs();
 
             trends.add(BalanceTrendResponse.builder()
                     .month(targetMonth.getMonthValue())
                     .year(targetMonth.getYear())
                     .income(income)
                     .expense(expense)
-                    .netSavings(income.subtract(expense)) // Thu - Chi
+                    .netSavings(income.subtract(expense))
                     .build());
         }
         return trends;
@@ -108,23 +114,21 @@ public class TransactionService {
      * Lấy cơ cấu chi tiêu theo danh mục (Expense Structure)
      */
     public List<ExpenseStructureResponse> getExpenseStructure(String walletId, int month, int year) {
-        // 1. Xác định thời gian
+        List<String> walletIds = resolveWalletIds(walletId);
+        if (walletIds.isEmpty()) return new ArrayList<>();
+
         YearMonth yearMonth = YearMonth.of(year, month);
         Instant start = yearMonth.atDay(1).atStartOfDay(ZoneId.systemDefault()).toInstant();
         Instant end = yearMonth.atEndOfMonth().atTime(23, 59, 59).atZone(ZoneId.systemDefault()).toInstant();
 
-        // 2. Lấy dữ liệu gom nhóm từ DB
-        List<Object[]> rawData = transactionRepository.findExpenseStructure(walletId, start, end);
+        List<Object[]> rawData = transactionRepository.findExpenseStructureByWalletIds(walletIds, start, end);
 
-        // 3. Tính tổng chi tiêu (để chia phần trăm)
         BigDecimal totalExpense = rawData.stream()
                 .map(obj -> (BigDecimal) obj[1])
                 .reduce(BigDecimal.ZERO, BigDecimal::add)
                 .abs();
 
         List<ExpenseStructureResponse> result = new ArrayList<>();
-
-        // 4. Map sang DTO và tính %
         for (Object[] row : rawData) {
             Category category = (Category) row[0];
             BigDecimal amountRaw = (BigDecimal) row[1];
@@ -142,10 +146,7 @@ public class TransactionService {
                     .percentage(percentage)
                     .build());
         }
-
-        // Sắp xếp giảm dần theo số tiền
         result.sort((a, b) -> b.getAmount().compareTo(a.getAmount()));
-
         return result;
     }
 
@@ -198,6 +199,8 @@ public class TransactionService {
     }
 
     public ByteArrayInputStream exportToExcel(String walletId, TransactionType type, Instant startDate, Instant endDate) {
+        validateWalletOwnership(walletId);
+
         // 1. Tạo bộ lọc (giống hệt hàm getTransactions nhưng không phân trang)
         Specification<Transaction> spec = Specification.where(TransactionSpecification.hasWalletId(walletId))
                 .and(TransactionSpecification.hasType(type))
@@ -212,35 +215,39 @@ public class TransactionService {
     }
 
     public MonthlyStatisticsResponse getMonthlyStatistics(String walletId, int month, int year) {
-        // 1. Tính toán khoảng thời gian (Start - End) của tháng
-        // Lưu ý: Project đang dùng Instant (UTC), nên ta cần xử lý múi giờ cẩn thận.
-        // Ở đây giả sử ta tính theo giờ hệ thống (hoặc UTC mặc định)
-        YearMonth yearMonth = YearMonth.of(year, month);
+        // 1. Xác định danh sách ví được phép xem
+        List<String> walletIds = resolveWalletIds(walletId);
 
-        // Ngày đầu tháng lúc 00:00:00
+        // 2. Nếu không có ví nào (Tài khoản mới) -> Trả về 0 hết ngay lập tức
+        if (walletIds.isEmpty()) {
+            return MonthlyStatisticsResponse.builder()
+                    .month(month).year(year)
+                    .totalIncome(BigDecimal.ZERO)
+                    .totalExpense(BigDecimal.ZERO)
+                    .netSavings(BigDecimal.ZERO)
+                    .build();
+        }
+
+        // 3. Tính toán thời gian
+        YearMonth yearMonth = YearMonth.of(year, month);
         Instant start = yearMonth.atDay(1).atStartOfDay(ZoneId.systemDefault()).toInstant();
-        // Ngày cuối tháng lúc 23:59:59.999999
         Instant end = yearMonth.atEndOfMonth().atTime(23, 59, 59).atZone(ZoneId.systemDefault()).toInstant();
 
-        // 2. Tính Tổng Thu (INCOME)
-        BigDecimal totalIncome = transactionRepository.sumAmountByWalletIdAndTypeAndDate(
-                walletId, TransactionType.INCOME, start, end
+        // 4. Query DB với danh sách ID (Dùng hàm mới có chữ "In")
+        BigDecimal totalIncome = transactionRepository.sumAmountByWalletIdInAndTypeAndDate(
+                walletIds, TransactionType.INCOME, start, end
         );
 
-        // 3. Tính Tổng Chi (EXPENSE)
-        // Lưu ý: Trong DB, EXPENSE đang lưu số ÂM (ví dụ -50000).
-        // Khi hiển thị thống kê "Tổng chi tiêu", ta thường muốn hiện số dương (Chi tiêu: 50.000đ).
-        // Nên ta lấy giá trị tuyệt đối (abs) hoặc đảo dấu.
-        BigDecimal totalExpenseRaw = transactionRepository.sumAmountByWalletIdAndTypeAndDate(
-                walletId, TransactionType.EXPENSE, start, end
+        BigDecimal totalExpenseRaw = transactionRepository.sumAmountByWalletIdInAndTypeAndDate(
+                walletIds, TransactionType.EXPENSE, start, end
         );
-        // Đổi sang số dương để hiển thị cho đẹp: "Chi tiêu: 50.000"
+
+        // Xử lý null
+        if (totalIncome == null) totalIncome = BigDecimal.ZERO;
+        if (totalExpenseRaw == null) totalExpenseRaw = BigDecimal.ZERO;
+
         BigDecimal totalExpense = totalExpenseRaw.abs();
-
-        // 4. Tính Số Dư (Net Savings) = Thu + Chi (Vì Chi là số âm nên cộng vào là trừ ra)
-        // Ví dụ: Thu 100 + (-30) = 70
-        // do expense lưu trong db là số dương nên dùng subtract
-        BigDecimal netSavings = totalIncome.subtract(totalExpenseRaw);
+        BigDecimal netSavings = totalIncome.subtract(totalExpense);
 
         return MonthlyStatisticsResponse.builder()
                 .month(month)
@@ -256,32 +263,53 @@ public class TransactionService {
             String walletId, TransactionType type,
             Instant startDate, Instant endDate, String categoryId) {
 
-        // 1. Tạo Pageable (Sắp xếp mới nhất lên đầu)
+        // Lấy UserID hiện tại
+        String currentUserId = SecurityUtils.getCurrentUserId();
+        List<String> walletIdsToQuery = new ArrayList<>();
+
+        // LOGIC MỚI: Xử lý Wallet ID
+        if (walletId != null && !walletId.trim().isEmpty() && !"undefined".equals(walletId)) {
+            // Trường hợp 1: Có chọn ví cụ thể -> Check quyền sở hữu ví đó
+            validateWalletOwnership(walletId);
+            walletIdsToQuery.add(walletId);
+        } else {
+            // Trường hợp 2: Không chọn ví (Xem tất cả) -> Lấy danh sách ví của User này
+            // Gọi sang Wallet Service lấy "My Wallets"
+            var walletResponse = walletClient.getMyWallets(); // Cần đảm bảo WalletClient có hàm này (xem Bước 3)
+            if (walletResponse != null && walletResponse.getResult() != null) {
+                walletIdsToQuery = walletResponse.getResult().stream()
+                        .map(WalletResponse::getId)
+                        .toList();
+            }
+            // Nếu user không có ví nào thì trả về rỗng luôn
+            if (walletIdsToQuery.isEmpty()) {
+                return PageResponse.<TransactionResponse>builder()
+                        .currentPage(page).pageSize(size).totalElements(0).data(List.of()).build();
+            }
+        }
+
         Pageable pageable = PageRequest.of(page - 1, size, Sort.by("createdAt").descending());
 
+        // Xử lý Category (giữ nguyên)
         List<String> categoryIdsToFilter = null;
         if (categoryId != null) {
             Category category = categoryRepository.findById(categoryId).orElse(null);
             if (category != null) {
                 categoryIdsToFilter = new ArrayList<>();
-                // Tái sử dụng hàm đệ quy collectCategoryIds bạn đã viết ở hàm delete
                 collectCategoryIds(category, categoryIdsToFilter);
             } else {
-                // Nếu gửi ID tào lao lên thì cho list rỗng để không ra kết quả nào
                 categoryIdsToFilter = List.of("non-existent-id");
             }
         }
 
-        // 2. Tạo Specification (Dynamic Query)
-        Specification<Transaction> spec = Specification.where(TransactionSpecification.hasWalletId(walletId))
+        // Tạo Specification: Thay hasWalletId bằng hasWalletIdIn
+        Specification<Transaction> spec = Specification.where(TransactionSpecification.hasWalletIdIn(walletIdsToQuery))
                 .and(TransactionSpecification.hasType(type))
                 .and(TransactionSpecification.createdBetween(startDate, endDate))
                 .and(TransactionSpecification.hasCategoryIn(categoryIdsToFilter));
 
-        // 3. Gọi Repository
         Page<Transaction> pageData = transactionRepository.findAll(spec, pageable);
 
-        // 4. Map sang Response
         return PageResponse.<TransactionResponse>builder()
                 .currentPage(page)
                 .pageSize(pageData.getSize())
@@ -303,13 +331,75 @@ public class TransactionService {
     public TransactionResponse getTransaction(String id) {
         Transaction transaction = transactionRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.TRANSACTION_NOT_FOUND));
+
+        // Kiểm tra quyền sở hữu wallet của transaction này
+        validateWalletOwnership(transaction.getWalletId());
+
         return transactionMapper.toTransactionResponse(transaction);
+    }
+
+
+    private void validateWalletOwnership(String walletId) {
+        // Nếu null hoặc rỗng thì bỏ qua (để hàm gọi bên ngoài tự xử lý logic "All Wallets")
+        if (walletId == null || walletId.trim().isEmpty() || "undefined".equals(walletId)) {
+            return;
+        }
+
+        String currentUserId = SecurityUtils.getCurrentUserId();
+
+        try {
+            var response = walletClient.getWallet(walletId);
+            if (response == null || response.getResult() == null) {
+                throw new AppException(ErrorCode.WALLET_NOT_FOUND);
+            }
+
+            // Debug log: In ra để kiểm tra xem userId có bị null không
+            log.info("Check wallet {} owner: {} vs current user: {}",
+                    walletId, response.getResult().getUserId(), currentUserId);
+
+            if (!currentUserId.equals(response.getResult().getUserId())) {
+                throw new AppException(ErrorCode.UNAUTHORIZED);
+            }
+        } catch (Exception e) {
+            // Nếu Wallet Service báo lỗi 404 hoặc 500
+            log.error("Lỗi xác thực ví: {}", e.getMessage());
+            throw new AppException(ErrorCode.WALLET_NOT_FOUND);
+        }
+    }
+
+    private List<String> resolveWalletIds(String walletId) {
+        if (walletId != null && !walletId.trim().isEmpty() && !"undefined".equals(walletId)) {
+            // Case 1: Người dùng chọn 1 ví cụ thể
+            validateWalletOwnership(walletId); // Check xem ví này có phải của nó không
+            return List.of(walletId);
+        } else {
+            // Case 2: Xem tổng quan (Không gửi ID)
+            // Phải gọi sang Wallet Service để hỏi: "Thằng này có những ví nào?"
+            try {
+                var response = walletClient.getMyWallets();
+                if (response != null && response.getResult() != null) {
+                    List<String> ids = response.getResult().stream()
+                            .map(WalletResponse::getId)
+                            .toList();
+
+                    // Nếu user mới tạo chưa có ví nào -> Trả về list rỗng
+                    if (ids.isEmpty()) return Collections.emptyList();
+
+                    return ids;
+                }
+            } catch (Exception e) {
+                log.error("Lỗi khi lấy danh sách ví: {}", e.getMessage());
+            }
+            return Collections.emptyList();
+        }
     }
 
     @Transactional
     public TransactionResponse update(String id, TransactionUpdateRequest request) {
         Transaction transaction = transactionRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.TRANSACTION_NOT_FOUND));
+
+        validateWalletOwnership(transaction.getWalletId());
 
         // 1. HOÀN TÁC SỐ DƯ CŨ TRÊN VÍ (Revert Old Balance)
         // Nếu là EXPENSE (Chi): Cũ là -100k -> Giờ phải +100k để bù lại
@@ -354,6 +444,8 @@ public class TransactionService {
         Transaction transaction = transactionRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.TRANSACTION_NOT_FOUND));
 
+        validateWalletOwnership(transaction.getWalletId());
+
         // 1. HOÀN TÁC SỐ DƯ (Trả lại tiền cho ví trước khi xóa)
         BigDecimal revertAmount = transaction.getAmount();
         if (transaction.getType() == TransactionType.INCOME) {
@@ -372,6 +464,8 @@ public class TransactionService {
 
     @Transactional
     public TransactionResponse create(TransactionCreationRequest request) {
+        validateWalletOwnership(request.getWalletId());
+
         Category category = null;
         if (request.getCategoryId() != null) {
             category = categoryRepository.findById(request.getCategoryId())

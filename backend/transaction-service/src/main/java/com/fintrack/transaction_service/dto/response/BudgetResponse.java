@@ -13,6 +13,7 @@ public class BudgetResponse {
     private BigDecimal spentAmount;
     private double percentage;
     private String walletId;
+    private String walletName;
     private String categoryId;
     private String categoryName;
     private Integer month;

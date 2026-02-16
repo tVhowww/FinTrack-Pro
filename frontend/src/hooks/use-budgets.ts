@@ -1,5 +1,5 @@
 import { budgetService } from "@/services/budget.service";
-import { BudgetCreationRequest } from "@/types/budget.dto";
+import { BudgetCreationRequest, BudgetUpdateRequest } from "@/types/budget.dto";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
@@ -45,6 +45,18 @@ export function useBudgets({ walletId, month, year }: UseBudgetsParams) {
     },
   });
 
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: BudgetUpdateRequest }) =>
+      budgetService.update(id, data),
+    onSuccess: () => {
+      toast.success("Cập nhật ngân sách thành công!");
+      queryClient.invalidateQueries({ queryKey: ["budgets"] });
+    },
+    onError: () => {
+      toast.error("Lỗi khi cập nhật ngân sách");
+    },
+  });
+
   return {
     budgets: Array.isArray(budgets) ? budgets : [], // Fallback an toàn
     isLoading,
@@ -52,5 +64,7 @@ export function useBudgets({ walletId, month, year }: UseBudgetsParams) {
     isCreating: createMutation.isPending,
     deleteBudget: deleteMutation.mutateAsync,
     isDeleting: deleteMutation.isPending,
+    updateBudget: updateMutation.mutateAsync,
+    isUpdating: updateMutation.isPending,
   };
 }

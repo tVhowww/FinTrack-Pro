@@ -1,6 +1,7 @@
 package com.fintrack.transaction_service.controller;
 
 import com.fintrack.transaction_service.dto.request.BudgetCreationRequest;
+import com.fintrack.transaction_service.dto.request.BudgetUpdateRequest;
 import com.fintrack.transaction_service.dto.response.ApiResponse;
 import com.fintrack.transaction_service.dto.response.BudgetResponse;
 import com.fintrack.transaction_service.service.BudgetService;
@@ -19,6 +20,13 @@ public class BudgetController {
     public ApiResponse<BudgetResponse> create(@RequestBody BudgetCreationRequest request) {
         return ApiResponse.<BudgetResponse>builder()
                 .result(budgetService.create(request))
+                .build();
+    }
+
+    @PutMapping("/{id}")
+    public ApiResponse<BudgetResponse> updateBudget(@PathVariable String id, @RequestBody BudgetUpdateRequest request) {
+        return ApiResponse.<BudgetResponse>builder()
+                .result(budgetService.update(id, request))
                 .build();
     }
 

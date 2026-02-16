@@ -1,6 +1,5 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -24,20 +23,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useCategories } from "@/hooks/use-categories"; // Hook có sẵn
-import { useWallets } from "@/hooks/use-wallets"; // Hook có sẵn
-import { BudgetCreationRequest } from "@/types/budget.dto";
+import { Button } from "@/components/ui/button";
+import { useCategories } from "@/hooks/use-categories";
+import { useWallets } from "@/hooks/use-wallets";
+import { Budget } from "@/types/budget.dto"; // Import Type Budget
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-// Schema Validation
 const BudgetSchema = z.object({
   name: z.string().min(1, "Vui lòng nhập tên"),
   amount: z.coerce.number().min(1000, "Hạn mức tối thiểu 1.000đ"),
   categoryId: z.string().min(1, "Vui lòng chọn danh mục"),
-  walletId: z.string().optional(), // Có thể rỗng (Global)
+  walletId: z.string().optional(),
   month: z.coerce.number().min(1).max(12),
   year: z.coerce.number().min(2020),
 });
@@ -45,26 +44,27 @@ const BudgetSchema = z.object({
 interface BudgetDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (data: BudgetCreationRequest) => Promise<any>; // Hàm submit từ cha truyền xuống
+  onSubmit: (data: any) => Promise<any>;
+  budgetToEdit?: Budget | null;
 }
 
 export function BudgetDialog({
   open,
   onOpenChange,
   onSubmit,
+  budgetToEdit,
 }: BudgetDialogProps) {
   const { categories } = useCategories();
   const { wallets } = useWallets();
-
-  // Làm phẳng danh mục (nếu có subCategories)
   const flattenCategories = categories.flatMap((c) => [
     c,
     ...(c.subCategories || []),
   ]);
-  // Chỉ lấy danh mục CHI TIÊU (EXPENSE)
   const expenseCategories = flattenCategories.filter(
     (c) => c.type === "EXPENSE",
   );
+
+  const isEditing = !!budgetToEdit; // Đánh dấu trạng thái Edit
 
   const form = useForm<z.infer<typeof BudgetSchema>>({
     resolver: zodResolver(BudgetSchema),
@@ -72,33 +72,41 @@ export function BudgetDialog({
       name: "",
       amount: 0,
       categoryId: "",
-      walletId: "all", // Mặc định chọn tất cả
+      walletId: "all",
       month: new Date().getMonth() + 1,
       year: new Date().getFullYear(),
     },
   });
 
-  // Reset form khi mở dialog
   useEffect(() => {
     if (open) {
-      form.reset({
-        name: "",
-        amount: 0,
-        categoryId: "",
-        walletId: "all",
-        month: new Date().getMonth() + 1,
-        year: new Date().getFullYear(),
-      });
+      if (budgetToEdit) {
+        form.reset({
+          name: budgetToEdit.name,
+          amount: budgetToEdit.amount,
+          categoryId: budgetToEdit.categoryId,
+          walletId: budgetToEdit.walletId || "all",
+          month: budgetToEdit.month,
+          year: budgetToEdit.year,
+        });
+      } else {
+        form.reset({
+          name: "",
+          amount: 0,
+          categoryId: "",
+          walletId: "all",
+          month: new Date().getMonth() + 1,
+          year: new Date().getFullYear(),
+        });
+      }
     }
-  }, [open, form]);
+  }, [open, budgetToEdit, form]);
 
   const handleSubmit = async (values: z.infer<typeof BudgetSchema>) => {
-    // Xử lý logic Global Budget: Nếu chọn "all" -> gửi null/undefined lên server
-    const payload: BudgetCreationRequest = {
+    const payload = {
       ...values,
       walletId: values.walletId === "all" ? null : values.walletId,
     };
-
     await onSubmit(payload);
     onOpenChange(false);
   };
@@ -107,7 +115,9 @@ export function BudgetDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Tạo ngân sách mới</DialogTitle>
+          <DialogTitle>
+            {isEditing ? "Sửa hạn mức ngân sách" : "Tạo ngân sách mới"}
+          </DialogTitle>
         </DialogHeader>
 
         <Form {...form}>
@@ -143,8 +153,8 @@ export function BudgetDialog({
               )}
             />
 
+            {/* CÁC TRƯỜNG BÊN DƯỚI BỊ KHÓA NẾU ĐANG EDIT */}
             <div className="grid grid-cols-2 gap-4">
-              {/* Chọn Ví (Có option Tất cả) */}
               <FormField
                 control={form.control}
                 name="walletId"
@@ -153,7 +163,8 @@ export function BudgetDialog({
                     <FormLabel>Áp dụng cho ví</FormLabel>
                     <Select
                       onValueChange={field.onChange}
-                      defaultValue={field.value}
+                      value={field.value}
+                      disabled={isEditing}
                     >
                       <FormControl>
                         <SelectTrigger>
@@ -162,7 +173,7 @@ export function BudgetDialog({
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="all">
-                          Tất cả các ví (Chung)
+                          Ngân sách chung
                         </SelectItem>
                         {wallets.map((w) => (
                           <SelectItem key={w.id} value={w.id}>
@@ -171,7 +182,6 @@ export function BudgetDialog({
                         ))}
                       </SelectContent>
                     </Select>
-                    <FormMessage />
                   </FormItem>
                 )}
               />
@@ -182,7 +192,11 @@ export function BudgetDialog({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Danh mục</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value}
+                      disabled={isEditing}
+                    >
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Chọn danh mục" />
@@ -196,7 +210,6 @@ export function BudgetDialog({
                         ))}
                       </SelectContent>
                     </Select>
-                    <FormMessage />
                   </FormItem>
                 )}
               />
@@ -210,9 +223,14 @@ export function BudgetDialog({
                   <FormItem>
                     <FormLabel>Tháng</FormLabel>
                     <FormControl>
-                      <Input type="number" min={1} max={12} {...field} />
+                      <Input
+                        type="number"
+                        min={1}
+                        max={12}
+                        {...field}
+                        disabled={isEditing}
+                      />
                     </FormControl>
-                    <FormMessage />
                   </FormItem>
                 )}
               />
@@ -223,16 +241,22 @@ export function BudgetDialog({
                   <FormItem>
                     <FormLabel>Năm</FormLabel>
                     <FormControl>
-                      <Input type="number" min={2020} {...field} />
+                      <Input
+                        type="number"
+                        min={2020}
+                        {...field}
+                        disabled={isEditing}
+                      />
                     </FormControl>
-                    <FormMessage />
                   </FormItem>
                 )}
               />
             </div>
 
             <DialogFooter>
-              <Button type="submit">Lưu ngân sách</Button>
+              <Button type="submit">
+                {isEditing ? "Lưu thay đổi" : "Lưu ngân sách"}
+              </Button>
             </DialogFooter>
           </form>
         </Form>

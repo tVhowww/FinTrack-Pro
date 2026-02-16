@@ -4,7 +4,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatCurrency } from "@/lib/utils";
 import { ExpenseStructure } from "@/types/statistics.dto";
-import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
+import {
+  Cell,
+  Legend,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+} from "recharts";
 
 interface ExpensePieChartProps {
   data: ExpenseStructure[];
@@ -29,14 +36,16 @@ export function ExpensePieChart({ data, isLoading }: ExpensePieChartProps) {
 
   // Nếu không có dữ liệu chi tiêu
   if (!data || data.length === 0) {
-     return (
-        <Card className="col-span-3 shadow-sm flex flex-col">
-            <CardHeader><CardTitle>Cơ cấu chi tiêu</CardTitle></CardHeader>
-            <CardContent className="flex-1 flex items-center justify-center text-muted-foreground">
-                Chưa có dữ liệu chi tiêu tháng này
-            </CardContent>
-        </Card>
-     )
+    return (
+      <Card className="col-span-3 shadow-sm flex flex-col">
+        <CardHeader>
+          <CardTitle>Cơ cấu chi tiêu</CardTitle>
+        </CardHeader>
+        <CardContent className="flex-1 flex items-center justify-center text-muted-foreground">
+          Chưa có dữ liệu chi tiêu tháng này
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
@@ -59,12 +68,19 @@ export function ExpensePieChart({ data, isLoading }: ExpensePieChartProps) {
                 nameKey="categoryName"
               >
                 {data.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  <Cell
+                    key={`cell-${index}`}
+                    fill={COLORS[index % COLORS.length]}
+                  />
                 ))}
               </Pie>
-              <Tooltip 
-                formatter={(value: number) => formatCurrency(value)} 
-                contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }}
+              <Tooltip
+                formatter={(value: number) => formatCurrency(value)}
+                contentStyle={{
+                  borderRadius: "8px",
+                  border: "none",
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                }}
               />
               <Legend />
             </PieChart>
