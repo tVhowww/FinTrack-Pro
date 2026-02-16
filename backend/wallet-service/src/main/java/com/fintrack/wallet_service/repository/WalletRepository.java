@@ -4,6 +4,7 @@ import com.fintrack.wallet_service.entity.Wallet;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -19,4 +20,8 @@ public interface WalletRepository extends JpaRepository<Wallet, String> {
     Optional<Wallet> findByIdAndUserId(String id, String userId);
 
     boolean existsByNameIgnoreCaseAndUserIdAndIdNotAndIsActive(String name, String userId, String id, boolean isActive);
+
+    void deleteByUserId(String userId);
+
+    List<Wallet> findByUserId(String userId);
 }
