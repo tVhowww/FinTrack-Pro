@@ -42,6 +42,10 @@ public class User {
 
     private String avatar;
 
+    @Column(name = "base_currency")
+    @Builder.Default
+    private String baseCurrency = "VND";
+
     @Builder.Default
     @Column(nullable = false, columnDefinition = "boolean default false")
     private boolean deleted = false;

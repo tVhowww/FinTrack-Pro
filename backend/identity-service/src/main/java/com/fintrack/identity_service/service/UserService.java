@@ -130,6 +130,10 @@ public class UserService {
         User user = userMapper.toUser(request);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
 
+        if (user.getBaseCurrency() == null || user.getBaseCurrency().trim().isEmpty()) {
+            user.setBaseCurrency("VND");
+        }
+
         // 3. Xử lý Roles (Tách ra hàm riêng cho gọn)
         Set<Role> roles = resolveRoles(request.getRoles());
         user.setRoles(roles);

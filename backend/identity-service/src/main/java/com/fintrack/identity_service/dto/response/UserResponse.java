@@ -22,4 +22,5 @@ public class UserResponse {
     private String city;
     private String avatar;
     private Set<RoleResponse> roles;
+    private String baseCurrency;
 }

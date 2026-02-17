@@ -10,4 +10,5 @@ public class ProfileUpdateRequest {
     private LocalDate dob;
     private String phoneNumber;
     private String city;
+    private String baseCurrency;
 }
