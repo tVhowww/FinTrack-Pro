@@ -62,3 +62,6 @@ jwt:
 
 app:
   internal-secret: ${INTERNAL_SECRET}
+  exchange-rate:
+    url: https://open.er-api.com/v6
+    # Đã xóa dòng api-key cho nhẹ nợ
