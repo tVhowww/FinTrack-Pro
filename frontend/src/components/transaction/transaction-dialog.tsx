@@ -43,7 +43,7 @@ import { z } from "zod";
 
 // Schema Validate
 const TransactionSchema = z.object({
-  amount: z.coerce.number().min(1000, "Số tiền tối thiểu 1.000đ"),
+  amount: z.coerce.number().min(10, "Số tiền tối thiểu 1.000đ"),
   type: z.nativeEnum(TransactionType),
   walletId: z.string().min(1, "Vui lòng chọn ví"),
   categoryId: z.string().optional(),

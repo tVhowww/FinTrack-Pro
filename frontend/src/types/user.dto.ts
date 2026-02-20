@@ -8,6 +8,7 @@ export interface UserResponse {
   phoneNumber?: string;
   city?: string;
   avatar?: string;
+  baseCurrency: string;
 }
 
 // 2. Request Update Profile

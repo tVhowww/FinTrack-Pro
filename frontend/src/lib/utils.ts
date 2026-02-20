@@ -5,16 +5,19 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatCurrency(amount: number | string | undefined | null) {
-  if (amount === undefined || amount === null) return "0 ₫";
+export function formatCurrency(
+  amount: number | string | undefined | null,
+  currency: string = "VND",
+) {
+  if (amount === undefined || amount === null) return `0 ${currency}`;
 
   const value = typeof amount === "string" ? parseFloat(amount) : amount;
-  if (isNaN(value)) return "0 ₫";
+  if (isNaN(value)) return `0 ${currency}`;
 
   return new Intl.NumberFormat("vi-VN", {
     style: "currency",
-    currency: "VND",
-    maximumFractionDigits: 0, // Tiền Việt không dùng số lẻ thập phân
+    currency: currency,
+    maximumFractionDigits: currency === "VND" ? 0 : 2,
   }).format(value);
 }
 

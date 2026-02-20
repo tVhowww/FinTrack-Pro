@@ -75,4 +75,11 @@ export const statisticsService = {
 
     return response.data?.result || [];
   },
+
+  getTotalBalance: async () => {
+    const response = await http.get<ApiResponse<number>>(
+      `${BASE_URL}/total-balance`,
+    );
+    return response.data?.result || 0;
+  },
 };
