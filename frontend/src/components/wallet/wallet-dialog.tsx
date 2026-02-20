@@ -185,7 +185,7 @@ export function WalletDialog({
                       Số dư {isEditMode ? "thực tế" : "ban đầu"}
                     </FormLabel>
                     <FormControl>
-                      <Input type="number" {...field} />
+                      <Input type="number" step="any" {...field} />
                     </FormControl>
                     {/* Thêm chú thích cho user hiểu chuyện gì sẽ xảy ra */}
                     {isEditMode && (

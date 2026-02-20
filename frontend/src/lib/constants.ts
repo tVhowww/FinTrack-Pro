@@ -4,6 +4,10 @@ export const CURRENCIES = [
   { code: "EUR", name: "Euro", symbol: "€", locale: "de-DE" },
   { code: "JPY", name: "Japanese Yen", symbol: "¥", locale: "ja-JP" },
   { code: "KRW", name: "Korean Won", symbol: "₩", locale: "ko-KR" },
+  { code: "GBP", name: "Bảng Anh", symbol: "£", locale: "en-GB" },
+  { code: "AUD", name: "Đô la Úc", symbol: "A$", locale: "en-AU" },
+  { code: "CAD", name: "Đô la Canada", symbol: "C$", locale: "en-CA" },
+  { code: "SGD", name: "Đô la Singapore", symbol: "S$", locale: "en-SG" },
   // Thêm các loại tiền khác nếu cần
 ] as const;
 
