@@ -6,16 +6,21 @@ import com.fintrack.transaction_service.dto.response.BudgetResponse;
 import com.fintrack.transaction_service.dto.response.WalletResponse;
 import com.fintrack.transaction_service.entity.Budget;
 import com.fintrack.transaction_service.entity.Category;
+import com.fintrack.transaction_service.entity.Transaction;
+import com.fintrack.transaction_service.enums.TransactionType;
 import com.fintrack.transaction_service.exception.AppException;
 import com.fintrack.transaction_service.exception.ErrorCode;
 import com.fintrack.transaction_service.mapper.BudgetMapper;
 import com.fintrack.transaction_service.repository.BudgetRepository;
 import com.fintrack.transaction_service.repository.CategoryRepository;
 import com.fintrack.transaction_service.repository.TransactionRepository;
+import com.fintrack.transaction_service.repository.httpclient.IdentityClient;
 import com.fintrack.transaction_service.repository.httpclient.WalletClient;
+import com.fintrack.transaction_service.repository.specification.TransactionSpecification;
 import com.fintrack.transaction_service.utils.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,6 +42,8 @@ public class BudgetService {
     private final CategoryRepository categoryRepository;
     private final BudgetMapper budgetMapper;
     private final WalletClient walletClient;
+    private final IdentityClient identityClient;
+    private final CurrencyConverterService currencyConverterService;
 
     /**
      * Lấy danh sách Budget (Xử lý 3 trường hợp: Tất cả, Ví chung, Ví cụ thể)
@@ -133,21 +140,18 @@ public class BudgetService {
         Instant start = yearMonth.atDay(1).atStartOfDay(ZoneId.systemDefault()).toInstant();
         Instant end = yearMonth.atEndOfMonth().atTime(23, 59, 59).atZone(ZoneId.systemDefault()).toInstant();
 
-        // Lấy danh sách ID để truyền vào Query
         List<String> targetWalletIds = new ArrayList<>();
-        String walletName = "Ngân sách chung"; // Mặc định
+        String walletName = "Ngân sách chung";
+        String baseCurrency = getUserBaseCurrency(); // Lấy loại tiền của User
+
+        // Tạo Map dò tiền tệ của từng ví
+        java.util.Map<String, String> walletCurrencyMap = new java.util.HashMap<>();
+        for (WalletResponse w : allMyWallets) {
+            walletCurrencyMap.put(w.getId(), w.getCurrency());
+        }
 
         if (budget.getWalletId() != null) {
             targetWalletIds.add(budget.getWalletId());
-            allMyWallets.stream()
-                    .filter(w -> w.getId().equals(budget.getWalletId()))
-                    .findFirst()
-                    .ifPresent(w -> {
-                        // Cần final array hoặc AtomicReference nếu dùng trong lambda gán ra ngoài,
-                        // nhưng đơn giản nhất là viết vòng lặp for:
-                    });
-
-            // Viết kiểu for cho dễ hiểu:
             for (WalletResponse w : allMyWallets) {
                 if (w.getId().equals(budget.getWalletId())) {
                     walletName = w.getName();
@@ -159,15 +163,22 @@ public class BudgetService {
         }
 
         BigDecimal spentAmount = BigDecimal.ZERO;
+
         if (!targetWalletIds.isEmpty()) {
-            BigDecimal result = transactionRepository.sumExpenseByCategoryAndDate(
-                    targetWalletIds,
-                    budget.getCategoryId(),
-                    start,
-                    end
-            );
-            if (result != null) {
-                spentAmount = result.abs();
+            // Lấy danh sách giao dịch thay vì cộng chay bằng Database
+            var spec = Specification.where(
+                            TransactionSpecification.hasWalletIdIn(targetWalletIds)
+                    ).and(TransactionSpecification.hasType(TransactionType.EXPENSE))
+                    .and(TransactionSpecification.hasCategoryIn(List.of(budget.getCategoryId())))
+                    .and(TransactionSpecification.createdBetween(start, end));
+
+            List<Transaction> transactions = transactionRepository.findAll(spec);
+
+            // Cộng dồn qua máy quy đổi
+            for (var tx : transactions) {
+                String txCurrency = walletCurrencyMap.getOrDefault(tx.getWalletId(), "VND");
+                BigDecimal converted = currencyConverterService.convertCurrency(tx.getAmount().abs(), txCurrency, baseCurrency);
+                spentAmount = spentAmount.add(converted);
             }
         }
 
@@ -182,7 +193,7 @@ public class BudgetService {
         return BudgetResponse.builder()
                 .id(budget.getId())
                 .name(budget.getName())
-                .amount(budget.getAmount())
+                .amount(budget.getAmount()) // Amount này được hiểu là theo BaseCurrency
                 .spentAmount(spentAmount)
                 .percentage(percentage)
                 .walletId(budget.getWalletId())
@@ -205,5 +216,17 @@ public class BudgetService {
             log.error("Lỗi khi lấy danh sách ví: {}", e.getMessage());
         }
         return Collections.emptyList();
+    }
+
+    private String getUserBaseCurrency() {
+        try {
+            var userResponse = identityClient.getMyInfo();
+            if (userResponse != null && userResponse.getResult() != null && userResponse.getResult().getBaseCurrency() != null) {
+                return userResponse.getResult().getBaseCurrency();
+            }
+        } catch (Exception e) {
+            log.error("Không lấy được Base Currency, dùng mặc định VND", e);
+        }
+        return "VND";
     }
 }

@@ -16,7 +16,8 @@ import { Badge } from "../ui/badge";
 
 interface BudgetCardProps {
   budget: Budget;
-  walletName: string; // Truyền vào từ component cha (BudgetsPage)
+  walletName: string;
+  baseCurrency?: string;
   onEdit: (budget: Budget) => void;
   onDelete: (id: string) => void;
 }
@@ -24,6 +25,7 @@ interface BudgetCardProps {
 export function BudgetCard({
   budget,
   walletName,
+  baseCurrency = "VND",
   onEdit,
   onDelete,
 }: BudgetCardProps) {
@@ -102,10 +104,10 @@ export function BudgetCard({
       <CardContent className="space-y-4 pt-2">
         <div className="flex justify-between items-end text-sm">
           <span className={`${statusText} text-lg font-bold`}>
-            {formatCurrency(currentSpent)}
+            {formatCurrency(currentSpent, baseCurrency)}
           </span>
           <span className="text-muted-foreground text-xs mb-1">
-            / {formatCurrency(budget.amount)}
+            / {formatCurrency(budget.amount, baseCurrency)}
           </span>
         </div>
 
@@ -117,7 +119,11 @@ export function BudgetCard({
               {isOverBudget ? "Vượt hạn mức!" : `${percentage.toFixed(1)}%`}
             </span>
             <span className="text-muted-foreground">
-              Còn: {formatCurrency(Math.max(budget.amount - currentSpent, 0))}
+              Còn:{" "}
+              {formatCurrency(
+                Math.max(budget.amount - currentSpent, 0),
+                baseCurrency,
+              )}
             </span>
           </div>
         </div>

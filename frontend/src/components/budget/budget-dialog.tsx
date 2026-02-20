@@ -34,7 +34,7 @@ import { z } from "zod";
 
 const BudgetSchema = z.object({
   name: z.string().min(1, "Vui lòng nhập tên"),
-  amount: z.coerce.number().min(1000, "Hạn mức tối thiểu 1.000đ"),
+  amount: z.coerce.number().min(0.1, "Hạn mức phải lớn hơn 0"),
   categoryId: z.string().min(1, "Vui lòng chọn danh mục"),
   walletId: z.string().optional(),
   month: z.coerce.number().min(1).max(12),
@@ -144,7 +144,7 @@ export function BudgetDialog({
               name="amount"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Hạn mức (VND)</FormLabel>
+                  <FormLabel>Hạn mức</FormLabel>
                   <FormControl>
                     <Input type="number" placeholder="5000000" {...field} />
                   </FormControl>
@@ -172,9 +172,7 @@ export function BudgetDialog({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="all">
-                          Ngân sách chung
-                        </SelectItem>
+                        <SelectItem value="all">Ngân sách chung</SelectItem>
                         {wallets.map((w) => (
                           <SelectItem key={w.id} value={w.id}>
                             {w.name}

@@ -18,6 +18,7 @@ import { BudgetCreationRequest } from "@/types/budget.dto";
 import { Plus } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { useUser } from "@/hooks/use-user";
 
 export default function BudgetsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -31,6 +32,9 @@ export default function BudgetsPage() {
   const [selectedWalletId, setSelectedWalletId] = useState<string>("all");
 
   const { wallets } = useWallets();
+
+  const { user } = useUser();
+  const baseCurrency = user?.baseCurrency || "VND";
 
   const {
     budgets,
@@ -177,7 +181,8 @@ export default function BudgetsPage() {
                 <BudgetCard
                   key={budget.id}
                   budget={budget}
-                  walletName={finalWalletName as string} // Truyền tên ví đã được chốt hạ vào đây
+                  walletName={finalWalletName as string}
+                  baseCurrency={baseCurrency}
                   onEdit={() => {
                     setEditingBudget(budget);
                     setIsDialogOpen(true);
