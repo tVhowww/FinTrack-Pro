@@ -13,6 +13,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 
@@ -21,6 +22,13 @@ import java.util.List;
 @RequestMapping("transactions")
 public class TransactionController {
     private final TransactionService transactionService;
+
+    @GetMapping("/statistics/total-balance")
+    public ApiResponse<BigDecimal> getTotalBalance() {
+        return ApiResponse.<BigDecimal>builder()
+                .result(transactionService.getTotalBalance())
+                .build();
+    }
 
     @GetMapping("/statistics/highest-expenses")
     public ApiResponse<List<TransactionResponse>> getHighestExpenses(
