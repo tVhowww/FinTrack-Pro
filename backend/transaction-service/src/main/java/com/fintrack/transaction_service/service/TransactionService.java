@@ -37,10 +37,7 @@ import java.text.NumberFormat;
 import java.time.Instant;
 import java.time.YearMonth;
 import java.time.ZoneId;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Locale;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -90,13 +87,36 @@ public class TransactionService {
         List<String> walletIds = resolveWalletIds(walletId);
         if (walletIds.isEmpty()) return new ArrayList<>();
 
+        // 1. Chuẩn bị công cụ quy đổi
+        String baseCurrency = getUserBaseCurrency();
+        Map<String, String> walletCurrencyMap = getWalletCurrencyMap();
+
         YearMonth yearMonth = YearMonth.of(year, month);
         Instant start = yearMonth.atDay(1).atStartOfDay(ZoneId.systemDefault()).toInstant();
         Instant end = yearMonth.atEndOfMonth().atTime(23, 59, 59).atZone(ZoneId.systemDefault()).toInstant();
 
-        List<Transaction> transactions = transactionRepository.findHighestExpensesByWalletIds(walletIds, start, end);
+        // 2. Lấy TẤT CẢ giao dịch CHI TIÊU trong tháng
+        Specification<Transaction> spec = Specification.where(TransactionSpecification.hasWalletIdIn(walletIds))
+                .and(TransactionSpecification.hasType(TransactionType.EXPENSE))
+                .and(TransactionSpecification.createdBetween(start, end));
 
+        List<Transaction> transactions = transactionRepository.findAll(spec);
+
+        // 3. Xếp hạng bằng Java (Dựa trên số tiền sau khi đã quy đổi)
         return transactions.stream()
+                .sorted((t1, t2) -> {
+                    // Dò tiền tệ của từng giao dịch
+                    String c1 = walletCurrencyMap.getOrDefault(t1.getWalletId(), "VND");
+                    String c2 = walletCurrencyMap.getOrDefault(t2.getWalletId(), "VND");
+
+                    // Quy đổi ra Base Currency để so sánh công bằng
+                    BigDecimal conv1 = currencyConverterService.convertCurrency(t1.getAmount().abs(), c1, baseCurrency);
+                    BigDecimal conv2 = currencyConverterService.convertCurrency(t2.getAmount().abs(), c2, baseCurrency);
+
+                    // Sắp xếp giảm dần (thằng nào tiêu nhiều tiền quy đổi hơn thì đứng trên)
+                    return conv2.compareTo(conv1);
+                })
+                .limit(5) // Chỉ lấy Top 5
                 .map(transactionMapper::toTransactionResponse)
                 .toList();
     }

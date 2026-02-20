@@ -54,6 +54,7 @@ const ActionCell = ({
 export const getColumns = (
   onEdit: (t: TransactionResponse) => void,
   onDelete: (t: TransactionResponse) => void,
+  wallets: any[],
 ): ColumnDef<TransactionResponse>[] => [
   {
     accessorKey: "date",
@@ -98,12 +99,15 @@ export const getColumns = (
         type === TransactionType.INCOME ? "text-green-600" : "text-red-600";
 
       // Dấu: + hoặc -
-      const prefix = type === TransactionType.INCOME ? "+" : "";
+      const prefix = type === TransactionType.INCOME ? "+" : "-";
+
+      const txCurrency =
+        wallets.find((w) => w.id === row.original.walletId)?.currency || "VND";
 
       return (
         <div className={`text-right font-bold ${colorClass}`}>
           {prefix}
-          {formatCurrency(amount)}
+          {formatCurrency(amount, txCurrency)}
         </div>
       );
     },

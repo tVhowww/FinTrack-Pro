@@ -16,6 +16,7 @@ import {
 interface ExpensePieChartProps {
   data: ExpenseStructure[];
   isLoading: boolean;
+  baseCurrency?: string;
 }
 
 // Bảng màu đẹp cho các miếng bánh
@@ -29,7 +30,11 @@ const COLORS = [
   "#6366f1", // Indigo
 ];
 
-export function ExpensePieChart({ data, isLoading }: ExpensePieChartProps) {
+export function ExpensePieChart({
+  data,
+  isLoading,
+  baseCurrency,
+}: ExpensePieChartProps) {
   if (isLoading) {
     return <Skeleton className="h-[350px] w-full rounded-xl" />;
   }
@@ -75,7 +80,9 @@ export function ExpensePieChart({ data, isLoading }: ExpensePieChartProps) {
                 ))}
               </Pie>
               <Tooltip
-                formatter={(value: number) => formatCurrency(value)}
+                formatter={(value: number) =>
+                  formatCurrency(value, baseCurrency)
+                }
                 contentStyle={{
                   borderRadius: "8px",
                   border: "none",

@@ -43,7 +43,7 @@ import { z } from "zod";
 
 // Schema Validate
 const TransactionSchema = z.object({
-  amount: z.coerce.number().min(10, "Số tiền tối thiểu 1.000đ"),
+  amount: z.coerce.number().min(0.01, "Số tiền phải lớn hơn 0"),
   type: z.nativeEnum(TransactionType),
   walletId: z.string().min(1, "Vui lòng chọn ví"),
   categoryId: z.string().optional(),
@@ -215,7 +215,12 @@ export function TransactionDialog({
                   <FormItem>
                     <FormLabel>Số tiền</FormLabel>
                     <FormControl>
-                      <Input type="number" placeholder="VD: 50000" {...field} />
+                      <Input 
+                        type="number" 
+                        step="any" 
+                        placeholder="VD: 50000 hoặc 10.5" 
+                        {...field} 
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

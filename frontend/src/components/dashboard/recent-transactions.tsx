@@ -7,6 +7,7 @@ import { format } from "date-fns";
 import { vi } from "date-fns/locale";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TransactionResponse } from "@/types/transaction.dto";
+import { useWallets } from "@/hooks/use-wallets";
 
 interface RecentTransactionsProps {
   data: TransactionResponse[];
@@ -17,6 +18,8 @@ export function RecentTransactions({
   data,
   isLoading,
 }: RecentTransactionsProps) {
+  const { wallets } = useWallets();
+
   return (
     <Card className="col-span-3 shadow-sm h-full">
       <CardHeader>
@@ -40,42 +43,52 @@ export function RecentTransactions({
               Chưa có giao dịch nào.
             </p>
           ) : (
-            data.map((tx) => (
-              <div
-                key={tx.id}
-                className="flex items-center justify-between group"
-              >
-                <div className="flex items-center space-x-4">
-                  <Avatar className="h-9 w-9 border transition-transform group-hover:scale-105">
-                    <AvatarFallback
-                      className={
-                        tx.type === "EXPENSE"
-                          ? "bg-red-50 text-red-600"
-                          : "bg-emerald-50 text-emerald-600"
-                      }
-                    >
-                      {tx.categoryName ? tx.categoryName[0] : "?"}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium leading-none">
-                      {tx.categoryName || "Giao dịch khác"}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {format(new Date(tx.date), "d MMM, yyyy", { locale: vi })}
-                    </p>
+            data.map((tx) => {
+              const txCurrency =
+                wallets.find((w: any) => w.id === tx.walletId)?.currency ||
+                "VND";
+
+              return (
+                <div
+                  key={tx.id}
+                  className="flex items-center justify-between group"
+                >
+                  <div className="flex items-center space-x-4">
+                    <Avatar className="h-9 w-9 border transition-transform group-hover:scale-105">
+                      <AvatarFallback
+                        className={
+                          tx.type === "EXPENSE"
+                            ? "bg-red-50 text-red-600"
+                            : "bg-emerald-50 text-emerald-600"
+                        }
+                      >
+                        {tx.categoryName ? tx.categoryName[0] : "?"}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium leading-none">
+                        {tx.categoryName || "Giao dịch khác"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {format(new Date(tx.date), "d MMM, yyyy", {
+                          locale: vi,
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                  <div
+                    className={`text-sm font-medium ${
+                      tx.type === "EXPENSE"
+                        ? "text-red-600"
+                        : "text-emerald-600"
+                    }`}
+                  >
+                    {tx.type === "EXPENSE" ? "-" : "+"}
+                    {formatCurrency(tx.amount, txCurrency)}
                   </div>
                 </div>
-                <div
-                  className={`text-sm font-medium ${
-                    tx.type === "EXPENSE" ? "text-red-600" : "text-emerald-600"
-                  }`}
-                >
-                  {tx.type === "EXPENSE" ? "-" : "+"}
-                  {formatCurrency(tx.amount)}
-                </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       </CardContent>

@@ -23,6 +23,7 @@ import {
   TransactionCreationRequest,
   TransactionUpdateRequest,
 } from "@/types/transaction.dto";
+import { useWallets } from "@/hooks/use-wallets";
 
 export default function TransactionsPage() {
   const [currentPage, setCurrentPage] = useState(1);
@@ -79,7 +80,9 @@ export default function TransactionsPage() {
     return await updateTransaction({ id, data });
   };
 
-  const columns = getColumns(handleEdit, (t) => setDeleteId(t.id));
+  const { wallets } = useWallets();
+
+  const columns = getColumns(handleEdit, (t) => setDeleteId(t.id), wallets);
 
   return (
     <div className="h-full flex flex-col space-y-4">

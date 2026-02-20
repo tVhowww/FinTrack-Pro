@@ -125,10 +125,18 @@ export default function DashboardPage() {
       {/* Khu vực Biểu đồ */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
         {/* Biểu đồ cột chiếm 4 phần */}
-        <BalanceChart data={trendData} isLoading={isLoadingTrend} />
+        <BalanceChart
+          data={trendData}
+          isLoading={isLoadingTrend}
+          baseCurrency={baseCurrency}
+        />
 
         {/* Biểu đồ tròn chiếm 3 phần */}
-        <ExpensePieChart data={structureData} isLoading={isLoadingStructure} />
+        <ExpensePieChart
+          data={structureData}
+          isLoading={isLoadingStructure}
+          baseCurrency={baseCurrency}
+        />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
