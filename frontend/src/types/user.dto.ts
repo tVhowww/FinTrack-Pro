@@ -17,6 +17,7 @@ export interface ProfileUpdateRequest {
   dob?: string;
   phoneNumber?: string;
   city?: string;
+  baseCurrency?: string;
 }
 
 // 3. Request Change Password

@@ -91,6 +91,8 @@ public class BudgetService {
         Budget budget = budgetMapper.toBudget(request);
         budget.setUserId(userId);
 
+        budget.setCurrency(getUserBaseCurrency());
+
         // Xử lý walletId rỗng -> null
         if (budget.getWalletId() != null && budget.getWalletId().trim().isEmpty()) {
             budget.setWalletId(null);
@@ -116,6 +118,7 @@ public class BudgetService {
         }
         if (request.getAmount() != null && request.getAmount().compareTo(BigDecimal.ZERO) > 0) {
             budget.setAmount(request.getAmount());
+            budget.setCurrency(getUserBaseCurrency());
         }
 
         budget = budgetRepository.save(budget);
@@ -182,9 +185,16 @@ public class BudgetService {
             }
         }
 
+        String budgetCurrency = budget.getCurrency() != null ? budget.getCurrency() : "VND";
+        BigDecimal displayAmount = currencyConverterService.convertCurrency(
+                budget.getAmount(),
+                budgetCurrency,
+                baseCurrency
+        );
+
         double percentage = 0;
-        if (budget.getAmount().compareTo(BigDecimal.ZERO) > 0) {
-            percentage = spentAmount.divide(budget.getAmount(), 4, RoundingMode.HALF_UP).doubleValue() * 100;
+        if (displayAmount.compareTo(BigDecimal.ZERO) > 0) {
+            percentage = spentAmount.divide(displayAmount, 4, RoundingMode.HALF_UP).doubleValue() * 100;
         }
 
         String categoryName = categoryRepository.findById(budget.getCategoryId())
@@ -193,7 +203,7 @@ public class BudgetService {
         return BudgetResponse.builder()
                 .id(budget.getId())
                 .name(budget.getName())
-                .amount(budget.getAmount()) // Amount này được hiểu là theo BaseCurrency
+                .amount(displayAmount)
                 .spentAmount(spentAmount)
                 .percentage(percentage)
                 .walletId(budget.getWalletId())

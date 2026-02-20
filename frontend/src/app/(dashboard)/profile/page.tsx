@@ -71,6 +71,14 @@ export default function ProfilePage() {
               </div>
               <div>
                 <label className="text-sm font-medium text-muted-foreground">
+                  Đồng tiền cơ sở (Mặc định)
+                </label>
+                <p className="text-lg font-semibold">
+                  {user?.baseCurrency || "VND"}
+                </p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">
                   Email
                 </label>
                 <p className="text-lg font-semibold">{user?.email}</p>
