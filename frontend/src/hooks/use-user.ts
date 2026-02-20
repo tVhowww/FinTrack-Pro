@@ -23,7 +23,7 @@ export function useUser() {
     mutationFn: userService.updateProfile,
     onSuccess: () => {
       toast.success("Cập nhật hồ sơ thành công!");
-      queryClient.invalidateQueries({ queryKey: ["me"] }); // Load lại data mới
+      queryClient.invalidateQueries();
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.message || "Lỗi cập nhật hồ sơ");

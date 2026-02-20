@@ -40,6 +40,7 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 // Xóa import toast và transactionService vì Hook cha sẽ lo việc này
 import { z } from "zod";
+import { getCurrencySymbol } from "@/lib/constants";
 
 // Schema Validate
 const TransactionSchema = z.object({
@@ -103,6 +104,12 @@ export function TransactionDialog({
       note: "",
     },
   });
+
+  const selectedWalletId = form.watch("walletId");
+
+  const selectedWallet = wallets.find((w) => w.id === selectedWalletId);
+
+  const currencySymbol = getCurrencySymbol(selectedWallet?.currency || "VND");
 
   useEffect(() => {
     if (open) {
@@ -215,12 +222,18 @@ export function TransactionDialog({
                   <FormItem>
                     <FormLabel>Số tiền</FormLabel>
                     <FormControl>
-                      <Input 
-                        type="number" 
-                        step="any" 
-                        placeholder="VD: 50000 hoặc 10.5" 
-                        {...field} 
-                      />
+                      <div className="relative">
+                        <Input
+                          type="number"
+                          step="any"
+                          placeholder="VD: 50000 hoặc 10.5"
+                          className="pr-8" // Cấp khoảng trống bên phải để chữ ko đè lên Ký hiệu
+                          {...field}
+                        />
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-medium text-muted-foreground pointer-events-none">
+                          {currencySymbol}
+                        </div>
+                      </div>
                     </FormControl>
                     <FormMessage />
                   </FormItem>

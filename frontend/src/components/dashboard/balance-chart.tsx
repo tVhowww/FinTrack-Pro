@@ -61,7 +61,17 @@ export function BalanceChart({
                 fontSize={12}
                 tickLine={false}
                 axisLine={false}
-                tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`} // Rút gọn: 1M, 2M
+                width={50}
+                tickFormatter={(value) => {
+                  if (value === 0) return "0";
+                  if (value >= 1000000) {
+                    return `${(value / 1000000).toFixed(1).replace(/\.0$/, "")}M`;
+                  }
+                  if (value >= 1000) {
+                    return `${(value / 1000).toFixed(1).replace(/\.0$/, "")}k`;
+                  }
+                  return value.toString();
+                }}
               />
               <Tooltip
                 formatter={(value: number) =>
