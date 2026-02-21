@@ -21,5 +21,22 @@ export const RegisterSchema = z
     path: ["confirmPassword"],
   });
 
+export const ForgotPasswordSchema = z.object({
+  email: z.string().email("Vui lòng nhập một địa chỉ email hợp lệ"),
+});
+
+export const ResetPasswordSchema = z
+  .object({
+    otp: z.string().length(6, "Mã OTP phải bao gồm đúng 6 chữ số"),
+    newPassword: z.string().min(6, "Mật khẩu mới phải có ít nhất 6 ký tự"),
+    confirmPassword: z.string(),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: "Mật khẩu xác nhận không khớp",
+    path: ["confirmPassword"],
+  });
+
 export type LoginBody = z.infer<typeof LoginSchema>;
 export type RegisterBody = z.infer<typeof RegisterSchema>;
+export type ForgotPasswordBody = z.infer<typeof ForgotPasswordSchema>;
+export type ResetPasswordBody = z.infer<typeof ResetPasswordSchema>;

@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 
 // Danh sách các trang Public (chưa đăng nhập cũng xem được)
 // Lưu ý: Login và Register là public, nhưng nếu đã login rồi thì không cho vào nữa
-const authPaths = ["/login", "/register"];
+const authPaths = ["/login", "/register", "/forgot-password"];
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
