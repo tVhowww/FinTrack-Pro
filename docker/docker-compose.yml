@@ -77,6 +77,16 @@ services:
       - wallet-db
       - transaction-db
 
+  # 2. Redis
+  redis:
+    image: redis:7-alpine
+    container_name: fintrack-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
   # --- MESSAGE BROKER (KAFKA) ---
 
   # 1. Zookeeper (Quản lý Kafka Cluster)
@@ -124,9 +134,12 @@ services:
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=password
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-service:8761/eureka/
+      - SPRING_DATA_REDIS_HOST=redis
+      - SPRING_DATA_REDIS_PORT=6379
     depends_on:
       - identity-db
       - discovery-service
+      - redis
 
   # --- Wallet Service ---
   wallet-service:
@@ -204,3 +217,4 @@ volumes:
   wallet_data:
   pgadmin_data:
   transaction_data:
+  redis_data:
