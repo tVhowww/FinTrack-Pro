@@ -1,9 +1,7 @@
 package com.fintrack.identity_service.service;
 
-import com.fintrack.identity_service.dto.request.AuthenticationRequest;
-import com.fintrack.identity_service.dto.request.IntrospectRequest;
-import com.fintrack.identity_service.dto.request.LogoutRequest;
-import com.fintrack.identity_service.dto.request.RefreshTokenRequest;
+import com.fintrack.identity_service.dto.event.NotificationEvent;
+import com.fintrack.identity_service.dto.request.*;
 import com.fintrack.identity_service.dto.response.AuthenticationResponse;
 import com.fintrack.identity_service.dto.response.IntrospectResponse;
 import com.fintrack.identity_service.entity.InvalidatedToken;
@@ -21,6 +19,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.NonFinal;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,8 +30,10 @@ import java.text.ParseException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
+import java.util.Random;
 import java.util.StringJoiner;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 @Service
 @RequiredArgsConstructor
@@ -40,10 +42,80 @@ public class AuthenticationService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final InvalidatedTokenRepository invalidatedTokenRepository;
+    private final StringRedisTemplate redisTemplate;
+    private final KafkaTemplate<String, Object> kafkaTemplate;
 
     @NonFinal
     @Value("${jwt.signerKey}")
     protected String SIGNER_KEY;
+
+    @Transactional
+    public void forgotPassword(ForgotPasswordRequest request) {
+        User user = userRepository.findByEmailAndDeletedFalse(request.getEmail())
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        // 1. Sinh mã OTP (6 số ngẫu nhiên)
+        String otp = String.format("%06d", new Random().nextInt(999999));
+
+        // 2. Lưu OTP vào Redis với Key là: reset_otp:{email}
+        // Thời gian sống (TTL): Đúng 5 phút (Redis sẽ tự hủy nó sau 5 phút)
+        String redisKey = "reset_otp:" + request.getEmail();
+        redisTemplate.opsForValue().set(redisKey, passwordEncoder.encode(otp), 5, TimeUnit.MINUTES);
+
+        // 3. Gửi email qua Kafka (Giữ nguyên như cũ)
+        String emailBody = String.format(
+                "Xin chào %s,\n\n" +
+                        "Mã OTP xác nhận đặt lại mật khẩu của bạn là: %s\n" +
+                        "Mã này sẽ tự động hết hạn sau 5 phút.\n",
+                user.getUsername(), otp
+        );
+
+        NotificationEvent event =
+                NotificationEvent.builder()
+                        .channel("EMAIL")
+                        .recipient(user.getEmail())
+                        .subject("FinTrack - Mã xác nhận")
+                        .body(emailBody)
+                        .build();
+
+        kafkaTemplate.send("notification-delivery", event);
+        log.info("Đã lưu OTP vào Redis và gửi qua email: {}", user.getEmail());
+    }
+
+    @Transactional
+    public void resetPassword(ResetPasswordRequest request) {
+        // 1. Lấy OTP từ Redis lên
+        String redisKey = "reset_otp:" + request.getEmail();
+        String hashedOtpFromRedis = redisTemplate.opsForValue().get(redisKey);
+
+        // Nếu get lên bằng null -> Nghĩa là Redis đã tự xóa nó (Quá 5 phút) hoặc user chưa từng request
+        if (hashedOtpFromRedis == null) {
+            throw new AppException(ErrorCode.OTP_EXPIRED); // Báo lỗi OTP hết hạn
+        }
+
+        // 2. So sánh mã OTP user nhập với mã hash trong Redis
+        if (!passwordEncoder.matches(request.getOtp(), hashedOtpFromRedis)) {
+            throw new AppException(ErrorCode.INVALID_OTP); // Báo lỗi OTP sai
+        }
+
+        // 3. OTP hợp lệ -> Cập nhật mật khẩu mới vào DB
+        User user = userRepository.findByEmailAndDeletedFalse(request.getEmail())
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+
+        // Hủy session hiện tại
+        if (user.getCurrentJwtId() != null) {
+            invalidateToken(user.getCurrentJwtId());
+            user.setCurrentJwtId(null);
+        }
+        userRepository.save(user);
+
+        // 4. Xóa luôn Key trong Redis đi để mã này không xài lại được nữa
+        redisTemplate.delete(redisKey);
+
+        log.info("User {} đã đặt lại mật khẩu thành công qua Redis.", user.getEmail());
+    }
 
     // refresh token
     @Transactional

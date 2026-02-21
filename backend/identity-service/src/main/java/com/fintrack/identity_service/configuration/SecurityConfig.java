@@ -46,7 +46,7 @@ public class SecurityConfig {
     // 1. Định nghĩa các đường dẫn được phép truy cập không cần login
     private final String[] PUBLIC_ENDPOINTS = {
             "/auth/token", "/auth/introspect", "/auth/logout",
-            "/auth/refresh", "/v3/api-docs/**",
+            "/auth/refresh", "/auth/reset-password", "/auth/forgot-password", "/v3/api-docs/**",
             "/swagger-ui/**",
             "/swagger-ui.html"
     };

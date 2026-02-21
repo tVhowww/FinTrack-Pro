@@ -1,9 +1,6 @@
 package com.fintrack.identity_service.controller;
 
-import com.fintrack.identity_service.dto.request.AuthenticationRequest;
-import com.fintrack.identity_service.dto.request.IntrospectRequest;
-import com.fintrack.identity_service.dto.request.LogoutRequest;
-import com.fintrack.identity_service.dto.request.RefreshTokenRequest;
+import com.fintrack.identity_service.dto.request.*;
 import com.fintrack.identity_service.dto.response.ApiResponse;
 import com.fintrack.identity_service.dto.response.AuthenticationResponse;
 import com.fintrack.identity_service.dto.response.IntrospectResponse;
@@ -22,6 +19,22 @@ import java.text.ParseException;
 @RequiredArgsConstructor
 public class AuthenticationController {
     private final AuthenticationService authenticationService;
+
+    @PostMapping("/forgot-password")
+    public ApiResponse<Void> forgotPassword(@RequestBody ForgotPasswordRequest request) {
+        authenticationService.forgotPassword(request);
+        return ApiResponse.<Void>builder()
+                .message("OTP đã được gửi đến email của bạn.")
+                .build();
+    }
+
+    @PostMapping("/reset-password")
+    public ApiResponse<Void> resetPassword(@RequestBody ResetPasswordRequest request) {
+        authenticationService.resetPassword(request);
+        return ApiResponse.<Void>builder()
+                .message("Đặt lại mật khẩu thành công. Vui lòng đăng nhập lại.")
+                .build();
+    }
 
     @PostMapping("/token")
     public ApiResponse<AuthenticationResponse> authenticate(@RequestBody AuthenticationRequest request) {
