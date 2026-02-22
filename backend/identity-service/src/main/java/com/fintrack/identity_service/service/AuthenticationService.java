@@ -41,7 +41,6 @@ import java.util.concurrent.TimeUnit;
 public class AuthenticationService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-    private final InvalidatedTokenRepository invalidatedTokenRepository;
     private final StringRedisTemplate redisTemplate;
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
@@ -138,12 +137,11 @@ public class AuthenticationService {
             throw new AppException(ErrorCode.UNAUTHENTICATED);
         }
 
-        // Hủy token cũ (Token Rotation)
-        InvalidatedToken invalidatedToken = InvalidatedToken.builder()
-                .id(jit)
-                .expiryTime(expiryTime)
-                .build();
-        invalidatedTokenRepository.save(invalidatedToken);
+        // Hủy token cũ (Token Rotation) - Đẩy vào Redis
+        long remainingTime = expiryTime.getTime() - System.currentTimeMillis();
+        if (remainingTime > 0) {
+            redisTemplate.opsForValue().set("jwt_blacklist:" + jit, "invalid", remainingTime, java.util.concurrent.TimeUnit.MILLISECONDS);
+        }
 
         // Tạo phát token mới (Cả cặp Access + Refresh mới)
         var token = generateToken(user);
@@ -171,12 +169,11 @@ public class AuthenticationService {
             // Lấy thời gian hết hạn
             Date expiryTime = signToken.getJWTClaimsSet().getExpirationTime();
 
-            // Hủy token hiện tại
-            InvalidatedToken invalidatedToken = InvalidatedToken.builder()
-                    .id(jit)
-                    .expiryTime(expiryTime)
-                    .build();
-            invalidatedTokenRepository.save(invalidatedToken);
+            // Hủy token hiện tại (Lưu vào Redis với TTL bằng thời gian sống còn lại)
+            long remainingTime = expiryTime.getTime() - System.currentTimeMillis();
+            if (remainingTime > 0) {
+                redisTemplate.opsForValue().set("jwt_blacklist:" + jit, "invalid", remainingTime, java.util.concurrent.TimeUnit.MILLISECONDS);
+            }
 
             // [LOGIC MỚI] Xóa dấu vết trong bảng User
             var username = signToken.getJWTClaimsSet().getSubject();
@@ -244,17 +241,10 @@ public class AuthenticationService {
 
     // --- HELPERS ---
     private void invalidateToken(String tokenId) {
-        // Vì ta không biết thời gian hết hạn của token cũ (do không lưu),
-        // Ta set đại thời gian hết hạn là: Thời điểm hiện tại + 1 giờ (bằng thời gian sống mặc định của token)
-        // Mục đích: Để Job dọn dẹp DB sau này biết đường mà xóa.
-        Date estimatedExpiryTime = new Date(Instant.now().plus(1, ChronoUnit.HOURS).toEpochMilli());
-
-        InvalidatedToken invalidatedToken = InvalidatedToken.builder()
-                .id(tokenId)
-                .expiryTime(estimatedExpiryTime)
-                .build();
-
-        invalidatedTokenRepository.save(invalidatedToken);
+        // Nếu chỉ có ID mà không có thời gian hết hạn (trường hợp user đăng nhập chỗ khác bị đá ra)
+        // Ta set TTL mặc định là 1 giờ (bằng thời gian sống tối đa của 1 token)
+        String redisKey = "jwt_blacklist:" + tokenId;
+        redisTemplate.opsForValue().set(redisKey, "invalid", 1, java.util.concurrent.TimeUnit.HOURS);
     }
 
     private String getTokenIdFromToken(String token) {
@@ -319,8 +309,9 @@ public class AuthenticationService {
             throw new AppException(ErrorCode.UNAUTHENTICATED);
         }
 
-        // 3. Check Blacklist (Token đã logout hoặc đã refresh trước đó)
-        if (invalidatedTokenRepository.existsById(signedJWT.getJWTClaimsSet().getJWTID())) {
+        // 3. Check Blacklist trên Redis
+        String redisKey = "jwt_blacklist:" + signedJWT.getJWTClaimsSet().getJWTID();
+        if (Boolean.TRUE.equals(redisTemplate.hasKey(redisKey))) {
             throw new AppException(ErrorCode.UNAUTHENTICATED);
         }
 
