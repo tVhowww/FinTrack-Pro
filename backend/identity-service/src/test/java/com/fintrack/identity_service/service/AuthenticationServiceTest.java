@@ -5,9 +5,7 @@ import com.fintrack.identity_service.dto.response.AuthenticationResponse;
 import com.fintrack.identity_service.entity.User;
 import com.fintrack.identity_service.exception.AppException;
 import com.fintrack.identity_service.exception.ErrorCode;
-import com.fintrack.identity_service.repository.InvalidatedTokenRepository;
 import com.fintrack.identity_service.repository.UserRepository;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -30,8 +28,6 @@ public class AuthenticationServiceTest {
     private UserRepository userRepository;
     @Mock
     private PasswordEncoder passwordEncoder;
-    @Mock
-    private InvalidatedTokenRepository invalidatedTokenRepository;
 
     @InjectMocks
     private AuthenticationService authenticationService;
