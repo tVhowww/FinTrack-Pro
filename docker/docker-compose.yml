@@ -188,12 +188,15 @@ services:
       - IDENTITY_SERVICE_URL=http://identity-service:8080
       - WALLET_SERVICE_URL=http://wallet-service:8081
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-service:8761/eureka/
+      - SPRING_DATA_REDIS_HOST=redis
+      - SPRING_DATA_REDIS_PORT=6379
     depends_on:
       - transaction-db
       - kafka
       - discovery-service
       - identity-service
       - wallet-service
+      - redis
 
   # --- API Gateway ---
   api-gateway:

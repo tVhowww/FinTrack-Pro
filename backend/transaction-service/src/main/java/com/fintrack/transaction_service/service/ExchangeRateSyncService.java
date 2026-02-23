@@ -6,14 +6,20 @@ import com.fintrack.transaction_service.repository.ExchangeRateRepository;
 import com.fintrack.transaction_service.repository.httpclient.ExchangeRateClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 @Service
 @RequiredArgsConstructor
@@ -22,6 +28,7 @@ public class ExchangeRateSyncService {
 
     private final ExchangeRateClient exchangeRateClient;
     private final ExchangeRateRepository exchangeRateRepository;
+    private final StringRedisTemplate redisTemplate;
 
     // Chạy lúc 00:00 mỗi ngày. (Nếu muốn test chạy mỗi phút 1 lần thì dùng: "0 * * * * ?")
     @Scheduled(cron = "0 0 0 * * ?")
@@ -38,7 +45,9 @@ public class ExchangeRateSyncService {
                 ExchangeRateApiResponse response = exchangeRateClient.getLatestRates(base);
 
                 if ("success".equals(response.getResult()) && response.getConversionRates() != null) {
-                    Map<String, java.math.BigDecimal> rates = response.getConversionRates();
+                    Map<String, BigDecimal> rates = response.getConversionRates();
+
+                    Map<String, String> redisRatesMap = new HashMap<>();
 
                     // Lặp qua tất cả các tỷ giá lấy được và lưu vào DB
                     rates.forEach((targetCurrency, rateValue) -> {
@@ -55,7 +64,16 @@ public class ExchangeRateSyncService {
                         exchangeRate.setLastUpdated(Instant.now());
 
                         exchangeRateRepository.save(exchangeRate);
+
+                        redisRatesMap.put(targetCurrency, rateValue.toString());
                     });
+
+                    String redisKey = "exchange_rates:" + base;
+                    redisTemplate.opsForHash().putAll(redisKey, redisRatesMap);
+
+                    // Set TTL 25 tiếng (đề phòng hôm sau job chạy trễ 1 chút vẫn có data backup)
+                    redisTemplate.expire(redisKey, 25, TimeUnit.HOURS);
+
                     log.info("Đã cập nhật thành công tỷ giá cho đồng: {}", base);
                 }
             } catch (Exception e) {
@@ -63,5 +81,11 @@ public class ExchangeRateSyncService {
             }
         }
         log.info("Hoàn tất tiến trình đồng bộ tỷ giá!");
+    }
+
+    @EventListener(ApplicationReadyEvent.class)
+    public void syncOnStartup() {
+        log.info("App vừa khởi động, tiến hành lấy tỷ giá mới nhất ngay cho nóng!");
+        syncDailyExchangeRates();
     }
 }

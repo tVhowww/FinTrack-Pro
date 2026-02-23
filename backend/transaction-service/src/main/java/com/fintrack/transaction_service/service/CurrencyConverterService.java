@@ -4,6 +4,7 @@ import com.fintrack.transaction_service.entity.ExchangeRate;
 import com.fintrack.transaction_service.repository.ExchangeRateRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -17,15 +18,13 @@ public class CurrencyConverterService {
 
     private final ExchangeRateRepository exchangeRateRepository;
 
+    private final StringRedisTemplate redisTemplate;
+
     /**
-     * Hàm quy đổi tiền tệ vạn năng
-     * @param amount Số tiền cần đổi
-     * @param fromCurrency Đồng tiền gốc (VD: USD)
-     * @param toCurrency Đồng tiền muốn đổi sang (VD: VND)
-     * @return Số tiền sau khi quy đổi
+     * Hàm quy đổi tiền tệ vạn năng (Đã tích hợp Redis Cache)
      */
     public BigDecimal convertCurrency(BigDecimal amount, String fromCurrency, String toCurrency) {
-        // 0. Kiểm tra an toàn: Nếu số tiền là null, hoặc 2 đồng tiền giống nhau thì trả về y nguyên
+        // 0. Kiểm tra an toàn
         if (amount == null || amount.compareTo(BigDecimal.ZERO) == 0) {
             return BigDecimal.ZERO;
         }
@@ -36,21 +35,50 @@ public class CurrencyConverterService {
         fromCurrency = fromCurrency.toUpperCase();
         toCurrency = toCurrency.toUpperCase();
 
-        // 1. Tìm tỷ giá trực tiếp (VD: Có sẵn cặp USD -> VND trong DB)
+        // ==========================================
+        // TẦNG 1: TÌM TRÊN REDIS (SIÊU TỐC)
+        // ==========================================
+        try {
+            // 1.1 Tìm tỷ giá thuận (VD: USD -> VND)
+            String redisKeyDirect = "exchange_rates:" + fromCurrency;
+            Object directRateObj = redisTemplate.opsForHash().get(redisKeyDirect, toCurrency);
+            if (directRateObj != null) {
+                BigDecimal rate = new BigDecimal(directRateObj.toString());
+                return amount.multiply(rate);
+            }
+
+            // 1.2 Tìm tỷ giá nghịch (VD: VND -> USD)
+            String redisKeyReverse = "exchange_rates:" + toCurrency;
+            Object reverseRateObj = redisTemplate.opsForHash().get(redisKeyReverse, fromCurrency);
+            if (reverseRateObj != null) {
+                BigDecimal rate = new BigDecimal(reverseRateObj.toString());
+                if (rate.compareTo(BigDecimal.ZERO) != 0) {
+                    return amount.divide(rate, 2, RoundingMode.HALF_UP);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Lỗi khi đọc tỷ giá từ Redis, sẽ chuyển sang dùng Database: {}", e.getMessage());
+        }
+
+        // ==========================================
+        // TẦNG 2: TÌM TRONG DATABASE (CHẬM HƠN - FALLBACK)
+        // ==========================================
+        // Nếu code chạy xuống được đây nghĩa là Redis không có dữ liệu (Cache Miss)
+
+        // 2.1 Tìm tỷ giá thuận
         Optional<ExchangeRate> directRate = exchangeRateRepository.findByBaseCurrencyAndTargetCurrency(fromCurrency, toCurrency);
         if (directRate.isPresent()) {
             return amount.multiply(directRate.get().getRate());
         }
 
-        // 2. Tìm tỷ giá ngược chiều (Phòng hờ DB chỉ lưu VND -> USD, thì mình lấy 1 chia cho tỷ giá đó)
+        // 2.2 Tìm tỷ giá nghịch
         Optional<ExchangeRate> reverseRate = exchangeRateRepository.findByBaseCurrencyAndTargetCurrency(toCurrency, fromCurrency);
         if (reverseRate.isPresent() && reverseRate.get().getRate().compareTo(BigDecimal.ZERO) != 0) {
-            // Dùng RoundingMode.HALF_UP để làm tròn chuẩn tài chính (làm tròn lên nếu phần thập phân >= 5)
             return amount.divide(reverseRate.get().getRate(), 2, RoundingMode.HALF_UP);
         }
 
-        // 3. Fallback (Bước đường cùng): Nếu DB hoàn toàn không có dữ liệu về 2 đồng tiền này
-        log.warn("Không tìm thấy tỷ giá quy đổi từ {} sang {}. Tạm thời giữ nguyên giá trị gốc!", fromCurrency, toCurrency);
+        // 3. Fallback (Bước đường cùng)
+        log.warn("Không tìm thấy tỷ giá quy đổi từ {} sang {} ở cả Redis và DB. Tạm thời giữ nguyên giá trị gốc!", fromCurrency, toCurrency);
         return amount;
     }
 }
