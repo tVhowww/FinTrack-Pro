@@ -25,6 +25,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -38,6 +39,7 @@ import java.time.Instant;
 import java.time.YearMonth;
 import java.time.ZoneId;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 @Service
 @RequiredArgsConstructor
@@ -50,6 +52,7 @@ public class TransactionService {
     private final IdentityClient identityClient;
     private final KafkaTemplate<String, Object> kafkaTemplate;
     private final CurrencyConverterService currencyConverterService;
+    private final StringRedisTemplate redisTemplate;
 
 
     public long countTransactionsByWallet(String walletId) {
@@ -552,6 +555,18 @@ public class TransactionService {
 
     @Transactional
     public TransactionResponse create(TransactionCreationRequest request) {
+        String currentUserId = SecurityUtils.getCurrentUserId();
+
+        // Tạo ra một cái khóa duy nhất cho user này khi tạo giao dịch.
+        // TTL = 3 giây (Đủ dài để chặn double-click, đủ ngắn để không gây khó chịu nếu mạng lag thật)
+        String lockKey = "lock:create_transaction:" + currentUserId;
+        Boolean acquired = redisTemplate.opsForValue().setIfAbsent(lockKey, "LOCKED", 3, TimeUnit.SECONDS);
+
+        if (Boolean.FALSE.equals(acquired)) {
+            log.warn("Phát hiện Double-Click từ User {}. Giao dịch đang bị từ chối.", currentUserId);
+            throw new AppException(ErrorCode.REQUEST_PROCESSING);
+        }
+
         validateWalletOwnership(request.getWalletId());
 
         Category category = null;

@@ -83,9 +83,9 @@ public class ExchangeRateSyncService {
         log.info("Hoàn tất tiến trình đồng bộ tỷ giá!");
     }
 
-    @EventListener(ApplicationReadyEvent.class)
-    public void syncOnStartup() {
-        log.info("App vừa khởi động, tiến hành lấy tỷ giá mới nhất ngay cho nóng!");
-        syncDailyExchangeRates();
-    }
+//    @EventListener(ApplicationReadyEvent.class)
+//    public void syncOnStartup() {
+//        log.info("App vừa khởi động, tiến hành lấy tỷ giá mới nhất ngay cho nóng!");
+//        syncDailyExchangeRates();
+//    }
 }

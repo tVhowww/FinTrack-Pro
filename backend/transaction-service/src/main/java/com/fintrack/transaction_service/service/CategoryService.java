@@ -38,6 +38,13 @@ public class CategoryService {
         // Lấy userId từ Token (bắt buộc)
         String userId = SecurityUtils.getCurrentUserId();
 
+        String lockKey = "lock:create_category:" + userId;
+        Boolean acquired = redisTemplate.opsForValue().setIfAbsent(lockKey, "LOCKED", 3, TimeUnit.SECONDS);
+        if (Boolean.FALSE.equals(acquired)) {
+            log.warn("Double-Click chặn đứng! User {} đang tạo Category.", userId);
+            throw new AppException(ErrorCode.REQUEST_PROCESSING);
+        }
+
         // 1. Check trùng tên
         boolean exists = categoryRepository.existsByNameAndUserIdAndTypeAndDeletedFalse(request.getName(), userId, request.getType());
         if (exists) throw new AppException(ErrorCode.CATEGORY_EXISTED);

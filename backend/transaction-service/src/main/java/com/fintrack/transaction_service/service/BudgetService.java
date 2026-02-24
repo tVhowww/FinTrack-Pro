@@ -21,6 +21,7 @@ import com.fintrack.transaction_service.utils.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,6 +33,7 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 @Service
 @RequiredArgsConstructor
@@ -44,6 +46,7 @@ public class BudgetService {
     private final WalletClient walletClient;
     private final IdentityClient identityClient;
     private final CurrencyConverterService currencyConverterService;
+    private final StringRedisTemplate redisTemplate;
 
     /**
      * Lấy danh sách Budget (Xử lý 3 trường hợp: Tất cả, Ví chung, Ví cụ thể)
@@ -80,6 +83,13 @@ public class BudgetService {
     @Transactional
     public BudgetResponse create(BudgetCreationRequest request) {
         String userId = SecurityUtils.getCurrentUserId();
+
+        String lockKey = "lock:create_budget:" + userId;
+        Boolean acquired = redisTemplate.opsForValue().setIfAbsent(lockKey, "LOCKED", 3, TimeUnit.SECONDS);
+        if (Boolean.FALSE.equals(acquired)) {
+            log.warn("Double-Click chặn đứng! User {} đang tạo Budget.", userId);
+            throw new AppException(ErrorCode.REQUEST_PROCESSING);
+        }
 
         // 1. Validate trùng
         if (budgetRepository.existsByWalletIdAndCategoryIdAndMonthAndYearAndUserId(

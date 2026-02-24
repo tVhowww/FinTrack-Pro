@@ -22,7 +22,8 @@ public enum ErrorCode {
     TRANSACTION_NOT_FOUND(2015, "Transaction not found", HttpStatus.NOT_FOUND),
     WALLET_NOT_FOUND(2020, "Wallet not found", HttpStatus.NOT_FOUND),
     BUDGET_ALREADY_EXISTS(2025, "Budget with the same name already exists for the month", HttpStatus.BAD_REQUEST),
-    BUDGET_NOT_FOUND(2026, "Budget not found", HttpStatus.NOT_FOUND)
+    BUDGET_NOT_FOUND(2026, "Budget not found", HttpStatus.NOT_FOUND),
+    REQUEST_PROCESSING(2030, "Request is being processed, please try again later", HttpStatus.TOO_MANY_REQUESTS)
     ;
 
     ErrorCode(int code, String message, HttpStatusCode statusCode) {
