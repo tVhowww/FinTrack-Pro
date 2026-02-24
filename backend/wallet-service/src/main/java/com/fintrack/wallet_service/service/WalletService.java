@@ -15,6 +15,7 @@ import com.fintrack.wallet_service.repository.httpclient.TransactionClient;
 import com.fintrack.wallet_service.utils.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -23,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 @Service
 @RequiredArgsConstructor
@@ -31,6 +33,7 @@ public class WalletService {
     private final WalletRepository walletRepository;
     private final WalletMapper walletMapper;
     private final TransactionClient transactionClient;
+    private final StringRedisTemplate redisTemplate;
 
     /**
      * Điều chỉnh số dư ví thủ công
@@ -120,6 +123,13 @@ public class WalletService {
 
         if (userId == null) {
             throw new AppException(ErrorCode.UNAUTHENTICATED);
+        }
+
+        String lockKey = "lock:create_wallet:" + userId;
+        Boolean acquired = redisTemplate.opsForValue().setIfAbsent(lockKey, "LOCKED", 3, TimeUnit.SECONDS);
+        if (Boolean.FALSE.equals(acquired)) {
+            log.warn("Double-Click chặn đứng! User {} đang tạo Wallet.", userId);
+            throw new AppException(ErrorCode.REQUEST_PROCESSING);
         }
 
         // 2. Check trùng tên ví (Optional)
