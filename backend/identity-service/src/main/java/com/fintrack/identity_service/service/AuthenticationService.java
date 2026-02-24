@@ -51,6 +51,21 @@ public class AuthenticationService {
         User user = userRepository.findByEmailAndDeletedFalse(request.getEmail())
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
 
+        String rateLimitKey = "rate_limit_otp:" + request.getEmail();
+
+        // Dùng hàm setIfAbsent (Tương đương SETNX trong Redis)
+        // Nếu Key chưa tồn tại -> Tạo Key, set giá trị "1", gán TTL 60s, trả về TRUE (Cho qua)
+        // Nếu Key ĐÃ tồn tại (User vừa gửi xong chưa quá 60s) -> Trả về FALSE (Chặn lại)
+        Boolean isAllowed = redisTemplate.opsForValue().setIfAbsent(rateLimitKey, "1", 60, TimeUnit.SECONDS);
+
+        if (Boolean.FALSE.equals(isAllowed)) {
+            // Lấy thời gian còn lại để báo cho người dùng biết phải đợi bao lâu nữa
+            Long expire = redisTemplate.getExpire(rateLimitKey);
+            log.warn("Spam OTP detected for email: {}. Please wait {} seconds.", request.getEmail(), expire);
+
+            throw new AppException(ErrorCode.TOO_MANY_REQUESTS);
+        }
+
         // 1. Sinh mã OTP (6 số ngẫu nhiên)
         String otp = String.format("%06d", new Random().nextInt(999999));
 
