@@ -213,10 +213,13 @@ services:
       - IDENTITY_SERVICE_URI=lb://identity-service
       - TRANSACTION_SERVICE_URI=lb://transaction-service
       # Nếu gateway dùng Eureka thì không cần, nếu dùng hardcode URL thì cần sửa lại config Gateway
+      - SPRING_DATA_REDIS_HOST=redis
+      - SPRING_DATA_REDIS_PORT=6379
     depends_on:
       - identity-service
       - transaction-service
       - discovery-service
+      - redis
 
 volumes:
   identity_data:
