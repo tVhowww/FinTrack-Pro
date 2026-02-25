@@ -16,7 +16,7 @@ import {
 import { generatePagination } from "@/lib/utils";
 import { useTransactions } from "@/hooks/use-transactions";
 import { TransactionResponse } from "@/types/transaction.dto";
-import { Plus } from "lucide-react";
+import { Plus, Download, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { getColumns } from "./columns";
 import {
@@ -24,6 +24,7 @@ import {
   TransactionUpdateRequest,
 } from "@/types/transaction.dto";
 import { useWallets } from "@/hooks/use-wallets";
+import { toast } from "sonner";
 
 export default function TransactionsPage() {
   const [currentPage, setCurrentPage] = useState(1);
@@ -38,10 +39,18 @@ export default function TransactionsPage() {
     isDeleting,
     createTransaction,
     updateTransaction,
+    exportTransactions,
+    isExporting,
   } = useTransactions({
     page: currentPage,
     size: pageSize,
   });
+
+  const handleExport = () => {
+    // có thể truyền thêm các tham số filter (tháng, năm, ví) vào đây nếu muốn lọc trước khi xuất.
+    // Hiện tại truyền rỗng để lấy hết hoặc theo logic mặc định.
+    exportTransactions({});
+  };
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [transactionToEdit, setTransactionToEdit] =
@@ -93,9 +102,25 @@ export default function TransactionsPage() {
             Lịch sử thu chi của bạn.
           </p>
         </div>
-        <Button onClick={handleCreate}>
-          <Plus className="mr-2 h-4 w-4" /> Thêm giao dịch
-        </Button>
+
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={handleExport}
+            disabled={isExporting}
+          >
+            {isExporting ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="mr-2 h-4 w-4" />
+            )}
+            Xuất Excel
+          </Button>
+
+          <Button onClick={handleCreate}>
+            <Plus className="mr-2 h-4 w-4" /> Thêm giao dịch
+          </Button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-auto">

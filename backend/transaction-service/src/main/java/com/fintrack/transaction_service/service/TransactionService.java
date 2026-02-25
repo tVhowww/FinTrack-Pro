@@ -286,18 +286,22 @@ public class TransactionService {
     }
 
     public ByteArrayInputStream exportToExcel(String walletId, TransactionType type, Instant startDate, Instant endDate) {
-        validateWalletOwnership(walletId);
+        // 1. Dùng helper để gom danh sách ví (Tự động xử lý vụ "Tất cả ví" hoặc "1 ví cụ thể")
+        List<String> walletIds = resolveWalletIds(walletId);
 
-        // 1. Tạo bộ lọc (giống hệt hàm getTransactions nhưng không phân trang)
-        Specification<Transaction> spec = Specification.where(TransactionSpecification.hasWalletId(walletId))
+        if (walletIds.isEmpty()) {
+            return ExcelHelper.transactionsToExcel(Collections.emptyList()); // Trả về file rỗng nếu không có ví
+        }
+
+        // 2. Tạo bộ lọc: Thay hasWalletId bằng hasWalletIdIn
+        Specification<Transaction> spec = Specification.where(TransactionSpecification.hasWalletIdIn(walletIds))
                 .and(TransactionSpecification.hasType(type))
                 .and(TransactionSpecification.createdBetween(startDate, endDate));
 
-        // 2. Lấy toàn bộ dữ liệu (không phân trang - findAll(spec))
-        // Lưu ý: Cần sort theo ngày giảm dần cho đẹp
+        // 3. Lấy toàn bộ dữ liệu & sort
         List<Transaction> transactions = transactionRepository.findAll(spec, Sort.by("date").descending());
 
-        // 3. Gọi Helper để tạo file
+        // 4. Gọi Helper để tạo file
         return ExcelHelper.transactionsToExcel(transactions);
     }
 

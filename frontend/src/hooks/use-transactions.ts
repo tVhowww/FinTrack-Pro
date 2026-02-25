@@ -99,7 +99,66 @@ export function useTransactions(
   });
 
   // =================================================================
-  // 5. HELPER: Kiểm tra giao dịch liên quan
+  // 5. MUTATION: Xuất Excel
+  // =================================================================
+  const exportMutation = useMutation({
+    mutationFn: (exportParams?: TransactionQueryParams) =>
+      transactionService.exportExcel(exportParams),
+    onSuccess: async (blob) => {
+      const fileName = `Lich_su_giao_dich_${new Date().getTime()}.xlsx`;
+
+      try {
+        // 1. CÁCH MỚI: Ép mở cửa sổ chọn chỗ lưu (Chỉ hỗ trợ Chrome, Edge, Cốc Cốc...)
+        if ("showSaveFilePicker" in window) {
+          const fileHandle = await (window as any).showSaveFilePicker({
+            suggestedName: fileName,
+            types: [
+              {
+                description: "Excel File",
+                accept: {
+                  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
+                    [".xlsx"],
+                },
+              },
+            ],
+          });
+
+          // Ghi dữ liệu vào file người dùng vừa chọn
+          const writable = await fileHandle.createWritable();
+          await writable.write(blob);
+          await writable.close();
+
+          toast.success("Đã lưu file Excel thành công!");
+          return; // Xong rồi thì thoát luôn
+        }
+
+        // 2. CÁCH CŨ (FALLBACK): Dành cho Safari, Firefox hoặc trình duyệt không hỗ trợ
+        const url = window.URL.createObjectURL(new Blob([blob]));
+        const link = document.createElement("a");
+        link.href = url;
+        link.setAttribute("download", fileName);
+        document.body.appendChild(link);
+        link.click();
+
+        link.parentNode?.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        toast.success("Đã tải xuống file Excel!");
+      } catch (error: any) {
+        // Nếu người dùng bấm "Cancel" lúc chọn thư mục thì không báo lỗi
+        if (error.name !== "AbortError") {
+          console.error("Lỗi khi lưu file:", error);
+          toast.error("Có lỗi xảy ra khi lưu file!");
+        }
+      }
+    },
+    onError: (error: any) => {
+      console.error("Export error:", error);
+      toast.error("Có lỗi xảy ra khi xuất dữ liệu từ máy chủ!");
+    },
+  });
+
+  // =================================================================
+  // 6. HELPER: Kiểm tra giao dịch liên quan
   // =================================================================
   const checkRelatedTransactions = async (categoryId: string) => {
     setIsCheckingRelated(true);
@@ -128,9 +187,11 @@ export function useTransactions(
     createTransaction: createMutation.mutateAsync,
     updateTransaction: updateMutation.mutateAsync,
     deleteTransaction: deleteMutation.mutateAsync,
+    exportTransactions: exportMutation.mutateAsync,
     isCreating: createMutation.isPending,
     isUpdating: updateMutation.isPending,
     isDeleting: deleteMutation.isPending,
+    isExporting: exportMutation.isPending,
     checkRelatedTransactions,
     isCheckingRelated,
   };

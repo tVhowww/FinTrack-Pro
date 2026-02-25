@@ -63,4 +63,12 @@ export const transactionService = {
     );
     return response.data;
   },
+
+  exportExcel: async (params?: TransactionQueryParams) => {
+    const response = await http.get(`${BASE_URL}/export`, {
+      params,
+      responseType: "blob", // Rất quan trọng: Báo cho Axios biết đây là file
+    });
+    return response.data;
+  },
 };
