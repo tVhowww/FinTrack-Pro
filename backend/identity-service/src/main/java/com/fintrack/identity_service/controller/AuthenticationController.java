@@ -6,6 +6,7 @@ import com.fintrack.identity_service.dto.response.AuthenticationResponse;
 import com.fintrack.identity_service.dto.response.IntrospectResponse;
 import com.fintrack.identity_service.service.AuthenticationService;
 import com.nimbusds.jose.JOSEException;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -19,6 +20,14 @@ import java.text.ParseException;
 @RequiredArgsConstructor
 public class AuthenticationController {
     private final AuthenticationService authenticationService;
+
+    @PostMapping("/google")
+    public ApiResponse<AuthenticationResponse> authenticateWithGoogle(@RequestBody GoogleLoginRequest request) {
+        var result = authenticationService.authenticateWithGoogle(request);
+        return ApiResponse.<AuthenticationResponse>builder()
+                .result(result)
+                .build();
+    }
 
     @PostMapping("/forgot-password")
     public ApiResponse<Void> forgotPassword(@RequestBody ForgotPasswordRequest request) {
@@ -61,7 +70,7 @@ public class AuthenticationController {
     }
 
     @PostMapping("/refresh")
-    public ApiResponse<AuthenticationResponse> refreshToken(@RequestBody RefreshTokenRequest request) throws ParseException, JOSEException {
+    public ApiResponse<AuthenticationResponse> refreshToken(@Valid @RequestBody RefreshTokenRequest request) throws ParseException, JOSEException {
         var result = authenticationService.refreshToken(request);
         return ApiResponse.<AuthenticationResponse>builder()
                 .result(result)

@@ -1,6 +1,5 @@
 package com.fintrack.identity_service.dto.request;
 
-import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -10,7 +9,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class RefreshTokenRequest {
-    @NotBlank(message = "Token không được để trống")
-    private String token;
+public class GoogleLoginRequest {
+    private String token; // Hứng ID Token từ Frontend
 }

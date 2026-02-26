@@ -73,4 +73,12 @@ export const authService = {
     );
     return response.data;
   },
+
+  loginGoogle: async (token: string) => {
+    const response = await http.post<ApiResponse<any>>(
+      "/identity/auth/google",
+      { token },
+    );
+    return response.data;
+  },
 };

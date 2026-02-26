@@ -8,6 +8,10 @@ import com.fintrack.identity_service.entity.User;
 import com.fintrack.identity_service.exception.AppException;
 import com.fintrack.identity_service.exception.ErrorCode;
 import com.fintrack.identity_service.repository.UserRepository;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
+import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.json.gson.GsonFactory;
 import com.nimbusds.jose.*;
 import com.nimbusds.jose.crypto.MACSigner;
 import com.nimbusds.jose.crypto.MACVerifier;
@@ -27,10 +31,7 @@ import org.springframework.util.CollectionUtils;
 import java.text.ParseException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.Date;
-import java.util.Random;
-import java.util.StringJoiner;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -45,6 +46,10 @@ public class AuthenticationService {
     @NonFinal
     @Value("${jwt.signerKey}")
     protected String SIGNER_KEY;
+
+    @NonFinal
+    @Value("${google.client-id:YOUR_GOOGLE_CLIENT_ID_HERE}")
+    protected String GOOGLE_CLIENT_ID;
 
     @Transactional
     public void forgotPassword(ForgotPasswordRequest request) {
@@ -302,6 +307,10 @@ public class AuthenticationService {
 
     // isRefresh: tham số này để dùng sau này nếu bạn làm refresh token (tạm thời chưa dùng)
     private SignedJWT verifyToken(String token, boolean isRefresh) throws JOSEException, ParseException {
+        if (token == null || token.trim().isEmpty()) {
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
+        }
+
         JWSVerifier verifier = new MACVerifier(SIGNER_KEY.getBytes());
 
         SignedJWT signedJWT = SignedJWT.parse(token);
@@ -348,5 +357,72 @@ public class AuthenticationService {
             });
         }
         return stringJoiner.toString();
+    }
+
+    @Transactional
+    public AuthenticationResponse authenticateWithGoogle(GoogleLoginRequest request) {
+        try {
+            // 1. Cấu hình máy quét Token của Google
+            GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(new NetHttpTransport(), new GsonFactory())
+                    .setAudience(Collections.singletonList(GOOGLE_CLIENT_ID))
+                    .build();
+
+            // 2. Kiểm tra token có chuẩn của Google không
+            GoogleIdToken idToken = verifier.verify(request.getToken());
+            if (idToken == null) {
+                throw new AppException(ErrorCode.UNAUTHENTICATED);
+            }
+
+            // 3. Lấy thông tin User từ Google
+            GoogleIdToken.Payload payload = idToken.getPayload();
+            String email = payload.getEmail();
+            String googleId = payload.getSubject();
+            String name = (String) payload.get("name");
+            String pictureUrl = (String) payload.get("picture");
+
+            // 4. Kiểm tra User có trong DB chưa
+            User user = userRepository.findByEmailAndDeletedFalse(email).orElse(null);
+
+            if (user == null) {
+                // NẾU CHƯA CÓ: Tự động tạo tài khoản mới
+                user = User.builder()
+                        .username(email) // Dùng email làm username luôn
+                        .email(email)
+                        .fullName(name)
+                        .avatar(pictureUrl)
+                        .provider("GOOGLE")
+                        .providerId(googleId)
+                        .password(passwordEncoder.encode(UUID.randomUUID().toString())) // Mật khẩu rác vì login qua Google
+                        .build();
+                user = userRepository.save(user);
+                log.info("Tạo mới tài khoản qua Google: {}", email);
+            } else {
+                // NẾU ĐÃ CÓ: Cập nhật lại provider nếu trước đó họ đăng ký tay
+                if (user.getProvider() == null || "LOCAL".equals(user.getProvider())) {
+                    user.setProvider("GOOGLE");
+                    user.setProviderId(googleId);
+                    userRepository.save(user);
+                }
+            }
+
+            // 5. Đá văng phiên đăng nhập cũ (nếu có)
+            if (user.getCurrentJwtId() != null) {
+                invalidateToken(user.getCurrentJwtId());
+            }
+
+            // 6. Nhả Token của hệ thống mình cho Frontend xài
+            String token = generateToken(user);
+            user.setCurrentJwtId(getTokenIdFromToken(token));
+            userRepository.save(user);
+
+            return AuthenticationResponse.builder()
+                    .token(token)
+                    .authenticated(true)
+                    .build();
+
+        } catch (Exception e) {
+            log.error("Google Login failed: ", e);
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
+        }
     }
 }

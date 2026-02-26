@@ -53,6 +53,13 @@ public class User {
     @Column(name = "current_jwt_id")
     private String currentJwtId; // Lưu JTI của token hợp lệ cuối cùng
 
+    @Column(name = "provider")
+    @Builder.Default
+    private String provider = "LOCAL"; // LOCAL, GOOGLE, FACEBOOK
+
+    @Column(name = "provider_id")
+    private String providerId; // Chứa ID định danh của Google/Facebook
+
     @ManyToMany
     @JoinTable(
             name = "user_roles", // Tên bảng trung gian
