@@ -252,18 +252,25 @@ public class TransactionService {
         // LẤY INFO TRƯỚC KHI XUỐNG ASYNC
         String recipientEmail = null;
         String username = "Người dùng";
+        String currency = "VND";
+
         try {
             var userResponse = identityClient.getMyInfo();
             if (userResponse != null && userResponse.getResult() != null) {
                 recipientEmail = userResponse.getResult().getEmail();
                 username = userResponse.getResult().getUsername();
             }
+
+            var walletResponse = walletClient.getWallet(request.getWalletId());
+            if (walletResponse != null && walletResponse.getResult() != null) {
+                currency = walletResponse.getResult().getCurrency();
+            }
         } catch (Exception e) {
             log.error("Lỗi lấy thông tin user để gửi email: {}", e.getMessage());
         }
 
         // 3. Gửi thông báo ASYNC (Truyền thêm Email và Tên)
-        sendTransactionNotification(transaction, category, recipientEmail, username);
+        sendTransactionNotification(transaction, category, recipientEmail, username, currency);
     }
 
     /**
@@ -597,18 +604,25 @@ public class TransactionService {
         // LẤY INFO TRƯỚC KHI XUỐNG ASYNC
         String recipientEmail = null;
         String username = "Người dùng";
+        String currency = "VND";
+
         try {
             var userResponse = identityClient.getMyInfo();
             if (userResponse != null && userResponse.getResult() != null) {
                 recipientEmail = userResponse.getResult().getEmail();
                 username = userResponse.getResult().getUsername();
             }
+
+            var walletResponse = walletClient.getWallet(request.getWalletId());
+            if (walletResponse != null && walletResponse.getResult() != null) {
+                currency = walletResponse.getResult().getCurrency();
+            }
         } catch (Exception e) {
             log.error("Lỗi lấy thông tin user để gửi email: {}", e.getMessage());
         }
 
         // 4. Gửi Notification qua Kafka (Truyền thêm Email và Tên)
-        sendTransactionNotification(transaction, category, recipientEmail, username);
+        sendTransactionNotification(transaction, category, recipientEmail, username, currency);
 
         return transactionMapper.toTransactionResponse(transaction);
     }
@@ -618,24 +632,29 @@ public class TransactionService {
      * Nếu lỗi sẽ không ảnh hưởng đến giao dịch chính
      */
     @Async
-    public void sendTransactionNotification(Transaction transaction, Category category, String recipientEmail, String username) { // 👇 ĐÃ THÊM THAM SỐ
+    public void sendTransactionNotification(Transaction transaction, Category category, String recipientEmail, String username, String currency) {
         try {
             if (recipientEmail == null || recipientEmail.isEmpty()) {
                 log.warn("User không có email, bỏ qua gửi thông báo cho transaction: {}", transaction.getId());
                 return;
             }
 
-            NumberFormat formatter = NumberFormat.getInstance(Locale.of("vi", "VN"));
+            // Dùng US Locale làm chuẩn để format số (ví dụ: 1,000,000.50)
+            // Nếu muốn format linh hoạt theo loại tiền thì dùng java.util.Currency
+            NumberFormat formatter = NumberFormat.getInstance(Locale.US);
             String formattedNumber = formatter.format(transaction.getAmount().abs());
+
+            // Đảm bảo fallback nếu currency bị null
+            String finalCurrency = (currency != null && !currency.isEmpty()) ? currency : "VND";
 
             String amountString;
             String actionString;
 
             if (transaction.getType() == TransactionType.EXPENSE) {
-                amountString = "-" + formattedNumber + " VND";
+                amountString = "-" + formattedNumber + " " + finalCurrency;
                 actionString = "thanh toán cho";
             } else {
-                amountString = "+" + formattedNumber + " VND";
+                amountString = "+" + formattedNumber + " " + finalCurrency;
                 actionString = "nhận tiền từ";
             }
 
