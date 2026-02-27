@@ -363,7 +363,7 @@ public class TransactionService {
     public PageResponse<TransactionResponse> getTransactions(
             int page, int size,
             String walletId, TransactionType type,
-            Instant startDate, Instant endDate, String categoryId) {
+            Instant startDate, Instant endDate, String categoryId, String keyword) {
 
         // Lấy UserID hiện tại
         String currentUserId = SecurityUtils.getCurrentUserId();
@@ -408,7 +408,8 @@ public class TransactionService {
         Specification<Transaction> spec = Specification.where(TransactionSpecification.hasWalletIdIn(walletIdsToQuery))
                 .and(TransactionSpecification.hasType(type))
                 .and(TransactionSpecification.createdBetween(startDate, endDate))
-                .and(TransactionSpecification.hasCategoryIn(categoryIdsToFilter));
+                .and(TransactionSpecification.hasCategoryIn(categoryIdsToFilter))
+                .and(TransactionSpecification.hasKeyword(keyword));
 
         Page<Transaction> pageData = transactionRepository.findAll(spec, pageable);
 

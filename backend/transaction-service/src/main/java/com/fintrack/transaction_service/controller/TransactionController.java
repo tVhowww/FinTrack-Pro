@@ -100,9 +100,10 @@ public class TransactionController {
             @RequestParam(value = "type", required = false) TransactionType type,
             @RequestParam(value = "startDate", required = false) Instant startDate,
             @RequestParam(value = "endDate", required = false) Instant endDate,
-            @RequestParam(value = "categoryId", required = false) String categoryId
+            @RequestParam(value = "categoryId", required = false) String categoryId,
+            @RequestParam(value = "keyword", required = false) String keyword
     ) {
-        var result = transactionService.getTransactions(page, size, walletId, type, startDate, endDate, categoryId);
+        var result = transactionService.getTransactions(page, size, walletId, type, startDate, endDate, categoryId, keyword);
 
         return ApiResponse.<PageResponse<TransactionResponse>>builder()
                 .result(result)

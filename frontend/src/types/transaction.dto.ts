@@ -44,4 +44,5 @@ export interface TransactionQueryParams {
   startDate?: string;
   endDate?: string;
   categoryId?: string;
+  keyword?: string;
 }

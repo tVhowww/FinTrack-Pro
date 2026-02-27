@@ -28,11 +28,8 @@ export function useTransactions(
     queryKey: ["transactions", params],
     queryFn: () => transactionService.getTransactions(params),
 
-    // Nếu trang của bạn cho phép xem "Tất cả ví" (không có walletId), bạn có thể bỏ check này hoặc điều chỉnh logic backend
-    enabled: params.walletId !== "undefined",
-
     placeholderData: (previousData) => previousData,
-    staleTime: 1000 * 60, // Cache 1 phút để tránh gọi lại liên tục
+    staleTime: 1000 * 60, // Cache 1 phút
     refetchOnWindowFocus: true,
   });
 

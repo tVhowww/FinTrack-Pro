@@ -15,7 +15,11 @@ import {
 } from "@/components/ui/pagination";
 import { generatePagination } from "@/lib/utils";
 import { useTransactions } from "@/hooks/use-transactions";
-import { TransactionResponse } from "@/types/transaction.dto";
+import {
+  TransactionQueryParams,
+  TransactionResponse,
+  TransactionType,
+} from "@/types/transaction.dto";
 import { Plus, Download, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { getColumns } from "./columns";
@@ -23,12 +27,24 @@ import {
   TransactionCreationRequest,
   TransactionUpdateRequest,
 } from "@/types/transaction.dto";
+import { useSearchParams } from "next/navigation";
 import { useWallets } from "@/hooks/use-wallets";
-import { toast } from "sonner";
+import { TransactionFilter } from "@/components/transaction/transaction-filter";
 
 export default function TransactionsPage() {
-  const [currentPage, setCurrentPage] = useState(1);
+  const searchParams = useSearchParams();
+
+  const currentPage = Number(searchParams.get("page")) || 1;
   const pageSize = 10;
+
+  const queryParams: TransactionQueryParams = {
+    page: currentPage,
+    size: pageSize,
+    keyword: searchParams.get("keyword") || undefined,
+    type: (searchParams.get("type") as TransactionType) || undefined,
+    walletId: searchParams.get("walletId") || undefined,
+    categoryId: searchParams.get("categoryId") || undefined,
+  };
 
   // Gọi Hook
   const {
@@ -41,15 +57,12 @@ export default function TransactionsPage() {
     updateTransaction,
     exportTransactions,
     isExporting,
-  } = useTransactions({
-    page: currentPage,
-    size: pageSize,
-  });
+  } = useTransactions(queryParams);
 
   const handleExport = () => {
     // có thể truyền thêm các tham số filter (tháng, năm, ví) vào đây nếu muốn lọc trước khi xuất.
     // Hiện tại truyền rỗng để lấy hết hoặc theo logic mặc định.
-    exportTransactions({});
+    exportTransactions(queryParams);
   };
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -93,6 +106,12 @@ export default function TransactionsPage() {
 
   const columns = getColumns(handleEdit, (t) => setDeleteId(t.id), wallets);
 
+  const handlePageChange = (newPage: number) => {
+    const params = new URLSearchParams(searchParams);
+    params.set("page", newPage.toString());
+    window.history.pushState(null, "", `?${params.toString()}`);
+  };
+
   return (
     <div className="h-full flex flex-col space-y-4">
       <div className="flex items-center justify-between">
@@ -123,6 +142,8 @@ export default function TransactionsPage() {
         </div>
       </div>
 
+      <TransactionFilter />
+
       <div className="flex-1 overflow-auto">
         {isLoading ? (
           <div className="text-center py-10 text-muted-foreground">
@@ -139,7 +160,7 @@ export default function TransactionsPage() {
                   <PaginationItem>
                     <PaginationPrevious
                       onClick={() =>
-                        setCurrentPage((prev) => Math.max(prev - 1, 1))
+                        handlePageChange(Math.max(currentPage - 1, 1))
                       }
                       className={
                         currentPage === 1
@@ -157,7 +178,7 @@ export default function TransactionsPage() {
                         ) : (
                           <PaginationLink
                             isActive={page === currentPage}
-                            onClick={() => setCurrentPage(page as number)}
+                            onClick={() => handlePageChange(page as number)}
                             className="cursor-pointer"
                           >
                             {page}
@@ -170,7 +191,7 @@ export default function TransactionsPage() {
                   <PaginationItem>
                     <PaginationNext
                       onClick={() =>
-                        setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+                        handlePageChange(Math.min(currentPage + 1, totalPages))
                       }
                       className={
                         currentPage >= totalPages
