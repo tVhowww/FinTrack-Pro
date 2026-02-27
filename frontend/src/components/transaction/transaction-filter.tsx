@@ -46,9 +46,13 @@ export function TransactionFilter() {
       params.delete(key);
     }
 
-    // Mỗi lần đổi bộ lọc thì reset về trang 1
-    params.set("page", "1");
+    // Nếu người dùng đổi Loại giao dịch (Thu/Chi)
+    // thì phải Reset (xóa) luôn cái Danh mục đang chọn để tránh xung đột
+    if (key === "type") {
+      params.delete("categoryId");
+    }
 
+    params.set("page", "1");
     replace(`${pathname}?${params.toString()}`);
   };
 
@@ -59,6 +63,11 @@ export function TransactionFilter() {
   const clearFilters = () => {
     replace(pathname); // Xóa sạch param, về lại đường dẫn gốc
   };
+
+  const flattenCategories = categories.flatMap((c) => [
+    c,
+    ...(c.subCategories || []),
+  ]);
 
   return (
     <div className="flex flex-col md:flex-row gap-4 mb-6 bg-card p-4 rounded-lg border shadow-sm">
@@ -133,11 +142,13 @@ export function TransactionFilter() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Tất cả danh mục</SelectItem>
-            {categories.map((c) => (
-              <SelectItem key={c.id} value={c.id}>
-                {c.name}
-              </SelectItem>
-            ))}
+            {flattenCategories
+              .filter((c) => currentType === "all" || c.type === currentType)
+              .map((c) => (
+                <SelectItem key={c.id} value={c.id}>
+                  {c.name}
+                </SelectItem>
+              ))}
           </SelectContent>
         </Select>
       </div>
