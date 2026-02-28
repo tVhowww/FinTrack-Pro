@@ -14,6 +14,7 @@ export const budgetService = {
     walletId?: string;
     month: number;
     year: number;
+    keyword?: string;
   }) => {
     const queryParams: any = {
       month: params.month,
@@ -24,6 +25,7 @@ export const budgetService = {
     if (params.walletId) {
       queryParams.walletId = params.walletId;
     }
+    if (params.keyword) queryParams.keyword = params.keyword;
 
     const response = await http.get<ApiResponse<BudgetResponse[]>>(
       `${BASE_URL}`,

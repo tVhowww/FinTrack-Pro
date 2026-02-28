@@ -7,15 +7,21 @@ interface UseBudgetsParams {
   walletId?: string;
   month: number;
   year: number;
+  keyword?: string;
 }
 
-export function useBudgets({ walletId, month, year }: UseBudgetsParams) {
+export function useBudgets({
+  walletId,
+  month,
+  year,
+  keyword,
+}: UseBudgetsParams) {
   const queryClient = useQueryClient();
 
   // 1. Query: Lấy danh sách
   const { data: budgets = [], isLoading } = useQuery({
-    queryKey: ["budgets", { walletId, month, year }],
-    queryFn: () => budgetService.getAll({ walletId, month, year }),
+    queryKey: ["budgets", { walletId, month, year, keyword }],
+    queryFn: () => budgetService.getAll({ walletId, month, year, keyword }),
     staleTime: 0,
     refetchOnWindowFocus: true,
   });

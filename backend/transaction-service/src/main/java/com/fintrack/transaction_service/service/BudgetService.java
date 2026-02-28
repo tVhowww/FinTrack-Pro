@@ -18,6 +18,7 @@ import com.fintrack.transaction_service.repository.httpclient.IdentityClient;
 import com.fintrack.transaction_service.repository.httpclient.WalletClient;
 import com.fintrack.transaction_service.repository.specification.TransactionSpecification;
 import com.fintrack.transaction_service.utils.SecurityUtils;
+import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.jpa.domain.Specification;
@@ -51,30 +52,44 @@ public class BudgetService {
     /**
      * Lấy danh sách Budget (Xử lý 3 trường hợp: Tất cả, Ví chung, Ví cụ thể)
      */
-    public List<BudgetResponse> getBudgets(String walletId, int month, int year) {
+    public List<BudgetResponse> getBudgets(String walletId, int month, int year, String keyword) { // 👇 [MỚI] Thêm param keyword
         String userId = SecurityUtils.getCurrentUserId();
-        List<Budget> budgets;
 
-        // Phân loại 3 trường hợp
-        if ("all".equals(walletId) || walletId == null || walletId.trim().isEmpty() || "undefined".equals(walletId)) {
-            // Trường hợp 1: "Tất cả các ví" -> Lấy TẤT CẢ
-            budgets = budgetRepository.findByMonthAndYearAndUserId(month, year, userId);
+        // 1. Dùng Specification để build query động siêu mạnh
+        Specification<Budget> spec = (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
 
-        } else if ("global".equals(walletId)) {
-            // Trường hợp 2: "Ngân sách chung" -> Chỉ lấy ngân sách Global (walletId = null)
-            budgets = budgetRepository.findByWalletIdIsNullAndMonthAndYearAndUserId(month, year, userId);
+            // Điều kiện bắt buộc: userId, month, year
+            predicates.add(cb.equal(root.get("userId"), userId));
+            predicates.add(cb.equal(root.get("month"), month));
+            predicates.add(cb.equal(root.get("year"), year));
 
-        } else {
-            // Trường hợp 3: Chọn "1 Ví cụ thể" -> Lấy của ví đó + Ngân sách chung
-            budgets = budgetRepository.findBudgetsForWallet(walletId, month, year, userId);
-        }
+            // Xử lý logic WalletId
+            if ("global".equals(walletId)) {
+                predicates.add(cb.isNull(root.get("walletId")));
+            } else if (walletId != null && !walletId.trim().isEmpty() && !"all".equals(walletId) && !"undefined".equals(walletId)) {
+                // Nếu chọn 1 ví cụ thể: Lấy của ví đó HOẶC ví chung (global)
+                predicates.add(cb.or(
+                        cb.equal(root.get("walletId"), walletId),
+                        cb.isNull(root.get("walletId"))
+                ));
+            }
+            // Nếu "all" thì không add thêm điều kiện wallet (Lấy sạch sành sanh)
+
+            if (keyword != null && !keyword.trim().isEmpty()) {
+                predicates.add(cb.like(cb.lower(root.get("name")), "%" + keyword.toLowerCase() + "%"));
+            }
+
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+
+        // Quét DB 1 phát lấy ra danh sách Budget
+        List<Budget> budgets = budgetRepository.findAll(spec);
 
         if (budgets.isEmpty()) return new ArrayList<>();
 
-        // Cache danh sách ví của User (Để dùng tính spentAmount cho Global Budget)
         List<WalletResponse> allMyWallets = getAllMyWallets();
 
-        // Map và tính toán số tiền đã chi tiêu
         return budgets.stream()
                 .map(budget -> mapToBudgetResponse(budget, allMyWallets))
                 .toList();
