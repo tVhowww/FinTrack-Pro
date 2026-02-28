@@ -6,8 +6,10 @@ const BASE_URL = "/wallet/wallets";
 
 export const walletService = {
   // GET /wallet/wallets
-  getAll: async () => {
-    const response = await http.get<ApiResponse<Wallet[]>>(BASE_URL);
+  getAll: async (params?: { keyword?: string; currency?: string }) => {
+    const response = await http.get<ApiResponse<Wallet[]>>(BASE_URL, {
+      params,
+    });
     return response.data;
   },
 

@@ -2,6 +2,7 @@ package com.fintrack.wallet_service.repository;
 
 import com.fintrack.wallet_service.entity.Wallet;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
 
 import java.util.Collection;
@@ -9,7 +10,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface WalletRepository extends JpaRepository<Wallet, String> {
+public interface WalletRepository extends JpaRepository<Wallet, String>, JpaSpecificationExecutor<Wallet> {
     // Kiểm tra ví trùng tên của user đó (Tránh 1 user tạo 2 ví "Tiền mặt")
     boolean existsByNameIgnoreCaseAndUserIdAndIsActive(String name, String userId, boolean isActive);
 

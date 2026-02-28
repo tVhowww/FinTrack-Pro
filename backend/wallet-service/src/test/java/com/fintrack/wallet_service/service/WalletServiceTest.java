@@ -14,6 +14,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -125,18 +126,20 @@ public class WalletServiceTest {
 
     @Test
     void getMyWallets_Success() {
-        // GIVE:
+        // GIVEN:
         mockSecurityContext();
-        when(walletRepository.findByUserIdAndIsActiveTrueOrderByCreatedAtDesc(userId))
+
+        when(walletRepository.findAll(any(Specification.class)))
                 .thenReturn(List.of(wallet));
+
         when(walletMapper.toWalletResponse(any(Wallet.class))).thenReturn(walletResponse);
 
-        // WHEN:
-        var responses = walletService.getMyWallets();
+        // WHEN: Truyền tham số null cho keyword và currency (Giả lập việc lấy tất cả)
+        var responses = walletService.getMyWallets(null, null);
 
         // THEN:
         assertEquals(1, responses.size());
-        assertEquals("wallet-123", responses.get(0).getId());
+        assertEquals("wallet-123", responses.get(0).getId()); // Nhớ đổi "wallet-123" cho khớp với biến walletResponse của bác nhé
     }
 
     @Test

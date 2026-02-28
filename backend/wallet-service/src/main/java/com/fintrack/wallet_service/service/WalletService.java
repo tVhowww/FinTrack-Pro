@@ -13,8 +13,10 @@ import com.fintrack.wallet_service.mapper.WalletMapper;
 import com.fintrack.wallet_service.repository.WalletRepository;
 import com.fintrack.wallet_service.repository.httpclient.TransactionClient;
 import com.fintrack.wallet_service.utils.SecurityUtils;
+import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -23,6 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -144,10 +147,33 @@ public class WalletService {
         return walletMapper.toWalletResponse(walletRepository.save(wallet));
     }
 
-    public List<WalletResponse> getMyWallets() {
+    public List<WalletResponse> getMyWallets(String keyword, String currency) {
         String userId = SecurityUtils.getCurrentUserId();
 
-        var wallets = walletRepository.findByUserIdAndIsActiveTrueOrderByCreatedAtDesc(userId);
+        Specification<Wallet> spec = (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+
+            // Điều kiện bắt buộc: Đúng user và ví chưa bị xóa
+            predicates.add(cb.equal(root.get("userId"), userId));
+            predicates.add(cb.isTrue(root.get("isActive")));
+
+            // Lọc theo Tên ví (keyword)
+            if (keyword != null && !keyword.trim().isEmpty()) {
+                predicates.add(cb.like(cb.lower(root.get("name")), "%" + keyword.toLowerCase() + "%"));
+            }
+
+            // Lọc theo Loại tiền (VND, USD...)
+            if (currency != null && !currency.trim().isEmpty() && !"all".equalsIgnoreCase(currency)) {
+                predicates.add(cb.equal(root.get("currency"), currency));
+            }
+
+            // Sắp xếp: Mới nhất lên đầu
+            query.orderBy(cb.desc(root.get("createdAt")));
+
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+
+        var wallets = walletRepository.findAll(spec);
 
         return wallets.stream()
                 .map(walletMapper::toWalletResponse)

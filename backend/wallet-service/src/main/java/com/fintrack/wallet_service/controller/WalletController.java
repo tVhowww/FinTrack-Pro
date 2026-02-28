@@ -37,9 +37,12 @@ public class WalletController {
 
     @GetMapping()
     @ResponseStatus(HttpStatus.OK)
-    ApiResponse<List<WalletResponse>> getMyWallets() {
+    ApiResponse<List<WalletResponse>> getMyWallets(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String currency
+    ) {
         return ApiResponse.<List<WalletResponse>>builder()
-                .result(walletService.getMyWallets())
+                .result(walletService.getMyWallets(keyword, currency))
                 .build();
     }
 
