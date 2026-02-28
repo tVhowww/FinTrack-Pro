@@ -129,7 +129,7 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6 pb-10">
       <div>
-        <h2 className="text-3xl font-bold tracking-tight">Cài đặt</h2>
+        <h2 className="text-2xl font-bold tracking-tight">Cài đặt</h2>
         <p className="text-sm text-muted-foreground">
           Quản lý thông tin cá nhân và bảo mật.
         </p>

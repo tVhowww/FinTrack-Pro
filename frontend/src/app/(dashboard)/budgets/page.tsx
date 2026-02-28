@@ -82,7 +82,7 @@ export default function BudgetsPage() {
       {/* HEADER TỔNG */}
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">
+          <h2 className="text-2xl font-bold tracking-tight">
             Quản lý Ngân sách
           </h2>
           <p className="text-sm text-muted-foreground">

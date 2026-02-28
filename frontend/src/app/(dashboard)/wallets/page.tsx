@@ -48,7 +48,7 @@ export default function WalletsPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Ví của tôi</h2>
+          <h2 className="text-2xl font-bold tracking-tight">Ví của tôi</h2>
           <p className="text-sm text-muted-foreground">
             Quản lý các nguồn tiền của bạn
           </p>
