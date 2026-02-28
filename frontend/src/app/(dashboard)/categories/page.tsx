@@ -7,12 +7,20 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
 import { useCategories } from "@/hooks/use-categories";
 import { useTransactions } from "@/hooks/use-transactions";
 import { formatCurrency } from "@/lib/utils";
 import { Category, TransactionType } from "@/types/category.dto";
-import { Plus, Inbox, AlertTriangle, Loader2, FileText } from "lucide-react";
-import { useState } from "react";
+import {
+  Plus,
+  Inbox,
+  AlertTriangle,
+  Loader2,
+  FileText,
+  Search,
+} from "lucide-react";
+import { useState, useMemo } from "react";
 
 export default function CategoriesPage() {
   const {
@@ -28,6 +36,9 @@ export default function CategoriesPage() {
   const [activeTab, setActiveTab] = useState<TransactionType>(
     TransactionType.EXPENSE,
   );
+
+  const [searchKeyword, setSearchKeyword] = useState("");
+
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
@@ -37,9 +48,50 @@ export default function CategoriesPage() {
   );
   const [parentCategory, setParentCategory] = useState<Category | null>(null);
 
-  // Filter Safe
-  const safeCategories = Array.isArray(categories) ? categories : [];
-  const filteredCategories = safeCategories.filter((c) => c.type === activeTab);
+  // =====================================================================
+  // THUẬT TOÁN LỌC FRONTEND (Type + Keyword Đệ Quy)
+  // =====================================================================
+  const displayCategories = useMemo(() => {
+    const safeCategories = Array.isArray(categories) ? categories : [];
+
+    // Bước 1: Lọc theo Tab (Thu/Chi)
+    const filteredByType = safeCategories.filter((c) => c.type === activeTab);
+
+    // Bước 2: Lọc theo Keyword
+    if (!searchKeyword.trim()) return filteredByType;
+
+    const lowerKeyword = searchKeyword.toLowerCase();
+
+    // Hàm đệ quy lọc cha con
+    const filterTree = (cats: Category[]): Category[] => {
+      return cats
+        .map((cat) => {
+          // Kiểm tra xem tên Cha có chứa từ khóa không
+          const isParentMatch = cat.name.toLowerCase().includes(lowerKeyword);
+
+          // Lọc các danh mục con (nếu có)
+          const filteredChildren = cat.subCategories
+            ? filterTree(cat.subCategories)
+            : [];
+
+          // Nếu Cha khớp -> Giữ nguyên Cha và toàn bộ Con của nó
+          if (isParentMatch) {
+            return cat;
+          }
+
+          // Nếu Cha KHÔNG khớp, nhưng có Đứa Con khớp -> Giữ lại Cha làm cái vỏ, và chỉ hiện những đứa Con khớp
+          if (filteredChildren.length > 0) {
+            return { ...cat, subCategories: filteredChildren };
+          }
+
+          // Không khớp gì cả -> Bỏ qua
+          return null;
+        })
+        .filter(Boolean) as Category[]; // Loại bỏ các null
+    };
+
+    return filterTree(filteredByType);
+  }, [categories, activeTab, searchKeyword]);
 
   const [relatedTransactions, setRelatedTransactions] = useState<any[]>([]);
 
@@ -85,24 +137,47 @@ export default function CategoriesPage() {
 
   return (
     <div className="h-full flex flex-col space-y-4">
-      {" "}
-      {/* Bỏ h-screen, dùng h-full của container cha */}
-      <div className="flex items-center justify-between px-1">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between px-1 gap-4">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Danh mục</h2>
           <p className="text-sm text-muted-foreground">
             Quản lý các khoản thu chi của bạn.
           </p>
         </div>
-        <Button onClick={handleCreateRoot} size="sm">
-          <Plus className="mr-2 h-4 w-4" /> Tạo mới
-        </Button>
+
+        <div className="flex flex-col md:flex-row items-center gap-2 w-full md:w-auto">
+          <div className="flex w-full md:w-auto gap-2">
+            <div className="relative flex-1 md:w-[250px]">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Tìm kiếm danh mục..."
+                className="pl-9 bg-background"
+                value={searchKeyword}
+                onChange={(e) => setSearchKeyword(e.target.value)}
+              />
+            </div>
+            <Button variant="secondary">Tìm</Button>
+          </div>
+
+          <Button
+            onClick={handleCreateRoot}
+            size="sm"
+            className="h-10 w-full md:w-auto"
+          >
+            <Plus className="mr-2 h-4 w-4" /> Tạo mới
+          </Button>
+        </div>
       </div>
-      {/* Container chính: Flex-1 để chiếm hết chiều cao còn lại */}
+
+      {/* Container chính */}
       <div className="flex-1 min-h-0 overflow-hidden">
         <Tabs
           value={activeTab}
-          onValueChange={(v) => setActiveTab(v as TransactionType)}
+          onValueChange={(v) => {
+            setActiveTab(v as TransactionType);
+            setSearchKeyword(""); // Chuyển Tab thì clear luôn tìm kiếm cho gọn
+          }}
           className="h-full flex flex-col"
         >
           <TabsList className="grid w-full grid-cols-2">
@@ -130,24 +205,32 @@ export default function CategoriesPage() {
                   <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-sm">
                     Đang tải dữ liệu...
                   </div>
-                ) : filteredCategories.length === 0 ? (
+                ) : displayCategories.length === 0 ? (
                   <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-3">
                     <div className="bg-muted/50 p-4 rounded-full">
                       <Inbox className="w-8 h-8 opacity-50" />
                     </div>
-                    <p className="text-sm">Chưa có danh mục nào.</p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleCreateRoot}
-                    >
-                      Tạo ngay
-                    </Button>
+                    {searchKeyword ? (
+                      <p className="text-sm">
+                        Không tìm thấy danh mục nào phù hợp.
+                      </p>
+                    ) : (
+                      <>
+                        <p className="text-sm">Chưa có danh mục nào.</p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleCreateRoot}
+                        >
+                          Tạo ngay
+                        </Button>
+                      </>
+                    )}
                   </div>
                 ) : (
                   <ScrollArea className="h-full">
                     <div className="p-4 space-y-2">
-                      {filteredCategories.map((category) => (
+                      {displayCategories.map((category) => (
                         <CategoryItem
                           key={category.id}
                           category={category}
@@ -164,6 +247,7 @@ export default function CategoriesPage() {
           </TabsContent>
         </Tabs>
       </div>
+
       <CategoryDialog
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
@@ -171,6 +255,8 @@ export default function CategoriesPage() {
         parentCategory={parentCategory}
         defaultType={activeTab}
       />
+
+      {/* ConfirmDialog giữ nguyên ... */}
       <ConfirmDialog
         open={!!deleteId}
         onOpenChange={(open) => !open && setDeleteId(null)}
