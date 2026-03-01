@@ -53,6 +53,7 @@ public class TransactionService {
     private final KafkaTemplate<String, Object> kafkaTemplate;
     private final CurrencyConverterService currencyConverterService;
     private final StringRedisTemplate redisTemplate;
+    private final BudgetAlertEngine budgetAlertEngine;
 
 
     public long countTransactionsByWallet(String walletId) {
@@ -539,6 +540,21 @@ public class TransactionService {
         walletClient.updateBalance(transaction.getWalletId(),
                 WalletBalanceUpdateRequest.builder().amount(newUpdateAmount).build());
 
+        String recipientEmail = null;
+        String username = "Người dùng";
+
+        try {
+            var userResponse = identityClient.getMyInfo();
+            if (userResponse != null && userResponse.getResult() != null) {
+                recipientEmail = userResponse.getResult().getEmail();
+                username = userResponse.getResult().getUsername();
+            }
+        } catch (Exception e) {
+            log.error("Lỗi lấy thông tin user để gửi email: {}", e.getMessage());
+        }
+
+        budgetAlertEngine.checkAndAlert(transaction, recipientEmail, username);
+
         return transactionMapper.toTransactionResponse(transaction);
     }
 
@@ -624,6 +640,8 @@ public class TransactionService {
 
         // 4. Gửi Notification qua Kafka (Truyền thêm Email và Tên)
         sendTransactionNotification(transaction, category, recipientEmail, username, currency);
+
+        budgetAlertEngine.checkAndAlert(transaction, recipientEmail, username);
 
         return transactionMapper.toTransactionResponse(transaction);
     }
