@@ -40,4 +40,6 @@ public interface CategoryRepository extends JpaRepository<Category, String> {
     @Modifying
     @Query("DELETE FROM Category c WHERE c.userId = :userId")
     void deleteByUserId(String userId);
+
+    List<Category> findByUserIdOrUserIdIsNull(String userId);
 }
