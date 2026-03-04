@@ -46,3 +46,11 @@ export interface TransactionQueryParams {
   categoryId?: string;
   keyword?: string;
 }
+
+export interface AiReceiptResponse {
+  amount: number;
+  date: string;
+  note: string;
+  categoryId: string | null;
+  currency?: string;
+}

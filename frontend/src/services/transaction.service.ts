@@ -2,6 +2,7 @@ import http from "@/lib/http";
 import { ApiResponse } from "@/types/api";
 import { PageResponse } from "@/types/common";
 import {
+  AiReceiptResponse,
   TransactionCreationRequest,
   TransactionQueryParams,
   TransactionResponse,
@@ -70,5 +71,22 @@ export const transactionService = {
       responseType: "blob", // Rất quan trọng: Báo cho Axios biết đây là file
     });
     return response.data;
+  },
+
+  scanReceipt: async (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    // Gọi sang endpoint /ai/scan-receipt
+    const response = await http.post<ApiResponse<AiReceiptResponse>>(
+      "/transaction/ai/scan-receipt",
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      },
+    );
+    return response.data.result;
   },
 };

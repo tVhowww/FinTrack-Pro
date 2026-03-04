@@ -155,7 +155,23 @@ export function useTransactions(
   });
 
   // =================================================================
-  // 6. HELPER: Kiểm tra giao dịch liên quan
+  // 6. MUTATION: Quét hóa đơn AI
+  // =================================================================
+  const scanMutation = useMutation({
+    mutationFn: (file: File) => transactionService.scanReceipt(file),
+    onSuccess: () => {
+      // toast.success("Phân tích hóa đơn thành công!");
+    },
+    onError: (error: any) => {
+      const msg =
+        error?.response?.data?.message ||
+        "Không thể đọc hóa đơn, vui lòng thử lại.";
+      toast.error(msg);
+    },
+  });
+
+  // =================================================================
+  // 7. HELPER: Kiểm tra giao dịch liên quan
   // =================================================================
   const checkRelatedTransactions = async (categoryId: string) => {
     setIsCheckingRelated(true);
@@ -185,10 +201,12 @@ export function useTransactions(
     updateTransaction: updateMutation.mutateAsync,
     deleteTransaction: deleteMutation.mutateAsync,
     exportTransactions: exportMutation.mutateAsync,
+    scanReceipt: scanMutation.mutateAsync,
     isCreating: createMutation.isPending,
     isUpdating: updateMutation.isPending,
     isDeleting: deleteMutation.isPending,
     isExporting: exportMutation.isPending,
+    isScanning: scanMutation.isPending,
     checkRelatedTransactions,
     isCheckingRelated,
   };

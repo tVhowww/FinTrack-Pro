@@ -57,6 +57,8 @@ export default function TransactionsPage() {
     updateTransaction,
     exportTransactions,
     isExporting,
+    scanReceipt,
+    isScanning,
   } = useTransactions(queryParams);
 
   const handleExport = () => {
@@ -213,6 +215,8 @@ export default function TransactionsPage() {
         transactionToEdit={transactionToEdit}
         onCreate={handleCreateSubmit}
         onUpdate={handleUpdateSubmit}
+        onScan={scanReceipt}
+        isScanning={isScanning}
       />
 
       <ConfirmDialog
