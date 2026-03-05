@@ -17,5 +17,6 @@ public class AiReceiptResponse {
     private String currency;
     private LocalDate date;
     private String note;
-    private String categoryId; // Chứa ID của danh mục mà AI cho là phù hợp nhất
+    private String categoryId;
+    private String type;
 }

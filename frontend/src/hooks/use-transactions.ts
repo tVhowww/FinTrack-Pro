@@ -158,14 +158,15 @@ export function useTransactions(
   // 6. MUTATION: Quét hóa đơn AI
   // =================================================================
   const scanMutation = useMutation({
-    mutationFn: (file: File) => transactionService.scanReceipt(file),
+    mutationFn: (payload: { file?: File; text?: string }) =>
+      transactionService.scanReceipt(payload),
     onSuccess: () => {
-      // toast.success("Phân tích hóa đơn thành công!");
+      // toast success để bên UI lo
     },
     onError: (error: any) => {
       const msg =
         error?.response?.data?.message ||
-        "Không thể đọc hóa đơn, vui lòng thử lại.";
+        "Không thể đọc thông tin, vui lòng thử lại.";
       toast.error(msg);
     },
   });

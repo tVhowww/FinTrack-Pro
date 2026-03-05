@@ -53,4 +53,5 @@ export interface AiReceiptResponse {
   note: string;
   categoryId: string | null;
   currency?: string;
+  type?: string;
 }

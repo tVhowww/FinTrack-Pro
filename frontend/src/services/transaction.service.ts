@@ -73,11 +73,11 @@ export const transactionService = {
     return response.data;
   },
 
-  scanReceipt: async (file: File) => {
+  scanReceipt: async ({ file, text }: { file?: File; text?: string }) => {
     const formData = new FormData();
-    formData.append("file", file);
+    if (file) formData.append("file", file);
+    if (text) formData.append("text", text);
 
-    // Gọi sang endpoint /ai/scan-receipt
     const response = await http.post<ApiResponse<AiReceiptResponse>>(
       "/transaction/ai/scan-receipt",
       formData,

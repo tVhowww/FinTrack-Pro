@@ -32,14 +32,12 @@ public class AiAssistantService {
     public AiReceiptResponse scanReceipt(MultipartFile file, String textNote) {
         String userId = SecurityUtils.getCurrentUserId();
 
-        // 1. Lấy danh sách Category của User
         List<Category> userCategories = categoryRepository.findByUserIdOrUserIdIsNull(userId);
 
         String categoriesContext = userCategories.stream()
                 .map(c -> String.format("- ID: %s | Tên: %s | Loại: %s", c.getId(), c.getName(), c.getType()))
                 .collect(Collectors.joining("\n"));
 
-        // 2. Viết Prompt
         String systemPrompt = """
                 Bạn là một trợ lý tài chính cá nhân thông minh.
                 Nhiệm vụ của bạn là trích xuất thông tin giao dịch từ hình ảnh hóa đơn hoặc văn bản người dùng cung cấp.
@@ -50,9 +48,10 @@ public class AiAssistantService {
                 Hãy trích xuất và phân tích theo các quy tắc sau:
                 1. amount: Số tiền thanh toán cuối cùng (kiểu số, không chứa dấu phẩy hay ký tự tiền tệ).
                 2. date: Ngày giao dịch (định dạng YYYY-MM-DD). Nếu không tìm thấy, hãy lấy ngày hiện tại.
-                3. note: Ghi chú ngắn gọn về giao dịch (ví dụ: "Highland Coffee", "Đi siêu thị Go", "Đổ xăng").
-                4. categoryId: Phân tích 'note' và chọn ra ID của danh mục phù hợp nhất từ danh sách phía trên. Nếu không chắc chắn, trả về null.
-                5. currency: Nhận diện mã tiền tệ trên hóa đơn (ví dụ: VND, USD, EUR, JPY...). Nếu trên hóa đơn có ký hiệu $ thì là USD. Nếu không rõ, trả về VND.
+                3. note: Ghi chú ngắn gọn về giao dịch (ví dụ: "Highland Coffee", "Đi siêu thị", "Nhận lương", "Mẹ cho").
+                4. type: Phân tích ngữ cảnh. Trả về "INCOME" nếu đây là khoản thu (nhận lương, được cho, hoàn tiền...). Trả về "EXPENSE" nếu là khoản chi (mua sắm, hóa đơn, trả tiền...). Mặc định là "EXPENSE".
+                5. categoryId: Phân tích 'note' và chọn ra ID của danh mục phù hợp nhất từ danh sách phía trên. Chú ý phải chọn danh mục có 'Loại' (type) khớp với trường 'type' bạn vừa xác định ở quy tắc 4. Nếu không chắc chắn, trả về null.
+                6. currency: Nhận diện mã tiền tệ. Nếu có ký hiệu $ thì là USD. Nếu không rõ, trả về VND.
                 """;
 
         String finalSystemPrompt = systemPrompt.replace("{categories}", categoriesContext);
@@ -63,7 +62,6 @@ public class AiAssistantService {
                     .system(finalSystemPrompt)
                     .user(userMessage);
 
-            // 3. Xử lý Ảnh (Multimodal)
             if (file != null && !file.isEmpty()) {
                 Media media = new Media(
                         MimeTypeUtils.parseMimeType(file.getContentType()),
@@ -75,7 +73,6 @@ public class AiAssistantService {
                         .user(u -> u.text(userMessage).media(media));
             }
 
-            // 4. Gọi AI
             return promptBuilder.call().entity(AiReceiptResponse.class);
 
         } catch (Exception e) {

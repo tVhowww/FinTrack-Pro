@@ -40,12 +40,12 @@ import { useEffect, useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { getCurrencySymbol } from "@/lib/constants";
-import { Loader2, Wand2, X } from "lucide-react";
+import { Camera, Loader2, Sparkles, X } from "lucide-react";
 import { toast } from "sonner";
 
 // Schema Validate
 const TransactionSchema = z.object({
-  amount: z.coerce.number().min(0.01, "Số tiền phải lớn hơn 0"),
+  amount: z.coerce.number().min(0, "Số tiền không hợp lệ"),
   type: z.nativeEnum(TransactionType),
   walletId: z.string().min(1, "Vui lòng chọn ví"),
   categoryId: z.string().optional(),
@@ -67,7 +67,7 @@ interface TransactionDialogProps {
     id: string;
     data: TransactionUpdateRequest;
   }) => Promise<any>;
-  onScan?: (file: File) => Promise<any>;
+  onScan?: (payload: { file?: File; text?: string }) => Promise<any>;
   isScanning?: boolean;
 }
 
@@ -85,11 +85,11 @@ export function TransactionDialog({
   const [wallets, setWallets] = useState<Wallet[]>([]);
 
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [quickText, setQuickText] = useState(""); // 👇 State cho Text Input
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { categories } = useCategories();
 
-  // Fetch Wallets
   useEffect(() => {
     if (open) {
       walletService
@@ -100,8 +100,8 @@ export function TransactionDialog({
         })
         .catch(console.error);
     } else {
-      // Reset ảnh preview khi đóng Dialog
       setPreviewUrl(null);
+      setQuickText(""); // Reset chữ khi đóng
     }
   }, [open]);
 
@@ -121,7 +121,6 @@ export function TransactionDialog({
   const selectedWallet = wallets.find((w) => w.id === selectedWalletId);
   const currencySymbol = getCurrencySymbol(selectedWallet?.currency || "VND");
 
-  // Reset Form
   useEffect(() => {
     if (open) {
       if (transactionToEdit) {
@@ -146,18 +145,24 @@ export function TransactionDialog({
     }
   }, [open, transactionToEdit, form, wallets]);
 
-  const handleScanReceipt = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !onScan) return;
+  const handleProcessAI = async (file?: File, text?: string) => {
+    if ((!file && !text) || !onScan) return;
 
-    // 1. Tạo URL ảnh để hiển thị ngay lập tức lên UI
-    const objectUrl = URL.createObjectURL(file);
-    setPreviewUrl(objectUrl);
+    // Xử lý hiện ảnh nếu có file
+    if (file) {
+      const objectUrl = URL.createObjectURL(file);
+      setPreviewUrl(objectUrl);
+      setQuickText(""); // Xóa text nếu đang chọn file
+    }
 
     try {
-      const result = await onScan(file);
+      const result = await onScan({ file, text });
 
-      // 2. Điền thông tin cơ bản
+      if (result?.type) {
+        form.setValue("type", result.type as TransactionType, {
+          shouldValidate: true,
+        });
+      }
       if (result?.date)
         form.setValue("date", new Date(result.date), { shouldValidate: true });
       if (result?.note)
@@ -167,7 +172,6 @@ export function TransactionDialog({
           shouldValidate: true,
         });
 
-      // 3. Logic Currency & Bắn đúng 1 cái Toast
       if (result?.amount !== undefined) {
         const currentWalletId = form.getValues("walletId");
         const currentWallet = wallets.find((w) => w.id === currentWalletId);
@@ -178,30 +182,30 @@ export function TransactionDialog({
           const matchedWallet = wallets.find(
             (w) => w.currency === billCurrency,
           );
-
           if (matchedWallet) {
             form.setValue("walletId", matchedWallet.id, {
               shouldValidate: true,
             });
             form.setValue("amount", result.amount, { shouldValidate: true });
             toast.success(
-              `Đã quét xong & Tự động đổi sang ví ${matchedWallet.name} (${billCurrency})`,
+              `Đã tự động đổi sang ví ${matchedWallet.name} (${billCurrency})`,
             );
           } else {
             form.setValue("amount", 0, { shouldValidate: true });
             toast.warning(
-              `Quét thành công! CẢNH BÁO: Hóa đơn dùng ${billCurrency}, ví đang chọn là ${currentWallet.currency}. Hãy tự nhập số tiền!`,
+              `CẢNH BÁO: Giao dịch dùng ${billCurrency}, ví đang chọn là ${currentWallet.currency}. Hãy tự nhập số tiền!`,
             );
           }
         } else {
           form.setValue("amount", result.amount, { shouldValidate: true });
-          toast.success("Quét hóa đơn và điền dữ liệu thành công!");
+          toast.success("AI đã điền dữ liệu thành công!");
         }
       }
     } catch (error) {
-      console.error("Lỗi khi quét hóa đơn:", error);
+      console.error("Lỗi AI:", error);
     } finally {
       if (fileInputRef.current) fileInputRef.current.value = "";
+      setQuickText(""); // Xóa text sau khi xong
     }
   };
 
@@ -232,48 +236,78 @@ export function TransactionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      {/* Đổi max-width linh hoạt: Có ảnh thì phình ra 800px, ko ảnh thì 500px */}
       <DialogContent
         className={`transition-all duration-300 ${previewUrl ? "sm:max-w-[800px]" : "sm:max-w-[500px]"}`}
       >
-        <DialogHeader className="flex flex-row justify-between items-center pr-6">
+        <DialogHeader className="pr-6">
           <DialogTitle>
             {isEditMode ? "Cập nhật giao dịch" : "Thêm giao dịch mới"}
           </DialogTitle>
+        </DialogHeader>
 
-          {!isEditMode && (
-            <div>
+        {!isEditMode && (
+          <div className="bg-purple-50/50 border border-purple-100 rounded-lg p-3 mb-2 space-y-2">
+            <div className="flex items-center text-sm font-semibold text-purple-700">
+              <Sparkles className="h-4 w-4 mr-1.5" /> Trợ lý nhập liệu AI
+            </div>
+            <div className="flex gap-2">
+              <Input
+                placeholder="VD: Trưa nay đi ăn phở hết 45k..."
+                className="bg-white border-purple-100 focus-visible:ring-purple-300"
+                value={quickText}
+                onChange={(e) => setQuickText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    if (quickText.trim()) handleProcessAI(undefined, quickText);
+                  }
+                }}
+                disabled={isScanning}
+              />
+              <Button
+                type="button"
+                className="bg-purple-600 hover:bg-purple-700 text-white shrink-0"
+                onClick={() => handleProcessAI(undefined, quickText)}
+                disabled={isScanning || !quickText.trim()}
+              >
+                {isScanning && quickText ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  "Gửi"
+                )}
+              </Button>
+              <div className="flex items-center px-1 text-muted-foreground text-xs uppercase font-medium">
+                Hoặc
+              </div>
               <input
                 type="file"
                 accept="image/*"
                 className="hidden"
                 ref={fileInputRef}
-                onChange={handleScanReceipt}
+                onChange={(e) => handleProcessAI(e.target.files?.[0])}
               />
               <Button
                 type="button"
-                variant="secondary"
-                size="sm"
-                className="bg-purple-100 text-purple-700 hover:bg-purple-200"
+                variant="outline"
+                className="shrink-0 border-purple-200 text-purple-700 hover:bg-purple-50"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isScanning}
               >
-                {isScanning ? (
+                {isScanning && !quickText ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 ) : (
-                  <Wand2 className="h-4 w-4 mr-2" />
+                  <Camera className="h-4 w-4 mr-2" />
                 )}
-                {isScanning ? "Đang phân tích..." : "Quét bằng AI"}
+                Tải ảnh
               </Button>
             </div>
-          )}
-        </DialogHeader>
+          </div>
+        )}
 
-        {/* Bố cục Grid: 2 cột nếu có ảnh, 1 cột nếu ko có ảnh */}
         <div
           className={previewUrl ? "grid grid-cols-1 md:grid-cols-2 gap-6" : ""}
         >
-          {/* CỘT TRÁI: HIỂN THỊ ẢNH BILL (Chỉ hiện khi có previewUrl) */}
+          {/* CỘT TRÁI: HIỂN THỊ ẢNH BILL */}
           {previewUrl && (
             <div className="flex flex-col items-center justify-start bg-muted/30 rounded-lg p-2 border">
               <div className="relative w-full flex justify-end mb-2">
@@ -301,7 +335,7 @@ export function TransactionDialog({
                 onSubmit={form.handleSubmit(onSubmit)}
                 className="space-y-4"
               >
-                {/* Các Input Fields bên dưới giữ nguyên */}
+                {/* ... (Phần UI các thẻ FormField bên dưới GIỮ NGUYÊN HOÀN TOÀN như cũ) ... */}
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
