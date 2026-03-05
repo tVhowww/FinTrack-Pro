@@ -89,4 +89,12 @@ export const transactionService = {
     );
     return response.data.result;
   },
+
+  chatWithAdvisor: async (message: string) => {
+    const response = await http.post<ApiResponse<string>>(
+      "/transaction/ai/chat",
+      { message },
+    );
+    return response.data.result;
+  },
 };
