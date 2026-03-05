@@ -40,7 +40,7 @@ import { useEffect, useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { getCurrencySymbol } from "@/lib/constants";
-import { Camera, Loader2, Sparkles, X } from "lucide-react";
+import { Camera, Loader2, Sparkles, X, Mic } from "lucide-react"; 
 import { toast } from "sonner";
 
 // Schema Validate
@@ -85,7 +85,8 @@ export function TransactionDialog({
   const [wallets, setWallets] = useState<Wallet[]>([]);
 
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [quickText, setQuickText] = useState(""); // 👇 State cho Text Input
+  const [quickText, setQuickText] = useState("");
+  const [isListening, setIsListening] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { categories } = useCategories();
@@ -101,7 +102,8 @@ export function TransactionDialog({
         .catch(console.error);
     } else {
       setPreviewUrl(null);
-      setQuickText(""); // Reset chữ khi đóng
+      setQuickText("");
+      setIsListening(false); // Tắt mic khi đóng
     }
   }, [open]);
 
@@ -145,24 +147,68 @@ export function TransactionDialog({
     }
   }, [open, transactionToEdit, form, wallets]);
 
+  const handleListen = () => {
+    // Ép kiểu any để bypass TypeScript (vì trình duyệt có sẵn nhưng TS có thể ko nhận)
+    const SpeechRecognition =
+      (window as any).SpeechRecognition ||
+      (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      toast.error(
+        "Trình duyệt của bạn không hỗ trợ tính năng nhận diện giọng nói!",
+      );
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = "vi-VN"; // Setup Tiếng Việt
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => {
+      setIsListening(true);
+      toast.info("Đang nghe... Bạn nói đi!", {
+        duration: 2000,
+        position: "top-center",
+      });
+    };
+
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      setQuickText(transcript); // Ném chữ vào ô input
+      // Có thể tự động gọi gửi AI luôn ở đây nếu muốn: handleProcessAI(undefined, transcript);
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error("Lỗi Mic:", event.error);
+      setIsListening(false);
+      toast.error("Không nghe rõ, bạn thử lại nhé!");
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognition.start();
+  };
+
+  // HÀM XỬ LÝ GỬI AI (Text & File)
   const handleProcessAI = async (file?: File, text?: string) => {
     if ((!file && !text) || !onScan) return;
 
-    // Xử lý hiện ảnh nếu có file
     if (file) {
       const objectUrl = URL.createObjectURL(file);
       setPreviewUrl(objectUrl);
-      setQuickText(""); // Xóa text nếu đang chọn file
+      setQuickText("");
     }
 
     try {
       const result = await onScan({ file, text });
 
-      if (result?.type) {
+      if (result?.type)
         form.setValue("type", result.type as TransactionType, {
           shouldValidate: true,
         });
-      }
       if (result?.date)
         form.setValue("date", new Date(result.date), { shouldValidate: true });
       if (result?.note)
@@ -205,7 +251,7 @@ export function TransactionDialog({
       console.error("Lỗi AI:", error);
     } finally {
       if (fileInputRef.current) fileInputRef.current.value = "";
-      setQuickText(""); // Xóa text sau khi xong
+      // Không xoá text ngay để user có thể nhìn thấy AI vừa nhận diện được câu gì
     }
   };
 
@@ -245,25 +291,42 @@ export function TransactionDialog({
           </DialogTitle>
         </DialogHeader>
 
+        {/* KHU VỰC TRỢ LÝ AI */}
         {!isEditMode && (
           <div className="bg-purple-50/50 border border-purple-100 rounded-lg p-3 mb-2 space-y-2">
             <div className="flex items-center text-sm font-semibold text-purple-700">
-              <Sparkles className="h-4 w-4 mr-1.5" /> Trợ lý nhập liệu AI
+              <Sparkles className="h-4 w-4 mr-1.5" /> Trợ lý AI (Text & Giọng
+              nói)
             </div>
-            <div className="flex gap-2">
-              <Input
-                placeholder="VD: Trưa nay đi ăn phở hết 45k..."
-                className="bg-white border-purple-100 focus-visible:ring-purple-300"
-                value={quickText}
-                onChange={(e) => setQuickText(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    if (quickText.trim()) handleProcessAI(undefined, quickText);
-                  }
-                }}
-                disabled={isScanning}
-              />
+
+            <div className="flex gap-2 relative">
+              <div className="relative flex-1">
+                <Input
+                  placeholder="VD: Nhận lương tháng này 20 triệu..."
+                  className="bg-white border-purple-100 focus-visible:ring-purple-300 pr-10" // Cấp chỗ cho nút Mic
+                  value={quickText}
+                  onChange={(e) => setQuickText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      if (quickText.trim())
+                        handleProcessAI(undefined, quickText);
+                    }
+                  }}
+                  disabled={isScanning || isListening}
+                />
+
+                <button
+                  type="button"
+                  onClick={handleListen}
+                  disabled={isScanning}
+                  className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full transition-colors
+                    ${isListening ? "bg-red-100 text-red-600 animate-pulse" : "text-gray-400 hover:text-purple-600 hover:bg-purple-50"}`}
+                >
+                  <Mic className="h-4 w-4" />
+                </button>
+              </div>
+
               <Button
                 type="button"
                 className="bg-purple-600 hover:bg-purple-700 text-white shrink-0"
@@ -276,6 +339,7 @@ export function TransactionDialog({
                   "Gửi"
                 )}
               </Button>
+
               <div className="flex items-center px-1 text-muted-foreground text-xs uppercase font-medium">
                 Hoặc
               </div>
@@ -286,6 +350,7 @@ export function TransactionDialog({
                 ref={fileInputRef}
                 onChange={(e) => handleProcessAI(e.target.files?.[0])}
               />
+
               <Button
                 type="button"
                 variant="outline"
@@ -335,7 +400,7 @@ export function TransactionDialog({
                 onSubmit={form.handleSubmit(onSubmit)}
                 className="space-y-4"
               >
-                {/* ... (Phần UI các thẻ FormField bên dưới GIỮ NGUYÊN HOÀN TOÀN như cũ) ... */}
+                {/* TOÀN BỘ CÁC INPUT DƯỚI NÀY GIỮ NGUYÊN (Type, Amount, Wallet, Date, Note...) */}
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
@@ -492,7 +557,10 @@ export function TransactionDialog({
                 />
 
                 <DialogFooter className="pt-2">
-                  <Button type="submit" disabled={isLoading || isScanning}>
+                  <Button
+                    type="submit"
+                    disabled={isLoading || isScanning || isListening}
+                  >
                     {isLoading
                       ? "Đang lưu..."
                       : isEditMode
