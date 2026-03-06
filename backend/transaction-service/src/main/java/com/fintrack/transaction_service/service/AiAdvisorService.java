@@ -4,8 +4,12 @@ import com.fintrack.transaction_service.dto.response.BalanceTrendResponse;
 import com.fintrack.transaction_service.dto.response.ExpenseStructureResponse;
 import com.fintrack.transaction_service.dto.response.MonthlyStatisticsResponse;
 import com.fintrack.transaction_service.dto.response.TransactionResponse;
+import com.fintrack.transaction_service.utils.SecurityUtils;
+import com.fintrack.transaction_service.utils.SimpleChatMemory;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
+import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -17,6 +21,7 @@ public class AiAdvisorService {
 
     private final ChatClient chatClient;
     private final TransactionService transactionService;
+    private final ChatMemory chatMemory = new SimpleChatMemory();
 
     public AiAdvisorService(ChatClient.Builder chatClientBuilder, TransactionService transactionService) {
         this.chatClient = chatClientBuilder.build();
@@ -24,6 +29,9 @@ public class AiAdvisorService {
     }
 
     public String chatWithAdvisor(String userMessage) {
+        // Lấy ID của Sếp đang chat để làm Session ID
+        String currentUserId = SecurityUtils.getCurrentUserId();
+
         LocalDate now = LocalDate.now();
         int month = now.getMonthValue();
         int year = now.getYear();
@@ -33,13 +41,12 @@ public class AiAdvisorService {
         List<ExpenseStructureResponse> structures = transactionService.getExpenseStructure(null, month, year);
         List<TransactionResponse> topExpenses = transactionService.getHighestExpenses(null, month, year);
 
-        // 2. LẤY THÊM TÓM TẮT LỊCH SỬ 6 THÁNG QUA (Thêm dòng này)
+        // 2. LẤY THÊM TÓM TẮT LỊCH SỬ 6 THÁNG QUA
         List<BalanceTrendResponse> trends = transactionService.getBalanceTrend(null);
 
         // 3. ĐÓNG GÓI DATA
         StringBuilder contextBuilder = new StringBuilder();
 
-        // Nhét ký ức 6 tháng vào não AI
         contextBuilder.append("--- TÓM TẮT XU HƯỚNG TÀI CHÍNH 6 THÁNG GẦN NHẤT ---\n");
         for (BalanceTrendResponse trend : trends) {
             contextBuilder.append(String.format("- Tháng %d/%d: Thu %s | Chi %s | Dư %s\n",
@@ -47,7 +54,6 @@ public class AiAdvisorService {
         }
         contextBuilder.append("\n");
 
-        // Giữ nguyên đoạn Data chi tiết của tháng này như cũ
         contextBuilder.append("--- CHI TIẾT DỮ LIỆU THÁNG HIỆN TẠI (").append(month).append("/").append(year).append(") ---\n");
         contextBuilder.append("- Tổng thu: ").append(stats.getTotalIncome()).append("\n");
         contextBuilder.append("- Tổng chi: ").append(stats.getTotalExpense()).append("\n");
@@ -81,7 +87,16 @@ public class AiAdvisorService {
         String finalSystemPrompt = systemPrompt.replace("{context}", contextBuilder.toString());
 
         try {
-            return chatClient.prompt().system(finalSystemPrompt).user(userMessage).call().content();
+            return chatClient.prompt()
+                    .system(finalSystemPrompt)
+                    .user(userMessage)
+                    .advisors(MessageChatMemoryAdvisor.builder(chatMemory).build())
+                    .advisors(a -> a
+                            .param("chat_memory_conversation_id", currentUserId)
+                            .param("chat_memory_retrieve_size", 10)
+                    )
+                    .call()
+                    .content();
         } catch (Exception e) {
             log.error("Lỗi AI: {}", e.getMessage(), e);
             return "Xin lỗi sếp, hệ thống đang bận xíu!";
