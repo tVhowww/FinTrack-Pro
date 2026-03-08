@@ -27,12 +27,14 @@ interface SavingGoalCardProps {
   goal: SavingGoal;
   onEdit: (goal: SavingGoal) => void;
   onDelete: (id: string) => void;
+  footer?: React.ReactNode;
 }
 
 export function SavingGoalCard({
   goal,
   onEdit,
   onDelete,
+  footer,
 }: SavingGoalCardProps) {
   const isCompleted = goal.status === "COMPLETED" || goal.percentage >= 100;
 
@@ -136,6 +138,8 @@ export function SavingGoalCard({
             </span>
           </div>
         </div>
+
+        {footer && <div className="pt-2">{footer}</div>}
       </CardContent>
 
       <div className={`absolute left-0 top-0 h-full w-1 ${progressColor}`} />

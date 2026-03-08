@@ -9,15 +9,26 @@ import { useSavingGoals } from "@/hooks/use-saving-goals";
 import { SavingGoal } from "@/types/saving-goal.dto";
 import { Plus, PiggyBank } from "lucide-react";
 import { useState } from "react";
+import confetti from "canvas-confetti";
+import { AddFundDialog } from "@/components/saving-goals/add-fund-dialog";
 
 export default function SavingGoalsPage() {
-  const { goals, isLoading, createGoal, updateGoal, deleteGoal, isDeleting } =
-    useSavingGoals();
+  const {
+    goals,
+    isLoading,
+    createGoal,
+    updateGoal,
+    deleteGoal,
+    isDeleting,
+    addFund,
+  } = useSavingGoals();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingGoal, setEditingGoal] = useState<SavingGoal | null>(null);
 
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [isAddFundOpen, setIsAddFundOpen] = useState(false);
+  const [targetGoal, setTargetGoal] = useState<SavingGoal | null>(null);
 
   const handleOpenChange = (open: boolean) => {
     setIsDialogOpen(open);
@@ -39,9 +50,27 @@ export default function SavingGoalsPage() {
     }
   };
 
+  const fireConfetti = () => {
+    confetti({
+      particleCount: 150,
+      spread: 70,
+      origin: { y: 0.6 },
+      colors: ["#10b981", "#3b82f6", "#f59e0b"],
+    });
+  };
+
+  const handleAddFundSubmit = async (amount: number) => {
+    if (targetGoal) {
+      const result = await addFund({ id: targetGoal.id, data: { amount } });
+      // Nếu sau khi nạp mà status nhảy sang COMPLETED thì bắn pháo hoa
+      if (result.status === "COMPLETED") {
+        fireConfetti();
+      }
+    }
+  };
+
   return (
     <div className="space-y-6">
-      {/* Header (giữ nguyên) */}
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
           <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
@@ -91,26 +120,57 @@ export default function SavingGoalsPage() {
                 setIsDialogOpen(true);
               }}
               onDelete={(id) => setDeleteId(id)}
+              footer={
+                goal.status !== "COMPLETED" ? (
+                  <Button
+                    size="sm"
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 mt-2"
+                    onClick={() => {
+                      setTargetGoal(goal);
+                      setIsAddFundOpen(true);
+                    }}
+                  >
+                    Nạp thêm tiền vào quỹ
+                  </Button>
+                ) : (
+                  <div className="w-full py-2 mt-2 border-t border-emerald-100 flex items-center justify-center gap-2 text-emerald-600 font-medium text-sm animate-in fade-in zoom-in duration-500">
+                    <span className="text-xl">✨</span>
+                    Mục tiêu đã hoàn tất!
+                  </div>
+                )
+              }
             />
           ))}
         </div>
       )}
 
-      {/* Dialog Sửa / Tạo */}
       <SavingGoalDialog
         open={isDialogOpen}
-        onOpenChange={handleOpenChange}
-        onSubmit={handleSubmit}
+        onOpenChange={setIsDialogOpen}
+        onSubmit={async (v) =>
+          editingGoal
+            ? updateGoal({ id: editingGoal.id, data: v })
+            : createGoal(v)
+        }
         goalToEdit={editingGoal}
+      />
+
+      <AddFundDialog
+        open={isAddFundOpen}
+        onOpenChange={setIsAddFundOpen}
+        onSubmit={handleAddFundSubmit}
+        goal={targetGoal}
       />
 
       <ConfirmDialog
         open={!!deleteId}
-        onOpenChange={(open) => !open && setDeleteId(null)}
-        title="Xóa quỹ tiết kiệm?"
-        description="Bạn có chắc chắn muốn xóa mục tiêu này không? Hành động này không thể hoàn tác."
-        onConfirm={handleDeleteExecute}
-        isLoading={isDeleting}
+        onOpenChange={(v) => !v && setDeleteId(null)}
+        title="Xóa quỹ?"
+        description="Mất tiền tích lũy hiển thị đấy sếp nhé!"
+        onConfirm={async () => {
+          await deleteGoal(deleteId!);
+          setDeleteId(null);
+        }}
       />
     </div>
   );
