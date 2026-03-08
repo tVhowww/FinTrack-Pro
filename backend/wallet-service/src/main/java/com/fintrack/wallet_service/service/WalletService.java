@@ -218,6 +218,9 @@ public class WalletService {
             wallet.setCurrency(request.getCurrency());
         }
 
+        if (request.getTargetAmount() != null) wallet.setTargetAmount(request.getTargetAmount());
+        if (request.getDeadline() != null) wallet.setDeadline(request.getDeadline());
+
         return walletMapper.toWalletResponse(walletRepository.save(wallet));
     }
 

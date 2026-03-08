@@ -12,7 +12,6 @@ import {
   User,
   Command,
   ChartBarStacked,
-  Target,
 } from "lucide-react";
 
 const sidebarItems = [
@@ -21,7 +20,6 @@ const sidebarItems = [
   { name: "Ví của tôi", href: "/wallets", icon: Wallet },
   { name: "Giao dịch", href: "/transactions", icon: ArrowRightLeft },
   { name: "Ngân sách", href: "/budgets", icon: PiggyBank },
-  { name: "Mục tiêu", href: "/saving-goals", icon: Target },
   { name: "Hồ sơ", href: "/profile", icon: User },
   { name: "Cài đặt", href: "/settings", icon: Settings },
 ];

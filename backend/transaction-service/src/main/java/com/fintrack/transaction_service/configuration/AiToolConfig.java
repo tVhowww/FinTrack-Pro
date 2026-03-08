@@ -2,7 +2,6 @@ package com.fintrack.transaction_service.configuration;
 
 import com.fintrack.transaction_service.dto.response.*;
 import com.fintrack.transaction_service.service.BudgetService;
-import com.fintrack.transaction_service.service.SavingGoalService;
 import com.fintrack.transaction_service.service.TransactionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,7 +18,6 @@ public class AiToolConfig {
 
     private final TransactionService transactionService;
     private final BudgetService budgetService;
-    private final SavingGoalService savingGoalService;
 
     @Tool(description = "Tra cứu dữ liệu thống kê tài chính, tổng thu, tổng chi và danh sách khoản chi tiêu của người dùng theo tháng và năm.")
     public String getFinancialData(int month, int year) {
@@ -81,28 +79,4 @@ public class AiToolConfig {
         return data.toString();
     }
 
-    @Tool(description = "Tra cứu danh sách các mục tiêu tiết kiệm (saving goals) của người dùng, bao gồm tên mục tiêu, tổng tiền cần đạt, số tiền hiện có, tiến độ phần trăm và trạng thái hoàn thành.")
-    public String checkSavingGoalsStatus() {
-        List<SavingGoalResponse> goals = savingGoalService.getMyGoals();
-
-        if (goals == null || goals.isEmpty()) {
-            return "Sếp hiện tại chưa có mục tiêu tiết kiệm nào. Hãy khuyên sếp lập một quỹ mới để có động lực phấn đấu nhé!";
-        }
-
-        StringBuilder data = new StringBuilder();
-        data.append("DANH SÁCH MỤC TIÊU TIẾT KIỆM CỦA SẾP:\n");
-
-        for (SavingGoalResponse g : goals) {
-            String statusText = "COMPLETED".equals(g.status().name()) ? "Đã hoàn thành (Quá đỉnh)" : "Đang tích lũy";
-
-            // Ép Gemini phải cổ vũ nếu tiến độ trên 80%
-            String motivation = (g.percentage() >= 80 && g.percentage() < 100) ? " (Sắp tới đích rồi, cố lên sếp!)" : "";
-
-            data.append(String.format("- Mục tiêu [%s]: Cần %s %s | Đã có %s %s | Tiến độ: %.1f%% %s | Trạng thái: %s | Hạn chót: %s\n",
-                    g.name(), g.targetAmount(), g.currency(), g.currentAmount(), g.currency(),
-                    g.percentage(), motivation, statusText, g.deadline()));
-        }
-
-        return data.toString();
-    }
 }
