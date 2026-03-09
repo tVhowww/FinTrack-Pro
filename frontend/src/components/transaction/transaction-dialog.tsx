@@ -34,13 +34,13 @@ import {
   TransactionType,
   TransactionUpdateRequest,
 } from "@/types/transaction.dto";
-import { Wallet } from "@/types/wallet.dto";
+import { Wallet, WalletType } from "@/types/wallet.dto";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { getCurrencySymbol } from "@/lib/constants";
-import { Camera, Loader2, Sparkles, X, Mic } from "lucide-react"; 
+import { Camera, Loader2, Sparkles, X, Mic } from "lucide-react";
 import { toast } from "sonner";
 
 // Schema Validate
@@ -275,10 +275,42 @@ export function TransactionDialog({
     }
   };
 
+  // Lấy danh sách gốc và lọc theo Thu/Chi
   const flattenCategories = categories.flatMap((c) => [
     c,
     ...(c.subCategories || []),
   ]);
+  const typeFilteredCategories = flattenCategories.filter(
+    (c) => c.type === form.watch("type"),
+  );
+
+  const SAVING_CAT_NAMES = ["Nạp tiền tích lũy", "Rút tiền tích lũy"];
+
+  let finalCategories = typeFilteredCategories.filter(
+    (cat) => !SAVING_CAT_NAMES.includes(cat.name),
+  );
+
+  if (selectedWallet?.type === WalletType.SAVING) {
+    finalCategories = [
+      {
+        id: "auto-saving-category",
+        name:
+          form.watch("type") === TransactionType.INCOME
+            ? "Nạp tiền tích lũy"
+            : "Rút tiền tích lũy",
+      } as any,
+    ];
+  }
+
+  useEffect(() => {
+    if (selectedWallet?.type === WalletType.SAVING) {
+      form.setValue("categoryId", "auto-saving-category");
+    } else {
+      if (form.getValues("categoryId") === "auto-saving-category") {
+        form.setValue("categoryId", "");
+      }
+    }
+  }, [selectedWallet?.type, form.watch("type"), form]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -506,13 +538,11 @@ export function TransactionDialog({
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {flattenCategories
-                              .filter((c) => c.type === form.watch("type"))
-                              .map((cat) => (
-                                <SelectItem key={cat.id} value={cat.id}>
-                                  {cat.name}
-                                </SelectItem>
-                              ))}
+                            {finalCategories.map((cat) => (
+                              <SelectItem key={cat.id} value={cat.id}>
+                                {cat.name}
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                         <FormMessage />

@@ -373,7 +373,7 @@ public class TransactionService {
         // LOGIC MỚI: Xử lý Wallet ID
         if (walletId != null && !walletId.trim().isEmpty() && !"undefined".equals(walletId)) {
             // Trường hợp 1: Có chọn ví cụ thể -> Check quyền sở hữu ví đó
-            validateWalletOwnership(walletId);
+            validateAndGetWallet(walletId);
             walletIdsToQuery.add(walletId);
         } else {
             // Trường hợp 2: Không chọn ví (Xem tất cả) -> Lấy danh sách ví của User này
@@ -437,16 +437,16 @@ public class TransactionService {
                 .orElseThrow(() -> new AppException(ErrorCode.TRANSACTION_NOT_FOUND));
 
         // Kiểm tra quyền sở hữu wallet của transaction này
-        validateWalletOwnership(transaction.getWalletId());
+        validateAndGetWallet(transaction.getWalletId());
 
         return transactionMapper.toTransactionResponse(transaction);
     }
 
 
-    private void validateWalletOwnership(String walletId) {
-        // Nếu null hoặc rỗng thì bỏ qua (để hàm gọi bên ngoài tự xử lý logic "All Wallets")
+    // Đổi kiểu trả về từ void -> WalletResponse
+    private WalletResponse validateAndGetWallet(String walletId) {
         if (walletId == null || walletId.trim().isEmpty() || "undefined".equals(walletId)) {
-            return;
+            return null;
         }
 
         String currentUserId = SecurityUtils.getCurrentUserId();
@@ -457,15 +457,12 @@ public class TransactionService {
                 throw new AppException(ErrorCode.WALLET_NOT_FOUND);
             }
 
-            // Debug log: In ra để kiểm tra xem userId có bị null không
-            log.info("Check wallet {} owner: {} vs current user: {}",
-                    walletId, response.getResult().getUserId(), currentUserId);
-
             if (!currentUserId.equals(response.getResult().getUserId())) {
                 throw new AppException(ErrorCode.UNAUTHORIZED);
             }
+
+            return response.getResult(); // Trả về ví để xài luôn
         } catch (Exception e) {
-            // Nếu Wallet Service báo lỗi 404 hoặc 500
             log.error("Lỗi xác thực ví: {}", e.getMessage());
             throw new AppException(ErrorCode.WALLET_NOT_FOUND);
         }
@@ -474,7 +471,7 @@ public class TransactionService {
     private List<String> resolveWalletIds(String walletId) {
         if (walletId != null && !walletId.trim().isEmpty() && !"undefined".equals(walletId)) {
             // Case 1: Người dùng chọn 1 ví cụ thể
-            validateWalletOwnership(walletId); // Check xem ví này có phải của nó không
+            validateAndGetWallet(walletId); // Check xem ví này có phải của nó không
             return List.of(walletId);
         } else {
             // Case 2: Xem tổng quan (Không gửi ID)
@@ -503,7 +500,7 @@ public class TransactionService {
         Transaction transaction = transactionRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.TRANSACTION_NOT_FOUND));
 
-        validateWalletOwnership(transaction.getWalletId());
+        WalletResponse wallet = validateAndGetWallet(transaction.getWalletId());
 
         // 1. HOÀN TÁC SỐ DƯ CŨ TRÊN VÍ (Revert Old Balance)
         // Nếu là EXPENSE (Chi): Cũ là -100k -> Giờ phải +100k để bù lại
@@ -518,12 +515,16 @@ public class TransactionService {
         walletClient.updateBalance(transaction.getWalletId(),
                 WalletBalanceUpdateRequest.builder().amount(revertAmount).build());
 
-        // 2. CẬP NHẬT THÔNG TIN MỚI
-        if (request.getCategoryId() != null) {
+        if (wallet != null && "SAVING".equals(wallet.getType())) {
+            String sysCatName = (transaction.getType() == TransactionType.INCOME) ? "Nạp tiền tích lũy" : "Rút tiền tích lũy";
+            transaction.setCategory(getOrCreateSystemCategory(sysCatName, transaction.getType()));
+        }
+        else if (request.getCategoryId() != null) {
             Category category = categoryRepository.findById(request.getCategoryId())
                     .orElseThrow(() -> new AppException(ErrorCode.CATEGORY_NOT_FOUND));
             transaction.setCategory(category);
         }
+
         if (request.getAmount() != null) transaction.setAmount(request.getAmount());
         if (request.getNote() != null) transaction.setNote(request.getNote());
         if (request.getDate() != null) transaction.setDate(request.getDate());
@@ -563,7 +564,7 @@ public class TransactionService {
         Transaction transaction = transactionRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.TRANSACTION_NOT_FOUND));
 
-        validateWalletOwnership(transaction.getWalletId());
+        validateAndGetWallet(transaction.getWalletId());
 
         // 1. HOÀN TÁC SỐ DƯ (Trả lại tiền cho ví trước khi xóa)
         BigDecimal revertAmount = transaction.getAmount();
@@ -595,10 +596,18 @@ public class TransactionService {
             throw new AppException(ErrorCode.REQUEST_PROCESSING);
         }
 
-        validateWalletOwnership(request.getWalletId());
+        WalletResponse wallet = validateAndGetWallet(request.getWalletId());
 
         Category category = null;
-        if (request.getCategoryId() != null) {
+
+        if (wallet != null && "SAVING".equals(wallet.getType())) {
+            String sysCatName = (request.getType() == TransactionType.INCOME) ? "Nạp tiền tích lũy" : "Rút tiền tích lũy";
+            category = getOrCreateSystemCategory(sysCatName, request.getType());
+            if (request.getNote() == null || request.getNote().trim().isEmpty()) {
+                request.setNote(sysCatName);
+            }
+        }
+        else if (request.getCategoryId() != null) {
             category = categoryRepository.findById(request.getCategoryId())
                     .orElseThrow(() -> new AppException(ErrorCode.CATEGORY_NOT_FOUND));
         }

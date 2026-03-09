@@ -18,4 +18,5 @@ public class WalletResponse {
     private String currency;
 
     private String userId;
+    private String type;
 }
