@@ -19,6 +19,7 @@ import { Wallet, WalletType } from "@/types/wallet.dto";
 import {
   CheckCircle2,
   Edit,
+  Hammer,
   MoreVertical,
   Target,
   Trash,
@@ -31,6 +32,7 @@ interface WalletCardProps {
   onEdit: (wallet: Wallet) => void;
   onDelete: (id: string) => void;
   onAddFund?: (wallet: Wallet) => void;
+  onWithdraw?: (wallet: Wallet) => void;
 }
 
 export function WalletCard({
@@ -38,6 +40,7 @@ export function WalletCard({
   onEdit,
   onDelete,
   onAddFund,
+  onWithdraw,
 }: WalletCardProps) {
   const isSaving = wallet.type === WalletType.SAVING;
   const isCompleted = isSaving && (wallet.percentage || 0) >= 100;
@@ -83,6 +86,17 @@ export function WalletCard({
               onClick={() => onAddFund(wallet)}
             >
               <Zap className="h-3 w-3 mr-1" fill="currentColor" /> Nạp
+            </Button>
+          )}
+
+          {isSaving && wallet.balance > 0 && onWithdraw && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs px-2 bg-rose-50 text-rose-600 border-rose-200 hover:bg-rose-100 hover:text-rose-700 font-semibold"
+              onClick={() => onWithdraw(wallet)}
+            >
+              <Hammer className="h-3 w-3 mr-1" fill="currentColor" /> Rút
             </Button>
           )}
 

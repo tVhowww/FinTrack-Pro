@@ -12,6 +12,7 @@ import { useState } from "react";
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { useSearchParams } from "next/navigation";
 import { WalletAddFundDialog } from "@/components/wallet/wallet-add-fund-dialog";
+import { WalletWithdrawDialog } from "@/components/wallet/wallet-withdraw-dialog";
 
 export default function WalletsPage() {
   const searchParams = useSearchParams();
@@ -31,10 +32,17 @@ export default function WalletsPage() {
 
   const [isAddFundOpen, setIsAddFundOpen] = useState(false);
   const [fundWallet, setFundWallet] = useState<Wallet | null>(null);
+  const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
+  const [withdrawWallet, setWithdrawWallet] = useState<Wallet | null>(null);
 
   const handleAddFund = (wallet: Wallet) => {
     setFundWallet(wallet);
     setIsAddFundOpen(true);
+  };
+
+  const handleWithdraw = (wallet: Wallet) => {
+    setWithdrawWallet(wallet);
+    setIsWithdrawOpen(true);
   };
 
   const handleCreate = (type: WalletType = WalletType.BASIC) => {
@@ -161,6 +169,7 @@ export default function WalletsPage() {
                       onEdit={handleEdit}
                       onDelete={(id) => setDeleteId(id)}
                       onAddFund={handleAddFund}
+                      onWithdraw={handleWithdraw}
                     />
                   ))}
                   <button
@@ -186,12 +195,6 @@ export default function WalletsPage() {
         defaultType={createType}
       />
 
-      <WalletAddFundDialog
-        open={isAddFundOpen}
-        onOpenChange={setIsAddFundOpen}
-        wallet={fundWallet}
-      />
-
       <ConfirmDialog
         open={!!deleteId}
         onOpenChange={(open) => !open && setDeleteId(null)}
@@ -199,6 +202,18 @@ export default function WalletsPage() {
         description="Dữ liệu này sẽ bị ẩn khỏi danh sách của bạn. Bạn sẽ không thể thực hiện giao dịch mới trên ví này nữa."
         onConfirm={handleDeleteExecute}
         isLoading={isDeleting}
+      />
+
+      <WalletAddFundDialog
+        open={isAddFundOpen}
+        onOpenChange={setIsAddFundOpen}
+        wallet={fundWallet}
+      />
+
+      <WalletWithdrawDialog
+        open={isWithdrawOpen}
+        onOpenChange={setIsWithdrawOpen}
+        wallet={withdrawWallet}
       />
     </div>
   );
