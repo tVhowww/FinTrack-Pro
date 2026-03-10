@@ -11,13 +11,13 @@ import { Plus, Search, Target, WalletIcon } from "lucide-react";
 import { useState } from "react";
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { useSearchParams } from "next/navigation";
+import { WalletAddFundDialog } from "@/components/wallet/wallet-add-fund-dialog";
 
 export default function WalletsPage() {
   const searchParams = useSearchParams();
   const keyword = searchParams.get("keyword") || undefined;
   const currency = searchParams.get("currency") || undefined;
   const currentType = searchParams.get("type") || "all";
-  const [createType, setCreateType] = useState<WalletType>(WalletType.BASIC);
 
   const { wallets, isLoading, deleteWallet, isDeleting } = useWallets({
     keyword,
@@ -27,6 +27,15 @@ export default function WalletsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedWallet, setSelectedWallet] = useState<Wallet | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [createType, setCreateType] = useState<WalletType>(WalletType.BASIC);
+
+  const [isAddFundOpen, setIsAddFundOpen] = useState(false);
+  const [fundWallet, setFundWallet] = useState<Wallet | null>(null);
+
+  const handleAddFund = (wallet: Wallet) => {
+    setFundWallet(wallet);
+    setIsAddFundOpen(true);
+  };
 
   const handleCreate = (type: WalletType = WalletType.BASIC) => {
     setSelectedWallet(null);
@@ -151,6 +160,7 @@ export default function WalletsPage() {
                       wallet={wallet}
                       onEdit={handleEdit}
                       onDelete={(id) => setDeleteId(id)}
+                      onAddFund={handleAddFund}
                     />
                   ))}
                   <button
@@ -174,6 +184,12 @@ export default function WalletsPage() {
         onOpenChange={setIsDialogOpen}
         walletToEdit={selectedWallet}
         defaultType={createType}
+      />
+
+      <WalletAddFundDialog
+        open={isAddFundOpen}
+        onOpenChange={setIsAddFundOpen}
+        wallet={fundWallet}
       />
 
       <ConfirmDialog

@@ -23,15 +23,22 @@ import {
   Target,
   Trash,
   Wallet as WalletIcon,
+  Zap,
 } from "lucide-react";
 
 interface WalletCardProps {
   wallet: Wallet;
   onEdit: (wallet: Wallet) => void;
   onDelete: (id: string) => void;
+  onAddFund?: (wallet: Wallet) => void;
 }
 
-export function WalletCard({ wallet, onEdit, onDelete }: WalletCardProps) {
+export function WalletCard({
+  wallet,
+  onEdit,
+  onDelete,
+  onAddFund,
+}: WalletCardProps) {
   const isSaving = wallet.type === WalletType.SAVING;
   const isCompleted = isSaving && (wallet.percentage || 0) >= 100;
 
@@ -66,27 +73,41 @@ export function WalletCard({ wallet, onEdit, onDelete }: WalletCardProps) {
             {wallet.name}
           </span>
         </CardTitle>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
+
+        <div className="flex items-center gap-1">
+          {isSaving && !isCompleted && onAddFund && (
             <Button
-              variant="ghost"
-              className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs px-2 bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100 hover:text-emerald-700 font-semibold"
+              onClick={() => onAddFund(wallet)}
             >
-              <MoreVertical className="h-4 w-4" />
+              <Zap className="h-3 w-3 mr-1" fill="currentColor" /> Nạp
             </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => onEdit(wallet)}>
-              <Edit className="mr-2 h-4 w-4" /> Sửa thông tin
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => onDelete(wallet.id)}
-              className="text-red-600 focus:text-red-600"
-            >
-              <Trash className="mr-2 h-4 w-4" /> Xóa ví
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+          )}
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => onEdit(wallet)}>
+                <Edit className="mr-2 h-4 w-4" /> Sửa thông tin
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => onDelete(wallet.id)}
+                className="text-red-600 focus:text-red-600"
+              >
+                <Trash className="mr-2 h-4 w-4" /> Xóa ví
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </CardHeader>
 
       <CardContent className={isSaving ? "pb-4" : ""}>
