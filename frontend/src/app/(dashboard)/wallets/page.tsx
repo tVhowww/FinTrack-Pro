@@ -6,8 +6,8 @@ import { WalletDialog } from "@/components/wallet/wallet-dialog";
 import { WalletCard } from "@/components/wallet/wallet-card";
 import { WalletFilter } from "@/components/wallet/wallet-filter";
 import { useWallets } from "@/hooks/use-wallets";
-import { Wallet } from "@/types/wallet.dto";
-import { Plus, Search } from "lucide-react";
+import { Wallet, WalletType } from "@/types/wallet.dto";
+import { Plus, Search, Target, WalletIcon } from "lucide-react";
 import { useState } from "react";
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { useSearchParams } from "next/navigation";
@@ -16,6 +16,8 @@ export default function WalletsPage() {
   const searchParams = useSearchParams();
   const keyword = searchParams.get("keyword") || undefined;
   const currency = searchParams.get("currency") || undefined;
+  const currentType = searchParams.get("type") || "all";
+  const [createType, setCreateType] = useState<WalletType>(WalletType.BASIC);
 
   const { wallets, isLoading, deleteWallet, isDeleting } = useWallets({
     keyword,
@@ -26,8 +28,9 @@ export default function WalletsPage() {
   const [selectedWallet, setSelectedWallet] = useState<Wallet | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  const handleCreate = () => {
+  const handleCreate = (type: WalletType = WalletType.BASIC) => {
     setSelectedWallet(null);
+    setCreateType(type);
     setIsDialogOpen(true);
   };
 
@@ -44,16 +47,22 @@ export default function WalletsPage() {
     }
   };
 
+  const basicWallets = wallets.filter((w) => w.type !== WalletType.SAVING);
+  const savingWallets = wallets.filter((w) => w.type === WalletType.SAVING);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Ví của tôi</h2>
+          <h2 className="text-2xl font-bold tracking-tight">Ví & Quỹ</h2>
           <p className="text-sm text-muted-foreground">
-            Quản lý các nguồn tiền của bạn
+            Quản lý dòng tiền chi tiêu và mục tiêu tích lũy
           </p>
         </div>
-        <Button onClick={handleCreate} className="w-full md:w-auto">
+        <Button
+          onClick={() => handleCreate(WalletType.BASIC)}
+          className="w-full md:w-auto"
+        >
           <Plus className="mr-2 h-4 w-4" /> Thêm ví mới
         </Button>
       </div>
@@ -66,54 +75,96 @@ export default function WalletsPage() {
             <Skeleton key={i} className="h-[150px] rounded-xl" />
           ))}
         </div>
+      ) : wallets.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-12 text-center border-2 border-dashed rounded-xl bg-muted/20">
+          <div className="bg-background p-4 rounded-full shadow-sm mb-4">
+            <Search className="h-8 w-8 text-muted-foreground opacity-50" />
+          </div>
+          <p className="text-muted-foreground font-medium">
+            {keyword || (currency && currency !== "all")
+              ? "Không tìm thấy kết quả phù hợp."
+              : "Bạn chưa có ví hay quỹ nào. Hãy tạo mới để bắt đầu!"}
+          </p>
+          {!keyword && (!currency || currency === "all") && (
+            <Button variant="outline" className="mt-4" onClick={handleCreate}>
+              Tạo mới ngay
+            </Button>
+          )}
+        </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {wallets.length === 0 ? (
-            <div className="col-span-full flex flex-col items-center justify-center py-12 text-center border-2 border-dashed rounded-xl bg-muted/20">
-              <div className="bg-background p-4 rounded-full shadow-sm mb-4">
-                <Search className="h-8 w-8 text-muted-foreground opacity-50" />
+        <div className="space-y-8">
+          {/* KHU VỰC 1: VÍ CHI TIÊU */}
+          {(currentType === "all" || currentType === WalletType.BASIC) && (
+            <div>
+              <div className="flex items-center gap-2 mb-4 border-b pb-2">
+                <div className="bg-primary/10 p-1.5 rounded-md">
+                  <WalletIcon className="h-5 w-5 text-primary" />
+                </div>
+                <h3 className="text-lg font-semibold tracking-tight">
+                  Ví chi tiêu hàng ngày
+                </h3>
               </div>
-              <p className="text-muted-foreground font-medium">
-                {keyword || (currency && currency !== "all")
-                  ? "Không tìm thấy ví nào phù hợp với bộ lọc."
-                  : "Bạn chưa có ví nào. Hãy tạo một ví mới để bắt đầu!"}
-              </p>
-              {!keyword && (!currency || currency === "all") && (
-                <Button
-                  variant="outline"
-                  className="mt-4"
-                  onClick={handleCreate}
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {basicWallets.map((wallet) => (
+                  <WalletCard
+                    key={wallet.id}
+                    wallet={wallet}
+                    onEdit={handleEdit}
+                    onDelete={(id) => setDeleteId(id)}
+                  />
+                ))}
+
+                <button
+                  onClick={() => handleCreate(WalletType.BASIC)}
+                  className="group flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-muted-foreground/25 p-8 text-center hover:bg-accent/50 hover:text-accent-foreground transition-all h-full min-h-[120px]"
                 >
-                  Tạo ví ngay
-                </Button>
+                  <div className="rounded-full bg-background p-3 shadow-sm group-hover:scale-110 transition-transform">
+                    <Plus className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                  <h3 className="font-semibold text-sm">Thêm ví mới</h3>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* KHU VỰC 2: QUỸ TIẾT KIỆM */}
+          {(currentType === "all" || currentType === WalletType.SAVING) && (
+            <div>
+              <div className="flex items-center gap-2 mb-4 border-b pb-2 mt-4">
+                <div className="bg-emerald-500/10 p-1.5 rounded-md">
+                  <Target className="h-5 w-5 text-emerald-600" />
+                </div>
+                <h3 className="text-lg font-semibold tracking-tight text-emerald-700">
+                  Mục tiêu tiết kiệm
+                </h3>
+              </div>
+
+              {savingWallets.length === 0 ? (
+                <div className="text-center p-6 border border-dashed rounded-xl bg-muted/10 text-muted-foreground text-sm">
+                  Bạn chưa có quỹ tiết kiệm nào. Hãy đặt ra một mục tiêu mới!
+                </div>
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {savingWallets.map((wallet) => (
+                    <WalletCard
+                      key={wallet.id}
+                      wallet={wallet}
+                      onEdit={handleEdit}
+                      onDelete={(id) => setDeleteId(id)}
+                    />
+                  ))}
+                  <button
+                    onClick={() => handleCreate(WalletType.SAVING)}
+                    className="group flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-muted-foreground/25 p-8 text-center hover:bg-accent/50 hover:text-accent-foreground transition-all h-full min-h-[120px]"
+                  >
+                    <div className="rounded-full bg-background p-3 shadow-sm group-hover:scale-110 transition-transform">
+                      <Plus className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <h3 className="font-semibold text-sm">Thêm ví mới</h3>
+                  </button>
+                </div>
               )}
             </div>
-          ) : (
-            <>
-              {wallets.map((wallet) => (
-                <WalletCard
-                  key={wallet.id}
-                  wallet={wallet}
-                  onEdit={handleEdit}
-                  onDelete={(id) => setDeleteId(id)}
-                />
-              ))}
-
-              <button
-                onClick={handleCreate}
-                className="group flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-muted-foreground/25 p-8 text-center hover:bg-accent/50 hover:text-accent-foreground transition-all h-full min-h-[150px]"
-              >
-                <div className="rounded-full bg-background p-3 shadow-sm group-hover:scale-110 transition-transform">
-                  <Plus className="h-6 w-6 text-muted-foreground" />
-                </div>
-                <div className="space-y-1">
-                  <h3 className="font-semibold">Thêm ví mới</h3>
-                  <p className="text-xs text-muted-foreground">
-                    Tạo ví để quản lý nguồn tiền
-                  </p>
-                </div>
-              </button>
-            </>
           )}
         </div>
       )}
@@ -122,13 +173,14 @@ export default function WalletsPage() {
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
         walletToEdit={selectedWallet}
+        defaultType={createType}
       />
 
       <ConfirmDialog
         open={!!deleteId}
         onOpenChange={(open) => !open && setDeleteId(null)}
-        title="Xóa ví này?"
-        description="Ví này sẽ bị vô hiệu hóa và ẩn khỏi danh sách của bạn. Bạn sẽ không thể thực hiện giao dịch mới trên ví này nữa."
+        title="Xóa ví/quỹ này?"
+        description="Dữ liệu này sẽ bị ẩn khỏi danh sách của bạn. Bạn sẽ không thể thực hiện giao dịch mới trên ví này nữa."
         onConfirm={handleDeleteExecute}
         isLoading={isDeleting}
       />

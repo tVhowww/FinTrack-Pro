@@ -18,19 +18,18 @@ public interface WalletMapper {
     WalletResponse toWalletResponse(Wallet wallet);
 
     @AfterMapping
-    default void calculatePercentage(Wallet wallet, @MappingTarget WalletResponse response) {
+    default void calculatePercentage(Wallet wallet, @MappingTarget WalletResponse.WalletResponseBuilder builder) {
         if (wallet.getType() == WalletType.SAVING) {
             if (wallet.getTargetAmount() != null && wallet.getTargetAmount().compareTo(BigDecimal.ZERO) > 0) {
                 double percentage = wallet.getBalance()
                         .divide(wallet.getTargetAmount(), 4, RoundingMode.HALF_UP)
                         .doubleValue() * 100;
-                // Khóa max 100% để Frontend không bị lố UI
-                response.setPercentage(Math.min(percentage, 100.0));
+                builder.percentage(Math.min(percentage, 100.0));
             } else {
-                response.setPercentage(0.0);
+                builder.percentage(0.0);
             }
         } else {
-            response.setPercentage(null); // Ví thường thì không có %
+            builder.percentage(null);
         }
     }
 }

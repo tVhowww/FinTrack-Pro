@@ -13,6 +13,7 @@ import { Search, X } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect } from "react";
 import { CURRENCIES } from "@/lib/constants";
+import { WalletType } from "@/types/wallet.dto";
 
 export function WalletFilter() {
   const searchParams = useSearchParams();
@@ -21,6 +22,7 @@ export function WalletFilter() {
 
   const currentKeyword = searchParams.get("keyword") || "";
   const currentCurrency = searchParams.get("currency") || "all";
+  const currentType = searchParams.get("type") || "all"; 
 
   // State tạm để gõ không bị gọi API liên tục
   const [localKeyword, setLocalKeyword] = useState(currentKeyword);
@@ -48,7 +50,8 @@ export function WalletFilter() {
     replace(pathname); // Xóa URL sạch sẽ
   };
 
-  const hasActiveFilters = currentKeyword !== "" || currentCurrency !== "all";
+  const hasActiveFilters =
+    currentKeyword !== "" || currentCurrency !== "all" || currentType !== "all";
 
   return (
     <div className="bg-card p-4 rounded-lg border shadow-sm flex flex-col md:flex-row gap-4 mb-6">
@@ -70,8 +73,22 @@ export function WalletFilter() {
         </Button>
       </div>
 
-      {/* Lọc Tiền tệ & Nút Xóa */}
       <div className="flex flex-wrap items-center gap-2">
+        <Select
+          value={currentType}
+          onValueChange={(val) => updateFilter("type", val)}
+        >
+          <SelectTrigger className="w-[150px] bg-background">
+            <SelectValue placeholder="Loại ví" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tất cả loại ví</SelectItem>
+            <SelectItem value={WalletType.BASIC}>Ví chi tiêu</SelectItem>
+            <SelectItem value={WalletType.SAVING}>Ví tiết kiệm</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {/* Lọc Tiền tệ */}
         <Select
           value={currentCurrency}
           onValueChange={(val) => updateFilter("currency", val)}

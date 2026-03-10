@@ -44,12 +44,14 @@ interface WalletDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   walletToEdit?: Wallet | null;
+  defaultType?: WalletType;
 }
 
 export function WalletDialog({
   open,
   onOpenChange,
   walletToEdit,
+  defaultType = WalletType.BASIC,
 }: WalletDialogProps) {
   const {
     createWallet,
@@ -92,13 +94,13 @@ export function WalletDialog({
           name: "",
           balance: 0,
           currency: "VND",
-          type: WalletType.BASIC,
+          type: defaultType,
           targetAmount: 0,
           deadline: format(new Date(), "yyyy-MM-dd"),
         });
       }
     }
-  }, [open, walletToEdit, form]);
+  }, [open, walletToEdit, form, defaultType]);
 
   const onSubmit = (values: WalletFormValues) => {
     // Ép kiểu Data gửi đi (Xóa mục tiêu nếu là ví thường)
