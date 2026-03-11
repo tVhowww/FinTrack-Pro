@@ -42,12 +42,23 @@ public class User {
 
     private String avatar;
 
+    @Column(name = "base_currency")
+    @Builder.Default
+    private String baseCurrency = "VND";
+
     @Builder.Default
     @Column(nullable = false, columnDefinition = "boolean default false")
     private boolean deleted = false;
 
     @Column(name = "current_jwt_id")
     private String currentJwtId; // Lưu JTI của token hợp lệ cuối cùng
+
+    @Column(name = "provider")
+    @Builder.Default
+    private String provider = "LOCAL"; // LOCAL, GOOGLE, FACEBOOK
+
+    @Column(name = "provider_id")
+    private String providerId; // Chứa ID định danh của Google/Facebook
 
     @ManyToMany
     @JoinTable(

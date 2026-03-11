@@ -2,6 +2,7 @@ package com.fintrack.transaction_service.repository;
 
 import com.fintrack.transaction_service.entity.Budget;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
@@ -10,7 +11,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface BudgetRepository extends JpaRepository<Budget, String> {
+public interface BudgetRepository extends JpaRepository<Budget, String>, JpaSpecificationExecutor<Budget> {
     boolean existsByWalletIdAndCategoryIdAndMonthAndYearAndUserId(String walletId, String categoryId, Integer month, Integer year, String userId);
 
     // 1. Cho "Ví chung" (Global): Chỉ lấy budget có walletId IS NULL

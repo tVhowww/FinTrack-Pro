@@ -56,4 +56,17 @@ public class TransactionSpecification {
             return root.get("walletId").in(walletIds);
         };
     }
+
+    public static Specification<Transaction> hasKeyword(String keyword) {
+        return (root, query, criteriaBuilder) -> {
+            if (keyword == null || keyword.trim().isEmpty()) {
+                return null;
+            }
+            // Ép cả dữ liệu DB và từ khóa về chữ thường (lower) rồi dùng toán tử LIKE (%keyword%)
+            return criteriaBuilder.like(
+                    criteriaBuilder.lower(root.get("note")),
+                    "%" + keyword.toLowerCase() + "%"
+            );
+        };
+    }
 }

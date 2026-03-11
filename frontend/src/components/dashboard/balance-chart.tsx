@@ -18,9 +18,14 @@ import {
 interface BalanceChartProps {
   data: BalanceTrend[];
   isLoading: boolean;
+  baseCurrency?: string;
 }
 
-export function BalanceChart({ data, isLoading }: BalanceChartProps) {
+export function BalanceChart({
+  data,
+  isLoading,
+  baseCurrency,
+}: BalanceChartProps) {
   if (isLoading) {
     return <Skeleton className="h-[350px] w-full rounded-xl" />;
   }
@@ -39,7 +44,10 @@ export function BalanceChart({ data, isLoading }: BalanceChartProps) {
       <CardContent className="pl-0">
         <div className="h-[300px] w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+            <BarChart
+              data={chartData}
+              margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+            >
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
               <XAxis
                 dataKey="name"
@@ -53,12 +61,28 @@ export function BalanceChart({ data, isLoading }: BalanceChartProps) {
                 fontSize={12}
                 tickLine={false}
                 axisLine={false}
-                tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`} // Rút gọn: 1M, 2M
+                width={50}
+                tickFormatter={(value) => {
+                  if (value === 0) return "0";
+                  if (value >= 1000000) {
+                    return `${(value / 1000000).toFixed(1).replace(/\.0$/, "")}M`;
+                  }
+                  if (value >= 1000) {
+                    return `${(value / 1000).toFixed(1).replace(/\.0$/, "")}k`;
+                  }
+                  return value.toString();
+                }}
               />
               <Tooltip
-                formatter={(value: number) => formatCurrency(value)}
+                formatter={(value: number) =>
+                  formatCurrency(value, baseCurrency)
+                }
                 cursor={{ fill: "transparent" }}
-                contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }}
+                contentStyle={{
+                  borderRadius: "8px",
+                  border: "none",
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                }}
               />
               <Legend />
               <Bar

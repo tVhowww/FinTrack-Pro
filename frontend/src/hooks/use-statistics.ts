@@ -59,6 +59,14 @@ export function useStatistics(
     staleTime: 1000 * 60 * 5,
   });
 
+  // 6. Lấy tổng tiền ví
+  const totalBalance = useQuery({
+    queryKey: ["statistics", "totalBalance"],
+    queryFn: () => statisticsService.getTotalBalance(),
+    enabled: isEnabled,
+    staleTime: 1000 * 60,
+  });
+
   return {
     trendData: trendQuery.data || [],
     isLoadingTrend: trendQuery.isLoading && isEnabled,
@@ -80,6 +88,7 @@ export function useStatistics(
 
     highestExpenses: highestExpenseQuery.data || [],
     isLoadingHighest: highestExpenseQuery.isLoading && isEnabled,
+    totalBalance: totalBalance.data || 0,
 
     refetch: () => {
       trendQuery.refetch();
@@ -87,6 +96,7 @@ export function useStatistics(
       monthlyQuery.refetch();
       recentTransactionsQuery.refetch();
       highestExpenseQuery.refetch();
+      totalBalance.refetch();
     },
   };
 }

@@ -2,6 +2,7 @@ package com.fintrack.transaction_service.controller;
 
 import com.fintrack.transaction_service.dto.request.TransactionCreationRequest;
 import com.fintrack.transaction_service.dto.request.TransactionUpdateRequest;
+import com.fintrack.transaction_service.dto.request.TransferRequest;
 import com.fintrack.transaction_service.dto.response.*;
 import com.fintrack.transaction_service.enums.TransactionType;
 import com.fintrack.transaction_service.service.TransactionService;
@@ -13,14 +14,30 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("transactions")
+@RequestMapping("/transactions")
 public class TransactionController {
     private final TransactionService transactionService;
+
+    @PostMapping("/transfer")
+    public ApiResponse<String> transferMoney(@RequestBody TransferRequest request) {
+        transactionService.transfer(request);
+        return ApiResponse.<String>builder()
+                .result("Chuyển tiền thành công")
+                .build();
+    }
+
+    @GetMapping("/statistics/total-balance")
+    public ApiResponse<BigDecimal> getTotalBalance() {
+        return ApiResponse.<BigDecimal>builder()
+                .result(transactionService.getTotalBalance())
+                .build();
+    }
 
     @GetMapping("/statistics/highest-expenses")
     public ApiResponse<List<TransactionResponse>> getHighestExpenses(
@@ -92,9 +109,10 @@ public class TransactionController {
             @RequestParam(value = "type", required = false) TransactionType type,
             @RequestParam(value = "startDate", required = false) Instant startDate,
             @RequestParam(value = "endDate", required = false) Instant endDate,
-            @RequestParam(value = "categoryId", required = false) String categoryId
+            @RequestParam(value = "categoryId", required = false) String categoryId,
+            @RequestParam(value = "keyword", required = false) String keyword
     ) {
-        var result = transactionService.getTransactions(page, size, walletId, type, startDate, endDate, categoryId);
+        var result = transactionService.getTransactions(page, size, walletId, type, startDate, endDate, categoryId, keyword);
 
         return ApiResponse.<PageResponse<TransactionResponse>>builder()
                 .result(result)

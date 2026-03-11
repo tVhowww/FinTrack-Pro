@@ -28,11 +28,8 @@ export function useTransactions(
     queryKey: ["transactions", params],
     queryFn: () => transactionService.getTransactions(params),
 
-    // Nếu trang của bạn cho phép xem "Tất cả ví" (không có walletId), bạn có thể bỏ check này hoặc điều chỉnh logic backend
-    enabled: params.walletId !== "undefined",
-
     placeholderData: (previousData) => previousData,
-    staleTime: 1000 * 60, // Cache 1 phút để tránh gọi lại liên tục
+    staleTime: 1000 * 60, // Cache 1 phút
     refetchOnWindowFocus: true,
   });
 
@@ -99,7 +96,100 @@ export function useTransactions(
   });
 
   // =================================================================
-  // 5. HELPER: Kiểm tra giao dịch liên quan
+  // 5. MUTATION: Xuất Excel
+  // =================================================================
+  const exportMutation = useMutation({
+    mutationFn: (exportParams?: TransactionQueryParams) =>
+      transactionService.exportExcel(exportParams),
+    onSuccess: async (blob) => {
+      const fileName = `Lich_su_giao_dich_${new Date().getTime()}.xlsx`;
+
+      try {
+        // 1. CÁCH MỚI: Ép mở cửa sổ chọn chỗ lưu (Chỉ hỗ trợ Chrome, Edge, Cốc Cốc...)
+        if ("showSaveFilePicker" in window) {
+          const fileHandle = await (window as any).showSaveFilePicker({
+            suggestedName: fileName,
+            types: [
+              {
+                description: "Excel File",
+                accept: {
+                  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
+                    [".xlsx"],
+                },
+              },
+            ],
+          });
+
+          // Ghi dữ liệu vào file người dùng vừa chọn
+          const writable = await fileHandle.createWritable();
+          await writable.write(blob);
+          await writable.close();
+
+          toast.success("Đã lưu file Excel thành công!");
+          return; // Xong rồi thì thoát luôn
+        }
+
+        // 2. CÁCH CŨ (FALLBACK): Dành cho Safari, Firefox hoặc trình duyệt không hỗ trợ
+        const url = window.URL.createObjectURL(new Blob([blob]));
+        const link = document.createElement("a");
+        link.href = url;
+        link.setAttribute("download", fileName);
+        document.body.appendChild(link);
+        link.click();
+
+        link.parentNode?.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        toast.success("Đã tải xuống file Excel!");
+      } catch (error: any) {
+        // Nếu người dùng bấm "Cancel" lúc chọn thư mục thì không báo lỗi
+        if (error.name !== "AbortError") {
+          console.error("Lỗi khi lưu file:", error);
+          toast.error("Có lỗi xảy ra khi lưu file!");
+        }
+      }
+    },
+    onError: (error: any) => {
+      console.error("Export error:", error);
+      toast.error("Có lỗi xảy ra khi xuất dữ liệu từ máy chủ!");
+    },
+  });
+
+  // =================================================================
+  // 6. MUTATION: Quét hóa đơn AI
+  // =================================================================
+  const scanMutation = useMutation({
+    mutationFn: (payload: { file?: File; text?: string }) =>
+      transactionService.scanReceipt(payload),
+    onSuccess: () => {
+      // toast success để bên UI lo
+    },
+    onError: (error: any) => {
+      const msg =
+        error?.response?.data?.message ||
+        "Không thể đọc thông tin, vui lòng thử lại.";
+      toast.error(msg);
+    },
+  });
+
+  // =================================================================
+  // 7. MUTATION: Chuyển tiền giữa các ví
+  // =================================================================
+
+  const transferMutation = useMutation({
+    mutationFn: transactionService.transfer,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["statistics"] });
+      queryClient.invalidateQueries({ queryKey: ["wallets"] });
+    },
+    onError: (error: any) => {
+      const msg = error?.response?.data?.message || "Chuyển tiền thất bại";
+      toast.error(msg);
+    },
+  });
+
+  // =================================================================
+  // 8. HELPER: Kiểm tra giao dịch liên quan
   // =================================================================
   const checkRelatedTransactions = async (categoryId: string) => {
     setIsCheckingRelated(true);
@@ -128,9 +218,15 @@ export function useTransactions(
     createTransaction: createMutation.mutateAsync,
     updateTransaction: updateMutation.mutateAsync,
     deleteTransaction: deleteMutation.mutateAsync,
+    exportTransactions: exportMutation.mutateAsync,
+    scanReceipt: scanMutation.mutateAsync,
+    transferTransaction: transferMutation.mutateAsync,
     isCreating: createMutation.isPending,
     isUpdating: updateMutation.isPending,
     isDeleting: deleteMutation.isPending,
+    isExporting: exportMutation.isPending,
+    isScanning: scanMutation.isPending,
+    isTransferring: transferMutation.isPending,
     checkRelatedTransactions,
     isCheckingRelated,
   };

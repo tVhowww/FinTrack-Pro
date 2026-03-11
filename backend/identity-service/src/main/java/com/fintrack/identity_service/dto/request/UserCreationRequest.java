@@ -32,4 +32,6 @@ public class UserCreationRequest {
     private LocalDate dob;
 
     private Set<String> roles;
+
+    private String baseCurrency;
 }

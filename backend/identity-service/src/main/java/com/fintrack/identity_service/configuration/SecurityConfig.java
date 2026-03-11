@@ -1,22 +1,16 @@
 package com.fintrack.identity_service.configuration;
 
-import com.fintrack.identity_service.dto.response.ApiResponse;
-import com.fintrack.identity_service.exception.ErrorCode;
-import com.fintrack.identity_service.repository.InvalidatedTokenRepository;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
-import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
@@ -26,19 +20,16 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
-import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
-import tools.jackson.databind.ObjectMapper;
 
 import javax.crypto.spec.SecretKeySpec;
-import java.io.IOException;
 
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
-    private final InvalidatedTokenRepository invalidatedTokenRepository;
+    private final StringRedisTemplate redisTemplate;
 
     @Value("${jwt.signerKey}")
     private String signerKey;
@@ -46,7 +37,7 @@ public class SecurityConfig {
     // 1. Định nghĩa các đường dẫn được phép truy cập không cần login
     private final String[] PUBLIC_ENDPOINTS = {
             "/auth/token", "/auth/introspect", "/auth/logout",
-            "/auth/refresh", "/v3/api-docs/**",
+            "/auth/refresh", "/auth/reset-password", "/auth/forgot-password", "/auth/google", "/v3/api-docs/**",
             "/swagger-ui/**",
             "/swagger-ui.html"
     };
@@ -106,9 +97,10 @@ public class SecurityConfig {
             Jwt jwt = nimbusJwtDecoder.decode(token);
 
             // Bước 2: Check xem token ID (JTI) có nằm trong "Sổ đen" (Database) không
-            if (invalidatedTokenRepository.existsById(jwt.getId())) {
-                // Nếu có -> Nghĩa là token này đã Logout -> Báo lỗi
-                throw new BadJwtException("Token has been invalidated");
+            String redisKey = "jwt_blacklist:" + jwt.getId();
+            if (Boolean.TRUE.equals(redisTemplate.hasKey(redisKey))) {
+                // Nếu có trong Redis -> Báo lỗi ngay lập tức
+                throw new BadJwtException("Token has been logged out or invalidated");
             }
 
             // Nếu mọi thứ ok -> Trả về thông tin token

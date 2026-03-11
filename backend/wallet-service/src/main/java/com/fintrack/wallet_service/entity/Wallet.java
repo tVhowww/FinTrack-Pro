@@ -1,5 +1,6 @@
 package com.fintrack.wallet_service.entity;
 
+import com.fintrack.wallet_service.enums.WalletType;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -26,7 +27,18 @@ public class Wallet {
     @Column(nullable = false)
     private BigDecimal balance;
 
-    private String currency; // VND, USD
+    private String currency;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    @Builder.Default
+    private WalletType type = WalletType.BASIC;
+
+    @Column(name = "target_amount")
+    private BigDecimal targetAmount;
+
+    @Column(name = "deadline")
+    private java.time.LocalDate deadline;
 
     @Column(name = "user_id", nullable = false)
     private String userId; // Lưu ID của user (Lấy từ Token)

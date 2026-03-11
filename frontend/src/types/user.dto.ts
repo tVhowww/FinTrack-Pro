@@ -8,6 +8,7 @@ export interface UserResponse {
   phoneNumber?: string;
   city?: string;
   avatar?: string;
+  baseCurrency: string;
 }
 
 // 2. Request Update Profile
@@ -16,6 +17,7 @@ export interface ProfileUpdateRequest {
   dob?: string;
   phoneNumber?: string;
   city?: string;
+  baseCurrency?: string;
 }
 
 // 3. Request Change Password

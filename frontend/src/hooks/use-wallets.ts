@@ -5,13 +5,18 @@ import { WalletFormValues } from "@/types/wallet.dto";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-export function useWallets() {
+interface UseWalletsParams {
+  keyword?: string;
+  currency?: string;
+}
+
+export function useWallets(params?: UseWalletsParams) {
   const queryClient = useQueryClient();
 
   // 1. Query: Lấy danh sách ví
   const { data, isLoading, error } = useQuery({
-    queryKey: ["wallets"],
-    queryFn: walletService.getAll,
+    queryKey: ["wallets", params],
+    queryFn: () => walletService.getAll(params),
     staleTime: 0,
     refetchOnWindowFocus: true,
   });

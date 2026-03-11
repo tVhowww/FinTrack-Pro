@@ -44,4 +44,22 @@ export interface TransactionQueryParams {
   startDate?: string;
   endDate?: string;
   categoryId?: string;
+  keyword?: string;
+}
+
+export interface AiReceiptResponse {
+  amount: number;
+  date: string;
+  note: string;
+  categoryId: string | null;
+  currency?: string;
+  type?: string;
+}
+
+export interface TransferRequest {
+  fromWalletId: string;
+  toWalletId: string;
+  amount: number;
+  categoryId?: string;
+  note?: string;
 }

@@ -6,6 +6,18 @@ spring:
     name: api-gateway
   cloud:
     gateway:
+      default-filters:
+        - name: RequestRateLimiter
+          args:
+            # Mỗi giây cấp cho user 10 lượt gọi API
+            redis-rate-limiter.replenishRate: 10
+            # Nhưng cho phép gọi dồn tối đa 20 lượt/giây (bùng nổ nhất thời)
+            redis-rate-limiter.burstCapacity: 20
+            # Mỗi request tiêu tốn 1 Token
+            redis-rate-limiter.requestedTokens: 1
+            # Bean nhận diện IP ban nãy
+            key-resolver: "#{@ipKeyResolver}"
+
       server:
         webflux:
           routes:

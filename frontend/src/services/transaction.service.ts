@@ -2,10 +2,12 @@ import http from "@/lib/http";
 import { ApiResponse } from "@/types/api";
 import { PageResponse } from "@/types/common";
 import {
+  AiReceiptResponse,
   TransactionCreationRequest,
   TransactionQueryParams,
   TransactionResponse,
   TransactionUpdateRequest,
+  TransferRequest,
 } from "@/types/transaction.dto";
 
 const BASE_URL = "/transaction/transactions";
@@ -62,5 +64,46 @@ export const transactionService = {
       `${BASE_URL}/${id}`,
     );
     return response.data;
+  },
+
+  exportExcel: async (params?: TransactionQueryParams) => {
+    const response = await http.get(`${BASE_URL}/export`, {
+      params,
+      responseType: "blob", // Rất quan trọng: Báo cho Axios biết đây là file
+    });
+    return response.data;
+  },
+
+  scanReceipt: async ({ file, text }: { file?: File; text?: string }) => {
+    const formData = new FormData();
+    if (file) formData.append("file", file);
+    if (text) formData.append("text", text);
+
+    const response = await http.post<ApiResponse<AiReceiptResponse>>(
+      "/transaction/ai/scan-receipt",
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      },
+    );
+    return response.data.result;
+  },
+
+  chatWithAdvisor: async (message: string) => {
+    const response = await http.post<ApiResponse<string>>(
+      "/transaction/ai/chat",
+      { message },
+    );
+    return response.data.result;
+  },
+
+  transfer: async (data: TransferRequest) => {
+    const response = await http.post<ApiResponse<string>>(
+      `${BASE_URL}/transfer`,
+      data,
+    );
+    return response.data.result;
   },
 };

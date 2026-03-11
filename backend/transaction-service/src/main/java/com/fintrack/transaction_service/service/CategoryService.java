@@ -1,5 +1,7 @@
 package com.fintrack.transaction_service.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fintrack.transaction_service.dto.request.CategoryCreationRequest;
 import com.fintrack.transaction_service.dto.response.CategoryResponse;
 import com.fintrack.transaction_service.entity.Category;
@@ -11,23 +13,37 @@ import com.fintrack.transaction_service.repository.CategoryRepository;
 import com.fintrack.transaction_service.repository.TransactionRepository;
 import com.fintrack.transaction_service.utils.SecurityUtils;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class CategoryService {
     private final CategoryRepository categoryRepository;
     private final TransactionRepository transactionRepository;
     private final CategoryMapper categoryMapper;
+    private final StringRedisTemplate redisTemplate;
+    private final ObjectMapper objectMapper;
 
     public CategoryResponse create(CategoryCreationRequest request) {
         // Lấy userId từ Token (bắt buộc)
         String userId = SecurityUtils.getCurrentUserId();
+
+        String lockKey = "lock:create_category:" + userId;
+        Boolean acquired = redisTemplate.opsForValue().setIfAbsent(lockKey, "LOCKED", 3, TimeUnit.SECONDS);
+        if (Boolean.FALSE.equals(acquired)) {
+            log.warn("Double-Click chặn đứng! User {} đang tạo Category.", userId);
+            throw new AppException(ErrorCode.REQUEST_PROCESSING);
+        }
 
         // 1. Check trùng tên
         boolean exists = categoryRepository.existsByNameAndUserIdAndTypeAndDeletedFalse(request.getName(), userId, request.getType());
@@ -61,22 +77,48 @@ public class CategoryService {
         }
 
         category = categoryRepository.save(category);
+
+        clearCategoryCache(userId);
         return categoryMapper.toCategoryResponse(category);
     }
 
     public List<CategoryResponse> getAll(TransactionType type) {
         String userId = SecurityUtils.getCurrentUserId();
-        List<Category> categories;
+        String typeKey = (type == null) ? "ALL" : type.name();
+        String redisKey = "categories:" + userId + ":" + typeKey;
 
+        // 1. Kiểm tra Redis trước (Cache Hit)
+        try {
+            String cachedData = redisTemplate.opsForValue().get(redisKey);
+            if (cachedData != null) {
+                log.info("Lấy danh mục từ Redis siêu tốc cho user: {}", userId);
+                return objectMapper.readValue(cachedData, new TypeReference<List<CategoryResponse>>() {});
+            }
+        } catch (Exception e) {
+            log.warn("Lỗi đọc Redis, sẽ query DB: {}", e.getMessage());
+        }
+
+        // 2. Nếu Redis KHÔNG CÓ (Cache Miss), mới chạy xuống DB
+        log.info("Lấy danh mục từ Database cho user: {}", userId);
+        List<Category> categories;
         if (type == null) {
             categories = categoryRepository.findAllRootCategories(userId);
         } else {
             categories = categoryRepository.findAllRootCategoriesByType(userId, type);
         }
 
-        return categories.stream()
+        List<CategoryResponse> responses = categories.stream()
                 .map(categoryMapper::toCategoryResponse)
                 .collect(Collectors.toList());
+
+        // 3. Cất vào Redis để lần sau xài (Lưu 24 tiếng)
+        try {
+            redisTemplate.opsForValue().set(redisKey, objectMapper.writeValueAsString(responses), 24, TimeUnit.HOURS);
+        } catch (Exception e) {
+            log.warn("Không thể lưu cache vào Redis: {}", e.getMessage());
+        }
+
+        return responses;
     }
 
     public CategoryResponse update(String id, CategoryCreationRequest request) {
@@ -126,6 +168,8 @@ public class CategoryService {
             category.setParent(null);
         }
 
+        clearCategoryCache(userId);
+
         return categoryMapper.toCategoryResponse(categoryRepository.save(category));
     }
 
@@ -153,6 +197,7 @@ public class CategoryService {
         // 3. Xóa mềm tất cả DANH MỤC (Logic cũ)
         softDeleteCategoryRecursive(category);
         categoryRepository.save(category);
+        clearCategoryCache(userId);
     }
 
     // Hàm đệ quy lấy ID
@@ -179,5 +224,15 @@ public class CategoryService {
                 softDeleteCategoryRecursive(child);
             }
         }
+    }
+
+    // Xoá toàn bộ cache danh mục của 1 User
+    private void clearCategoryCache(String userId) {
+        redisTemplate.delete(Arrays.asList(
+                "categories:" + userId + ":ALL",
+                "categories:" + userId + ":INCOME",
+                "categories:" + userId + ":EXPENSE"
+        ));
+        log.info("Đã xóa cache Category của user: {}", userId);
     }
 }

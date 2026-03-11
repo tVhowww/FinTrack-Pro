@@ -34,10 +34,11 @@ public class BudgetController {
     public ApiResponse<List<BudgetResponse>> getBudgets(
             @RequestParam(required = false) String walletId,
             @RequestParam int month,
-            @RequestParam int year
+            @RequestParam int year,
+            @RequestParam(required = false) String keyword
     ) {
         return ApiResponse.<List<BudgetResponse>>builder()
-                .result(budgetService.getBudgets(walletId, month, year))
+                .result(budgetService.getBudgets(walletId, month, year, keyword))
                 .build();
     }
 

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FinTrack Notification</title>
+    <style>
+        body { font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f1f5f9; margin: 0; padding: 0; }
+        .wrapper { width: 100%; table-layout: fixed; background-color: #f1f5f9; padding-bottom: 40px; }
+        .main-content { background-color: #ffffff; max-width: 600px; margin: 40px auto; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
+        .header { background-color: #2563eb; color: #ffffff; padding: 24px; text-align: center; }
+        .header h1 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: 1px; }
+        .body-content { padding: 32px; color: #334155; font-size: 16px; line-height: 1.6; }
+        .footer { background-color: #f8fafc; padding: 20px; text-align: center; font-size: 13px; color: #64748b; border-top: 1px solid #e2e8f0; }
+        .footer p { margin: 5px 0; }
+        .highlight { color: #2563eb; font-weight: bold; }
+    </style>
+</head>
+<body>
+<div class="wrapper">
+    <div class="main-content">
+        <div class="header">
+            <h1>FinTrack</h1>
+        </div>
+
+        <div class="body-content" th:utext="${bodyContent}">
+        </div>
+
+        <div class="footer">
+            <p>&copy; 2026 FinTrack App. All rights reserved.</p>
+            <p>Đây là email tự động từ hệ thống, vui lòng không trả lời lại (Do not reply).</p>
+        </div>
+    </div>
+</div>
+</body>
+</html>

@@ -45,6 +45,9 @@ public class Budget {
     @Column(nullable = false)
     private Integer year;
 
+    @Column(name = "currency")
+    private String currency;
+
     @CreatedDate
     @Column(updatable = false)
     private Instant createdAt;

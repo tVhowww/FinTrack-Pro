@@ -3,6 +3,7 @@ package com.fintrack.transaction_service.service;
 import com.fintrack.transaction_service.dto.event.NotificationEvent;
 import com.fintrack.transaction_service.dto.request.TransactionCreationRequest;
 import com.fintrack.transaction_service.dto.request.TransactionUpdateRequest;
+import com.fintrack.transaction_service.dto.request.TransferRequest;
 import com.fintrack.transaction_service.dto.request.WalletBalanceUpdateRequest;
 import com.fintrack.transaction_service.dto.response.*;
 import com.fintrack.transaction_service.entity.Category;
@@ -25,6 +26,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -37,10 +39,8 @@ import java.text.NumberFormat;
 import java.time.Instant;
 import java.time.YearMonth;
 import java.time.ZoneId;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Locale;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 @Service
 @RequiredArgsConstructor
@@ -52,22 +52,76 @@ public class TransactionService {
     private final WalletClient walletClient;
     private final IdentityClient identityClient;
     private final KafkaTemplate<String, Object> kafkaTemplate;
+    private final CurrencyConverterService currencyConverterService;
+    private final StringRedisTemplate redisTemplate;
+    private final BudgetAlertEngine budgetAlertEngine;
+
 
     public long countTransactionsByWallet(String walletId) {
         return transactionRepository.countByWalletId(walletId);
+    }
+
+    // Thêm hàm này vào TransactionService.java
+    public BigDecimal getTotalBalance() {
+        // 1. Lấy đồng tiền cơ sở của User
+        String baseCurrency = getUserBaseCurrency();
+        BigDecimal totalBalance = BigDecimal.ZERO;
+
+        try {
+            // 2. Lấy danh sách ví từ Wallet Service
+            var response = walletClient.getMyWallets();
+            if (response != null && response.getResult() != null) {
+                for (var wallet : response.getResult()) {
+                    // 3. Quy đổi số dư từng ví ra đồng tiền cơ sở
+                    BigDecimal converted = currencyConverterService.convertCurrency(
+                            wallet.getBalance(),
+                            wallet.getCurrency(),
+                            baseCurrency
+                    );
+                    totalBalance = totalBalance.add(converted);
+                }
+            }
+        } catch (Exception e) {
+            log.error("Lỗi khi lấy danh sách ví để tính tổng số dư: {}", e.getMessage());
+        }
+
+        return totalBalance;
     }
 
     public List<TransactionResponse> getHighestExpenses(String walletId, int month, int year) {
         List<String> walletIds = resolveWalletIds(walletId);
         if (walletIds.isEmpty()) return new ArrayList<>();
 
+        // 1. Chuẩn bị công cụ quy đổi
+        String baseCurrency = getUserBaseCurrency();
+        Map<String, String> walletCurrencyMap = getWalletCurrencyMap();
+
         YearMonth yearMonth = YearMonth.of(year, month);
         Instant start = yearMonth.atDay(1).atStartOfDay(ZoneId.systemDefault()).toInstant();
         Instant end = yearMonth.atEndOfMonth().atTime(23, 59, 59).atZone(ZoneId.systemDefault()).toInstant();
 
-        List<Transaction> transactions = transactionRepository.findHighestExpensesByWalletIds(walletIds, start, end);
+        // 2. Lấy TẤT CẢ giao dịch CHI TIÊU trong tháng
+        Specification<Transaction> spec = Specification.where(TransactionSpecification.hasWalletIdIn(walletIds))
+                .and(TransactionSpecification.hasType(TransactionType.EXPENSE))
+                .and(TransactionSpecification.createdBetween(start, end));
 
+        List<Transaction> transactions = transactionRepository.findAll(spec);
+
+        // 3. Xếp hạng bằng Java (Dựa trên số tiền sau khi đã quy đổi)
         return transactions.stream()
+                .sorted((t1, t2) -> {
+                    // Dò tiền tệ của từng giao dịch
+                    String c1 = walletCurrencyMap.getOrDefault(t1.getWalletId(), "VND");
+                    String c2 = walletCurrencyMap.getOrDefault(t2.getWalletId(), "VND");
+
+                    // Quy đổi ra Base Currency để so sánh công bằng
+                    BigDecimal conv1 = currencyConverterService.convertCurrency(t1.getAmount().abs(), c1, baseCurrency);
+                    BigDecimal conv2 = currencyConverterService.convertCurrency(t2.getAmount().abs(), c2, baseCurrency);
+
+                    // Sắp xếp giảm dần (thằng nào tiêu nhiều tiền quy đổi hơn thì đứng trên)
+                    return conv2.compareTo(conv1);
+                })
+                .limit(5) // Chỉ lấy Top 5
                 .map(transactionMapper::toTransactionResponse)
                 .toList();
     }
@@ -77,8 +131,10 @@ public class TransactionService {
      */
     public List<BalanceTrendResponse> getBalanceTrend(String walletId) {
         List<String> walletIds = resolveWalletIds(walletId);
-        if (walletIds.isEmpty()) return new ArrayList<>(); // User mới -> Trả về mảng rỗng
+        if (walletIds.isEmpty()) return new ArrayList<>();
 
+        String baseCurrency = getUserBaseCurrency();
+        java.util.Map<String, String> walletCurrencyMap = getWalletCurrencyMap();
         List<BalanceTrendResponse> trends = new ArrayList<>();
         YearMonth currentMonth = YearMonth.now();
 
@@ -87,24 +143,30 @@ public class TransactionService {
             Instant start = targetMonth.atDay(1).atStartOfDay(ZoneId.systemDefault()).toInstant();
             Instant end = targetMonth.atEndOfMonth().atTime(23, 59, 59).atZone(ZoneId.systemDefault()).toInstant();
 
-            BigDecimal income = transactionRepository.sumAmountByWalletIdInAndTypeAndDate(
-                    walletIds, TransactionType.INCOME, start, end
-            );
-            if (income == null) income = BigDecimal.ZERO;
+            Specification<Transaction> spec = Specification.where(TransactionSpecification.hasWalletIdIn(walletIds))
+                    .and(TransactionSpecification.createdBetween(start, end));
+            List<Transaction> transactions = transactionRepository.findAll(spec);
 
-            BigDecimal expenseRaw = transactionRepository.sumAmountByWalletIdInAndTypeAndDate(
-                    walletIds, TransactionType.EXPENSE, start, end
-            );
-            if (expenseRaw == null) expenseRaw = BigDecimal.ZERO;
+            BigDecimal mIncome = BigDecimal.ZERO;
+            BigDecimal mExpense = BigDecimal.ZERO;
 
-            BigDecimal expense = expenseRaw.abs();
+            for (Transaction tx : transactions) {
+                String txCurrency = walletCurrencyMap.getOrDefault(tx.getWalletId(), "VND");
+                BigDecimal converted = currencyConverterService.convertCurrency(tx.getAmount().abs(), txCurrency, baseCurrency);
+
+                if (tx.getType() == TransactionType.INCOME) {
+                    mIncome = mIncome.add(converted);
+                } else if (tx.getType() == TransactionType.EXPENSE) {
+                    mExpense = mExpense.add(converted);
+                }
+            }
 
             trends.add(BalanceTrendResponse.builder()
                     .month(targetMonth.getMonthValue())
                     .year(targetMonth.getYear())
-                    .income(income)
-                    .expense(expense)
-                    .netSavings(income.subtract(expense))
+                    .income(mIncome)
+                    .expense(mExpense)
+                    .netSavings(mIncome.subtract(mExpense))
                     .build());
         }
         return trends;
@@ -117,26 +179,43 @@ public class TransactionService {
         List<String> walletIds = resolveWalletIds(walletId);
         if (walletIds.isEmpty()) return new ArrayList<>();
 
+        String baseCurrency = getUserBaseCurrency();
+        java.util.Map<String, String> walletCurrencyMap = getWalletCurrencyMap();
+
         YearMonth yearMonth = YearMonth.of(year, month);
         Instant start = yearMonth.atDay(1).atStartOfDay(ZoneId.systemDefault()).toInstant();
         Instant end = yearMonth.atEndOfMonth().atTime(23, 59, 59).atZone(ZoneId.systemDefault()).toInstant();
 
-        List<Object[]> rawData = transactionRepository.findExpenseStructureByWalletIds(walletIds, start, end);
+        // Chỉ lấy giao dịch CHI TIÊU
+        Specification<Transaction> spec = Specification.where(TransactionSpecification.hasWalletIdIn(walletIds))
+                .and(TransactionSpecification.hasType(TransactionType.EXPENSE))
+                .and(TransactionSpecification.createdBetween(start, end));
 
-        BigDecimal totalExpense = rawData.stream()
-                .map(obj -> (BigDecimal) obj[1])
-                .reduce(BigDecimal.ZERO, BigDecimal::add)
-                .abs();
+        List<Transaction> transactions = transactionRepository.findAll(spec);
+
+        // Map để gom nhóm số tiền theo CategoryId
+        java.util.Map<Category, BigDecimal> categorySums = new java.util.HashMap<>();
+        BigDecimal totalConvertedExpense = BigDecimal.ZERO;
+
+        for (Transaction tx : transactions) {
+            String txCurrency = walletCurrencyMap.getOrDefault(tx.getWalletId(), "VND");
+            BigDecimal converted = currencyConverterService.convertCurrency(tx.getAmount().abs(), txCurrency, baseCurrency);
+
+            totalConvertedExpense = totalConvertedExpense.add(converted);
+
+            // Gom nhóm
+            Category cat = tx.getCategory();
+            categorySums.put(cat, categorySums.getOrDefault(cat, BigDecimal.ZERO).add(converted));
+        }
 
         List<ExpenseStructureResponse> result = new ArrayList<>();
-        for (Object[] row : rawData) {
-            Category category = (Category) row[0];
-            BigDecimal amountRaw = (BigDecimal) row[1];
-            BigDecimal amount = amountRaw.abs();
+        for (java.util.Map.Entry<Category, BigDecimal> entry : categorySums.entrySet()) {
+            Category category = entry.getKey();
+            BigDecimal amount = entry.getValue();
 
             double percentage = 0;
-            if (totalExpense.compareTo(BigDecimal.ZERO) > 0) {
-                percentage = amount.divide(totalExpense, 4, RoundingMode.HALF_UP).doubleValue() * 100;
+            if (totalConvertedExpense.compareTo(BigDecimal.ZERO) > 0) {
+                percentage = amount.divide(totalConvertedExpense, 4, RoundingMode.HALF_UP).doubleValue() * 100;
             }
 
             result.add(ExpenseStructureResponse.builder()
@@ -146,6 +225,7 @@ public class TransactionService {
                     .percentage(percentage)
                     .build());
         }
+
         result.sort((a, b) -> b.getAmount().compareTo(a.getAmount()));
         return result;
     }
@@ -174,18 +254,25 @@ public class TransactionService {
         // LẤY INFO TRƯỚC KHI XUỐNG ASYNC
         String recipientEmail = null;
         String username = "Người dùng";
+        String currency = "VND";
+
         try {
             var userResponse = identityClient.getMyInfo();
             if (userResponse != null && userResponse.getResult() != null) {
                 recipientEmail = userResponse.getResult().getEmail();
                 username = userResponse.getResult().getUsername();
             }
+
+            var walletResponse = walletClient.getWallet(request.getWalletId());
+            if (walletResponse != null && walletResponse.getResult() != null) {
+                currency = walletResponse.getResult().getCurrency();
+            }
         } catch (Exception e) {
             log.error("Lỗi lấy thông tin user để gửi email: {}", e.getMessage());
         }
 
         // 3. Gửi thông báo ASYNC (Truyền thêm Email và Tên)
-        sendTransactionNotification(transaction, category, recipientEmail, username);
+        sendTransactionNotification(transaction, category, recipientEmail, username, currency);
     }
 
     /**
@@ -208,69 +295,77 @@ public class TransactionService {
     }
 
     public ByteArrayInputStream exportToExcel(String walletId, TransactionType type, Instant startDate, Instant endDate) {
-        validateWalletOwnership(walletId);
+        // 1. Dùng helper để gom danh sách ví (Tự động xử lý vụ "Tất cả ví" hoặc "1 ví cụ thể")
+        List<String> walletIds = resolveWalletIds(walletId);
 
-        // 1. Tạo bộ lọc (giống hệt hàm getTransactions nhưng không phân trang)
-        Specification<Transaction> spec = Specification.where(TransactionSpecification.hasWalletId(walletId))
+        if (walletIds.isEmpty()) {
+            return ExcelHelper.transactionsToExcel(Collections.emptyList()); // Trả về file rỗng nếu không có ví
+        }
+
+        // 2. Tạo bộ lọc: Thay hasWalletId bằng hasWalletIdIn
+        Specification<Transaction> spec = Specification.where(TransactionSpecification.hasWalletIdIn(walletIds))
                 .and(TransactionSpecification.hasType(type))
                 .and(TransactionSpecification.createdBetween(startDate, endDate));
 
-        // 2. Lấy toàn bộ dữ liệu (không phân trang - findAll(spec))
-        // Lưu ý: Cần sort theo ngày giảm dần cho đẹp
+        // 3. Lấy toàn bộ dữ liệu & sort
         List<Transaction> transactions = transactionRepository.findAll(spec, Sort.by("date").descending());
 
-        // 3. Gọi Helper để tạo file
+        // 4. Gọi Helper để tạo file
         return ExcelHelper.transactionsToExcel(transactions);
     }
 
     public MonthlyStatisticsResponse getMonthlyStatistics(String walletId, int month, int year) {
-        // 1. Xác định danh sách ví được phép xem
         List<String> walletIds = resolveWalletIds(walletId);
-
-        // 2. Nếu không có ví nào (Tài khoản mới) -> Trả về 0 hết ngay lập tức
         if (walletIds.isEmpty()) {
             return MonthlyStatisticsResponse.builder()
                     .month(month).year(year)
-                    .totalIncome(BigDecimal.ZERO)
-                    .totalExpense(BigDecimal.ZERO)
-                    .netSavings(BigDecimal.ZERO)
-                    .build();
+                    .totalIncome(BigDecimal.ZERO).totalExpense(BigDecimal.ZERO).netSavings(BigDecimal.ZERO).build();
         }
 
-        // 3. Tính toán thời gian
+        // 1. Chuẩn bị dữ liệu quy đổi
+        String baseCurrency = getUserBaseCurrency();
+        java.util.Map<String, String> walletCurrencyMap = getWalletCurrencyMap();
+
         YearMonth yearMonth = YearMonth.of(year, month);
         Instant start = yearMonth.atDay(1).atStartOfDay(ZoneId.systemDefault()).toInstant();
         Instant end = yearMonth.atEndOfMonth().atTime(23, 59, 59).atZone(ZoneId.systemDefault()).toInstant();
 
-        // 4. Query DB với danh sách ID (Dùng hàm mới có chữ "In")
-        BigDecimal totalIncome = transactionRepository.sumAmountByWalletIdInAndTypeAndDate(
-                walletIds, TransactionType.INCOME, start, end
-        );
+        // 2. Lấy toàn bộ giao dịch trong tháng của các ví này
+        Specification<Transaction> spec = Specification.where(TransactionSpecification.hasWalletIdIn(walletIds))
+                .and(TransactionSpecification.createdBetween(start, end));
+        List<Transaction> transactions = transactionRepository.findAll(spec);
 
-        BigDecimal totalExpenseRaw = transactionRepository.sumAmountByWalletIdInAndTypeAndDate(
-                walletIds, TransactionType.EXPENSE, start, end
-        );
+        // 3. Tính toán trên RAM (Java)
+        BigDecimal totalIncome = BigDecimal.ZERO;
+        BigDecimal totalExpense = BigDecimal.ZERO;
 
-        // Xử lý null
-        if (totalIncome == null) totalIncome = BigDecimal.ZERO;
-        if (totalExpenseRaw == null) totalExpenseRaw = BigDecimal.ZERO;
+        for (Transaction tx : transactions) {
+            // Xác định đồng tiền của cái ví chứa giao dịch này
+            String txCurrency = walletCurrencyMap.getOrDefault(tx.getWalletId(), "VND");
 
-        BigDecimal totalExpense = totalExpenseRaw.abs();
-        BigDecimal netSavings = totalIncome.subtract(totalExpense);
+            // QUY ĐỔI TIỀN TỆ
+            BigDecimal convertedAmount = currencyConverterService.convertCurrency(
+                    tx.getAmount().abs(), txCurrency, baseCurrency);
+
+            if (tx.getType() == TransactionType.INCOME) {
+                totalIncome = totalIncome.add(convertedAmount);
+            } else if (tx.getType() == TransactionType.EXPENSE) {
+                totalExpense = totalExpense.add(convertedAmount);
+            }
+        }
 
         return MonthlyStatisticsResponse.builder()
-                .month(month)
-                .year(year)
+                .month(month).year(year)
                 .totalIncome(totalIncome)
                 .totalExpense(totalExpense)
-                .netSavings(netSavings)
+                .netSavings(totalIncome.subtract(totalExpense))
                 .build();
     }
 
     public PageResponse<TransactionResponse> getTransactions(
             int page, int size,
             String walletId, TransactionType type,
-            Instant startDate, Instant endDate, String categoryId) {
+            Instant startDate, Instant endDate, String categoryId, String keyword) {
 
         // Lấy UserID hiện tại
         String currentUserId = SecurityUtils.getCurrentUserId();
@@ -279,7 +374,7 @@ public class TransactionService {
         // LOGIC MỚI: Xử lý Wallet ID
         if (walletId != null && !walletId.trim().isEmpty() && !"undefined".equals(walletId)) {
             // Trường hợp 1: Có chọn ví cụ thể -> Check quyền sở hữu ví đó
-            validateWalletOwnership(walletId);
+            validateAndGetWallet(walletId);
             walletIdsToQuery.add(walletId);
         } else {
             // Trường hợp 2: Không chọn ví (Xem tất cả) -> Lấy danh sách ví của User này
@@ -315,7 +410,8 @@ public class TransactionService {
         Specification<Transaction> spec = Specification.where(TransactionSpecification.hasWalletIdIn(walletIdsToQuery))
                 .and(TransactionSpecification.hasType(type))
                 .and(TransactionSpecification.createdBetween(startDate, endDate))
-                .and(TransactionSpecification.hasCategoryIn(categoryIdsToFilter));
+                .and(TransactionSpecification.hasCategoryIn(categoryIdsToFilter))
+                .and(TransactionSpecification.hasKeyword(keyword));
 
         Page<Transaction> pageData = transactionRepository.findAll(spec, pageable);
 
@@ -342,16 +438,16 @@ public class TransactionService {
                 .orElseThrow(() -> new AppException(ErrorCode.TRANSACTION_NOT_FOUND));
 
         // Kiểm tra quyền sở hữu wallet của transaction này
-        validateWalletOwnership(transaction.getWalletId());
+        validateAndGetWallet(transaction.getWalletId());
 
         return transactionMapper.toTransactionResponse(transaction);
     }
 
 
-    private void validateWalletOwnership(String walletId) {
-        // Nếu null hoặc rỗng thì bỏ qua (để hàm gọi bên ngoài tự xử lý logic "All Wallets")
+    // Đổi kiểu trả về từ void -> WalletResponse
+    private WalletResponse validateAndGetWallet(String walletId) {
         if (walletId == null || walletId.trim().isEmpty() || "undefined".equals(walletId)) {
-            return;
+            return null;
         }
 
         String currentUserId = SecurityUtils.getCurrentUserId();
@@ -362,15 +458,12 @@ public class TransactionService {
                 throw new AppException(ErrorCode.WALLET_NOT_FOUND);
             }
 
-            // Debug log: In ra để kiểm tra xem userId có bị null không
-            log.info("Check wallet {} owner: {} vs current user: {}",
-                    walletId, response.getResult().getUserId(), currentUserId);
-
             if (!currentUserId.equals(response.getResult().getUserId())) {
                 throw new AppException(ErrorCode.UNAUTHORIZED);
             }
+
+            return response.getResult(); // Trả về ví để xài luôn
         } catch (Exception e) {
-            // Nếu Wallet Service báo lỗi 404 hoặc 500
             log.error("Lỗi xác thực ví: {}", e.getMessage());
             throw new AppException(ErrorCode.WALLET_NOT_FOUND);
         }
@@ -379,7 +472,7 @@ public class TransactionService {
     private List<String> resolveWalletIds(String walletId) {
         if (walletId != null && !walletId.trim().isEmpty() && !"undefined".equals(walletId)) {
             // Case 1: Người dùng chọn 1 ví cụ thể
-            validateWalletOwnership(walletId); // Check xem ví này có phải của nó không
+            validateAndGetWallet(walletId); // Check xem ví này có phải của nó không
             return List.of(walletId);
         } else {
             // Case 2: Xem tổng quan (Không gửi ID)
@@ -408,7 +501,7 @@ public class TransactionService {
         Transaction transaction = transactionRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.TRANSACTION_NOT_FOUND));
 
-        validateWalletOwnership(transaction.getWalletId());
+        WalletResponse wallet = validateAndGetWallet(transaction.getWalletId());
 
         // 1. HOÀN TÁC SỐ DƯ CŨ TRÊN VÍ (Revert Old Balance)
         // Nếu là EXPENSE (Chi): Cũ là -100k -> Giờ phải +100k để bù lại
@@ -423,12 +516,16 @@ public class TransactionService {
         walletClient.updateBalance(transaction.getWalletId(),
                 WalletBalanceUpdateRequest.builder().amount(revertAmount).build());
 
-        // 2. CẬP NHẬT THÔNG TIN MỚI
-        if (request.getCategoryId() != null) {
+        if (wallet != null && "SAVING".equals(wallet.getType())) {
+            String sysCatName = (transaction.getType() == TransactionType.INCOME) ? "Nạp tiền tích lũy" : "Rút tiền tích lũy";
+            transaction.setCategory(getOrCreateSystemCategory(sysCatName, transaction.getType()));
+        }
+        else if (request.getCategoryId() != null) {
             Category category = categoryRepository.findById(request.getCategoryId())
                     .orElseThrow(() -> new AppException(ErrorCode.CATEGORY_NOT_FOUND));
             transaction.setCategory(category);
         }
+
         if (request.getAmount() != null) transaction.setAmount(request.getAmount());
         if (request.getNote() != null) transaction.setNote(request.getNote());
         if (request.getDate() != null) transaction.setDate(request.getDate());
@@ -445,6 +542,21 @@ public class TransactionService {
         walletClient.updateBalance(transaction.getWalletId(),
                 WalletBalanceUpdateRequest.builder().amount(newUpdateAmount).build());
 
+        String recipientEmail = null;
+        String username = "Người dùng";
+
+        try {
+            var userResponse = identityClient.getMyInfo();
+            if (userResponse != null && userResponse.getResult() != null) {
+                recipientEmail = userResponse.getResult().getEmail();
+                username = userResponse.getResult().getUsername();
+            }
+        } catch (Exception e) {
+            log.error("Lỗi lấy thông tin user để gửi email: {}", e.getMessage());
+        }
+
+        budgetAlertEngine.checkAndAlert(transaction, recipientEmail, username);
+
         return transactionMapper.toTransactionResponse(transaction);
     }
 
@@ -453,7 +565,7 @@ public class TransactionService {
         Transaction transaction = transactionRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.TRANSACTION_NOT_FOUND));
 
-        validateWalletOwnership(transaction.getWalletId());
+        validateAndGetWallet(transaction.getWalletId());
 
         // 1. HOÀN TÁC SỐ DƯ (Trả lại tiền cho ví trước khi xóa)
         BigDecimal revertAmount = transaction.getAmount();
@@ -473,10 +585,75 @@ public class TransactionService {
 
     @Transactional
     public TransactionResponse create(TransactionCreationRequest request) {
-        validateWalletOwnership(request.getWalletId());
+        String currentUserId = SecurityUtils.getCurrentUserId();
+        String lockKey = "lock:create_transaction:" + currentUserId;
+        Boolean acquired = redisTemplate.opsForValue().setIfAbsent(lockKey, "LOCKED", 3, TimeUnit.SECONDS);
+
+        if (Boolean.FALSE.equals(acquired)) {
+            log.warn("Phát hiện Double-Click từ User {}. Giao dịch đang bị từ chối.", currentUserId);
+            throw new AppException(ErrorCode.REQUEST_PROCESSING);
+        }
+
+        return createInternal(request); // Chuyển xuống hàm lõi
+    }
+
+    @Transactional
+    public void transfer(TransferRequest request) {
+        String currentUserId = SecurityUtils.getCurrentUserId();
+        String lockKey = "lock:transfer_transaction:" + currentUserId;
+        Boolean acquired = redisTemplate.opsForValue().setIfAbsent(lockKey, "LOCKED", 3, TimeUnit.SECONDS);
+
+        if (Boolean.FALSE.equals(acquired)) {
+            log.warn("Phát hiện Double-Click chuyển tiền từ User {}", currentUserId);
+            throw new AppException(ErrorCode.REQUEST_PROCESSING);
+        }
+
+        // Validate trước 2 ví xem có quyền sở hữu không
+        WalletResponse fromWallet = validateAndGetWallet(request.getFromWalletId());
+        WalletResponse toWallet = validateAndGetWallet(request.getToWalletId());
+
+        Instant transactionDate = request.getDate() != null ? request.getDate() : Instant.now();
+
+        Category transferOutCategory = getOrCreateSystemCategory("Chuyển tiền đi", TransactionType.EXPENSE);
+        Category transferInCategory = getOrCreateSystemCategory("Nhận tiền đến", TransactionType.INCOME);
+
+        // Phát súng 1: TRỪ TIỀN VÍ NGUỒN
+        TransactionCreationRequest expenseReq = TransactionCreationRequest.builder()
+                .amount(request.getAmount())
+                .type(TransactionType.EXPENSE)
+                .walletId(request.getFromWalletId())
+                .date(transactionDate)
+                .note(request.getNote() != null && !request.getNote().isEmpty() ? request.getNote() : "Chuyển tiền sang ví " + toWallet.getName())
+                .categoryId(transferOutCategory.getId())
+                .build();
+        createInternal(expenseReq); // Dùng hàm lõi để KHÔNG bị vướng Redis Lock
+
+        // Phát súng 2: CỘNG TIỀN VÍ ĐÍCH
+        TransactionCreationRequest incomeReq = TransactionCreationRequest.builder()
+                .amount(request.getAmount())
+                .type(TransactionType.INCOME)
+                .walletId(request.getToWalletId())
+                .date(transactionDate)
+                .note("Nhận tiền từ quỹ " + fromWallet.getName())
+                .categoryId(transferInCategory.getId())
+                .build();
+        createInternal(incomeReq);
+    }
+
+    // LÕI XỬ LÝ (KHÔNG CÓ REDIS LOCK ĐỂ TÁI SỬ DỤNG)
+    private TransactionResponse createInternal(TransactionCreationRequest request) {
+        WalletResponse wallet = validateAndGetWallet(request.getWalletId());
 
         Category category = null;
-        if (request.getCategoryId() != null) {
+
+        if (wallet != null && "SAVING".equals(wallet.getType())) {
+            String sysCatName = (request.getType() == TransactionType.INCOME) ? "Nạp tiền tích lũy" : "Rút tiền tích lũy";
+            category = getOrCreateSystemCategory(sysCatName, request.getType());
+            if (request.getNote() == null || request.getNote().trim().isEmpty()) {
+                request.setNote(sysCatName);
+            }
+        }
+        else if (request.getCategoryId() != null) {
             category = categoryRepository.findById(request.getCategoryId())
                     .orElseThrow(() -> new AppException(ErrorCode.CATEGORY_NOT_FOUND));
         }
@@ -494,23 +671,32 @@ public class TransactionService {
                 .amount(updateAmount)
                 .build();
 
+        // GỌI SANG WALLET SERVICE (Nếu đứt mạng khúc này, @Transactional sẽ rollback DB ở trên)
         walletClient.updateBalance(request.getWalletId(), balanceRequest);
 
         // LẤY INFO TRƯỚC KHI XUỐNG ASYNC
         String recipientEmail = null;
         String username = "Người dùng";
+        String currency = "VND";
+
         try {
             var userResponse = identityClient.getMyInfo();
             if (userResponse != null && userResponse.getResult() != null) {
                 recipientEmail = userResponse.getResult().getEmail();
                 username = userResponse.getResult().getUsername();
             }
+
+            if (wallet != null) {
+                currency = wallet.getCurrency();
+            }
         } catch (Exception e) {
             log.error("Lỗi lấy thông tin user để gửi email: {}", e.getMessage());
         }
 
-        // 4. Gửi Notification qua Kafka (Truyền thêm Email và Tên)
-        sendTransactionNotification(transaction, category, recipientEmail, username);
+        // 4. Gửi Notification qua Kafka (ASYNC)
+        sendTransactionNotification(transaction, category, recipientEmail, username, currency);
+
+        budgetAlertEngine.checkAndAlert(transaction, recipientEmail, username);
 
         return transactionMapper.toTransactionResponse(transaction);
     }
@@ -520,24 +706,29 @@ public class TransactionService {
      * Nếu lỗi sẽ không ảnh hưởng đến giao dịch chính
      */
     @Async
-    public void sendTransactionNotification(Transaction transaction, Category category, String recipientEmail, String username) { // 👇 ĐÃ THÊM THAM SỐ
+    public void sendTransactionNotification(Transaction transaction, Category category, String recipientEmail, String username, String currency) {
         try {
             if (recipientEmail == null || recipientEmail.isEmpty()) {
                 log.warn("User không có email, bỏ qua gửi thông báo cho transaction: {}", transaction.getId());
                 return;
             }
 
-            NumberFormat formatter = NumberFormat.getInstance(Locale.of("vi", "VN"));
+            // Dùng US Locale làm chuẩn để format số (ví dụ: 1,000,000.50)
+            // Nếu muốn format linh hoạt theo loại tiền thì dùng java.util.Currency
+            NumberFormat formatter = NumberFormat.getInstance(Locale.US);
             String formattedNumber = formatter.format(transaction.getAmount().abs());
+
+            // Đảm bảo fallback nếu currency bị null
+            String finalCurrency = (currency != null && !currency.isEmpty()) ? currency : "VND";
 
             String amountString;
             String actionString;
 
             if (transaction.getType() == TransactionType.EXPENSE) {
-                amountString = "-" + formattedNumber + " VND";
+                amountString = "-" + formattedNumber + " " + finalCurrency;
                 actionString = "thanh toán cho";
             } else {
-                amountString = "+" + formattedNumber + " VND";
+                amountString = "+" + formattedNumber + " " + finalCurrency;
                 actionString = "nhận tiền từ";
             }
 
@@ -572,5 +763,34 @@ public class TransactionService {
             log.error("Lỗi khi gửi Kafka Notification cho transaction {}: {}",
                     transaction.getId(), e.getMessage(), e);
         }
+    }
+
+    // Lấy đồng tiền cơ sở của User (nếu không có mặc định là VND)
+    private String getUserBaseCurrency() {
+        try {
+            var userResponse = identityClient.getMyInfo();
+            if (userResponse != null && userResponse.getResult() != null && userResponse.getResult().getBaseCurrency() != null) {
+                return userResponse.getResult().getBaseCurrency();
+            }
+        } catch (Exception e) {
+            log.error("Không lấy được Base Currency của User, dùng mặc định VND", e);
+        }
+        return "VND";
+    }
+
+    // Lấy Map chứa WalletId -> Currency (Ví dụ: "wallet-1" -> "USD")
+    private java.util.Map<String, String> getWalletCurrencyMap() {
+        java.util.Map<String, String> map = new java.util.HashMap<>();
+        try {
+            var response = walletClient.getMyWallets();
+            if (response != null && response.getResult() != null) {
+                for (var w : response.getResult()) {
+                    map.put(w.getId(), w.getCurrency());
+                }
+            }
+        } catch (Exception e) {
+            log.error("Lỗi lấy danh sách ví để map tiền tệ: {}", e.getMessage());
+        }
+        return map;
     }
 }

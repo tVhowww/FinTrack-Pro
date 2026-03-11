@@ -40,6 +40,17 @@ spring:
       circuitbreaker:
         enabled: true
 
+  ai:
+    google:
+      genai:
+        api-key: ${GEMINI_API_KEY}
+        chat:
+          options:
+            # Dùng bản Flash cho tốc độ siêu nhanh và rẻ (chuyên đọc ảnh)
+            model: gemini-2.5-flash
+            # Nhiệt độ (0.0 đến 1.0) -> Set 0.2 để AI trả lời chuẩn xác logic JSON, không sáng tạo chém gió
+            temperature: 0.2
+
 # Cau hinh Eureka Client
 eureka:
   client:
@@ -62,3 +73,6 @@ jwt:
 
 app:
   internal-secret: ${INTERNAL_SECRET}
+  exchange-rate:
+    url: https://open.er-api.com/v6
+    # Đã xóa dòng api-key cho nhẹ nợ

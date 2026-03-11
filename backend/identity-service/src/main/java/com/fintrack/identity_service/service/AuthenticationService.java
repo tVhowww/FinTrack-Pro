@@ -1,17 +1,17 @@
 package com.fintrack.identity_service.service;
 
-import com.fintrack.identity_service.dto.request.AuthenticationRequest;
-import com.fintrack.identity_service.dto.request.IntrospectRequest;
-import com.fintrack.identity_service.dto.request.LogoutRequest;
-import com.fintrack.identity_service.dto.request.RefreshTokenRequest;
+import com.fintrack.identity_service.dto.event.NotificationEvent;
+import com.fintrack.identity_service.dto.request.*;
 import com.fintrack.identity_service.dto.response.AuthenticationResponse;
 import com.fintrack.identity_service.dto.response.IntrospectResponse;
-import com.fintrack.identity_service.entity.InvalidatedToken;
 import com.fintrack.identity_service.entity.User;
 import com.fintrack.identity_service.exception.AppException;
 import com.fintrack.identity_service.exception.ErrorCode;
-import com.fintrack.identity_service.repository.InvalidatedTokenRepository;
 import com.fintrack.identity_service.repository.UserRepository;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
+import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.json.gson.GsonFactory;
 import com.nimbusds.jose.*;
 import com.nimbusds.jose.crypto.MACSigner;
 import com.nimbusds.jose.crypto.MACVerifier;
@@ -21,6 +21,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.NonFinal;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,9 +31,8 @@ import org.springframework.util.CollectionUtils;
 import java.text.ParseException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.Date;
-import java.util.StringJoiner;
-import java.util.UUID;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 @Service
 @RequiredArgsConstructor
@@ -39,11 +40,99 @@ import java.util.UUID;
 public class AuthenticationService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-    private final InvalidatedTokenRepository invalidatedTokenRepository;
+    private final StringRedisTemplate redisTemplate;
+    private final KafkaTemplate<String, Object> kafkaTemplate;
 
     @NonFinal
     @Value("${jwt.signerKey}")
     protected String SIGNER_KEY;
+
+    @NonFinal
+    @Value("${google.client-id:YOUR_GOOGLE_CLIENT_ID_HERE}")
+    protected String GOOGLE_CLIENT_ID;
+
+    @Transactional
+    public void forgotPassword(ForgotPasswordRequest request) {
+        User user = userRepository.findByEmailAndDeletedFalse(request.getEmail())
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        String rateLimitKey = "rate_limit_otp:" + request.getEmail();
+
+        // Dùng hàm setIfAbsent (Tương đương SETNX trong Redis)
+        // Nếu Key chưa tồn tại -> Tạo Key, set giá trị "1", gán TTL 60s, trả về TRUE (Cho qua)
+        // Nếu Key ĐÃ tồn tại (User vừa gửi xong chưa quá 60s) -> Trả về FALSE (Chặn lại)
+        Boolean isAllowed = redisTemplate.opsForValue().setIfAbsent(rateLimitKey, "1", 60, TimeUnit.SECONDS);
+
+        if (Boolean.FALSE.equals(isAllowed)) {
+            // Lấy thời gian còn lại để báo cho người dùng biết phải đợi bao lâu nữa
+            Long expire = redisTemplate.getExpire(rateLimitKey);
+            log.warn("Spam OTP detected for email: {}. Please wait {} seconds.", request.getEmail(), expire);
+
+            throw new AppException(ErrorCode.TOO_MANY_REQUESTS);
+        }
+
+        // 1. Sinh mã OTP (6 số ngẫu nhiên)
+        String otp = String.format("%06d", new Random().nextInt(999999));
+
+        // 2. Lưu OTP vào Redis với Key là: reset_otp:{email}
+        // Thời gian sống (TTL): Đúng 5 phút (Redis sẽ tự hủy nó sau 5 phút)
+        String redisKey = "reset_otp:" + request.getEmail();
+        redisTemplate.opsForValue().set(redisKey, passwordEncoder.encode(otp), 5, TimeUnit.MINUTES);
+
+        // 3. Gửi email qua Kafka (Giữ nguyên như cũ)
+        String emailBody = String.format(
+                "Xin chào %s,\n\n" +
+                        "Mã OTP xác nhận đặt lại mật khẩu của bạn là: %s\n" +
+                        "Mã này sẽ tự động hết hạn sau 5 phút.\n",
+                user.getUsername(), otp
+        );
+
+        NotificationEvent event =
+                NotificationEvent.builder()
+                        .channel("EMAIL")
+                        .recipient(user.getEmail())
+                        .subject("FinTrack - Mã xác nhận")
+                        .body(emailBody)
+                        .build();
+
+        kafkaTemplate.send("notification-delivery", event);
+        log.info("Đã lưu OTP vào Redis và gửi qua email: {}", user.getEmail());
+    }
+
+    @Transactional
+    public void resetPassword(ResetPasswordRequest request) {
+        // 1. Lấy OTP từ Redis lên
+        String redisKey = "reset_otp:" + request.getEmail();
+        String hashedOtpFromRedis = redisTemplate.opsForValue().get(redisKey);
+
+        // Nếu get lên bằng null -> Nghĩa là Redis đã tự xóa nó (Quá 5 phút) hoặc user chưa từng request
+        if (hashedOtpFromRedis == null) {
+            throw new AppException(ErrorCode.OTP_EXPIRED); // Báo lỗi OTP hết hạn
+        }
+
+        // 2. So sánh mã OTP user nhập với mã hash trong Redis
+        if (!passwordEncoder.matches(request.getOtp(), hashedOtpFromRedis)) {
+            throw new AppException(ErrorCode.INVALID_OTP); // Báo lỗi OTP sai
+        }
+
+        // 3. OTP hợp lệ -> Cập nhật mật khẩu mới vào DB
+        User user = userRepository.findByEmailAndDeletedFalse(request.getEmail())
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+
+        // Hủy session hiện tại
+        if (user.getCurrentJwtId() != null) {
+            invalidateToken(user.getCurrentJwtId());
+            user.setCurrentJwtId(null);
+        }
+        userRepository.save(user);
+
+        // 4. Xóa luôn Key trong Redis đi để mã này không xài lại được nữa
+        redisTemplate.delete(redisKey);
+
+        log.info("User {} đã đặt lại mật khẩu thành công qua Redis.", user.getEmail());
+    }
 
     // refresh token
     @Transactional
@@ -66,12 +155,11 @@ public class AuthenticationService {
             throw new AppException(ErrorCode.UNAUTHENTICATED);
         }
 
-        // Hủy token cũ (Token Rotation)
-        InvalidatedToken invalidatedToken = InvalidatedToken.builder()
-                .id(jit)
-                .expiryTime(expiryTime)
-                .build();
-        invalidatedTokenRepository.save(invalidatedToken);
+        // Hủy token cũ (Token Rotation) - Đẩy vào Redis
+        long remainingTime = expiryTime.getTime() - System.currentTimeMillis();
+        if (remainingTime > 0) {
+            redisTemplate.opsForValue().set("jwt_blacklist:" + jit, "invalid", remainingTime, java.util.concurrent.TimeUnit.MILLISECONDS);
+        }
 
         // Tạo phát token mới (Cả cặp Access + Refresh mới)
         var token = generateToken(user);
@@ -99,12 +187,11 @@ public class AuthenticationService {
             // Lấy thời gian hết hạn
             Date expiryTime = signToken.getJWTClaimsSet().getExpirationTime();
 
-            // Hủy token hiện tại
-            InvalidatedToken invalidatedToken = InvalidatedToken.builder()
-                    .id(jit)
-                    .expiryTime(expiryTime)
-                    .build();
-            invalidatedTokenRepository.save(invalidatedToken);
+            // Hủy token hiện tại (Lưu vào Redis với TTL bằng thời gian sống còn lại)
+            long remainingTime = expiryTime.getTime() - System.currentTimeMillis();
+            if (remainingTime > 0) {
+                redisTemplate.opsForValue().set("jwt_blacklist:" + jit, "invalid", remainingTime, java.util.concurrent.TimeUnit.MILLISECONDS);
+            }
 
             // [LOGIC MỚI] Xóa dấu vết trong bảng User
             var username = signToken.getJWTClaimsSet().getSubject();
@@ -172,17 +259,10 @@ public class AuthenticationService {
 
     // --- HELPERS ---
     private void invalidateToken(String tokenId) {
-        // Vì ta không biết thời gian hết hạn của token cũ (do không lưu),
-        // Ta set đại thời gian hết hạn là: Thời điểm hiện tại + 1 giờ (bằng thời gian sống mặc định của token)
-        // Mục đích: Để Job dọn dẹp DB sau này biết đường mà xóa.
-        Date estimatedExpiryTime = new Date(Instant.now().plus(1, ChronoUnit.HOURS).toEpochMilli());
-
-        InvalidatedToken invalidatedToken = InvalidatedToken.builder()
-                .id(tokenId)
-                .expiryTime(estimatedExpiryTime)
-                .build();
-
-        invalidatedTokenRepository.save(invalidatedToken);
+        // Nếu chỉ có ID mà không có thời gian hết hạn (trường hợp user đăng nhập chỗ khác bị đá ra)
+        // Ta set TTL mặc định là 1 giờ (bằng thời gian sống tối đa của 1 token)
+        String redisKey = "jwt_blacklist:" + tokenId;
+        redisTemplate.opsForValue().set(redisKey, "invalid", 1, java.util.concurrent.TimeUnit.HOURS);
     }
 
     private String getTokenIdFromToken(String token) {
@@ -227,6 +307,10 @@ public class AuthenticationService {
 
     // isRefresh: tham số này để dùng sau này nếu bạn làm refresh token (tạm thời chưa dùng)
     private SignedJWT verifyToken(String token, boolean isRefresh) throws JOSEException, ParseException {
+        if (token == null || token.trim().isEmpty()) {
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
+        }
+
         JWSVerifier verifier = new MACVerifier(SIGNER_KEY.getBytes());
 
         SignedJWT signedJWT = SignedJWT.parse(token);
@@ -247,8 +331,9 @@ public class AuthenticationService {
             throw new AppException(ErrorCode.UNAUTHENTICATED);
         }
 
-        // 3. Check Blacklist (Token đã logout hoặc đã refresh trước đó)
-        if (invalidatedTokenRepository.existsById(signedJWT.getJWTClaimsSet().getJWTID())) {
+        // 3. Check Blacklist trên Redis
+        String redisKey = "jwt_blacklist:" + signedJWT.getJWTClaimsSet().getJWTID();
+        if (Boolean.TRUE.equals(redisTemplate.hasKey(redisKey))) {
             throw new AppException(ErrorCode.UNAUTHENTICATED);
         }
 
@@ -272,5 +357,72 @@ public class AuthenticationService {
             });
         }
         return stringJoiner.toString();
+    }
+
+    @Transactional
+    public AuthenticationResponse authenticateWithGoogle(GoogleLoginRequest request) {
+        try {
+            // 1. Cấu hình máy quét Token của Google
+            GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(new NetHttpTransport(), new GsonFactory())
+                    .setAudience(Collections.singletonList(GOOGLE_CLIENT_ID))
+                    .build();
+
+            // 2. Kiểm tra token có chuẩn của Google không
+            GoogleIdToken idToken = verifier.verify(request.getToken());
+            if (idToken == null) {
+                throw new AppException(ErrorCode.UNAUTHENTICATED);
+            }
+
+            // 3. Lấy thông tin User từ Google
+            GoogleIdToken.Payload payload = idToken.getPayload();
+            String email = payload.getEmail();
+            String googleId = payload.getSubject();
+            String name = (String) payload.get("name");
+            String pictureUrl = (String) payload.get("picture");
+
+            // 4. Kiểm tra User có trong DB chưa
+            User user = userRepository.findByEmailAndDeletedFalse(email).orElse(null);
+
+            if (user == null) {
+                // NẾU CHƯA CÓ: Tự động tạo tài khoản mới
+                user = User.builder()
+                        .username(email) // Dùng email làm username luôn
+                        .email(email)
+                        .fullName(name)
+                        .avatar(pictureUrl)
+                        .provider("GOOGLE")
+                        .providerId(googleId)
+                        .password(passwordEncoder.encode(UUID.randomUUID().toString())) // Mật khẩu rác vì login qua Google
+                        .build();
+                user = userRepository.save(user);
+                log.info("Tạo mới tài khoản qua Google: {}", email);
+            } else {
+                // NẾU ĐÃ CÓ: Cập nhật lại provider nếu trước đó họ đăng ký tay
+                if (user.getProvider() == null || "LOCAL".equals(user.getProvider())) {
+                    user.setProvider("GOOGLE");
+                    user.setProviderId(googleId);
+                    userRepository.save(user);
+                }
+            }
+
+            // 5. Đá văng phiên đăng nhập cũ (nếu có)
+            if (user.getCurrentJwtId() != null) {
+                invalidateToken(user.getCurrentJwtId());
+            }
+
+            // 6. Nhả Token của hệ thống mình cho Frontend xài
+            String token = generateToken(user);
+            user.setCurrentJwtId(getTokenIdFromToken(token));
+            userRepository.save(user);
+
+            return AuthenticationResponse.builder()
+                    .token(token)
+                    .authenticated(true)
+                    .build();
+
+        } catch (Exception e) {
+            log.error("Google Login failed: ", e);
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
+        }
     }
 }

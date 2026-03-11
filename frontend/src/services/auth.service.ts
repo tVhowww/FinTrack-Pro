@@ -5,6 +5,7 @@ import {
   LoginRequest,
   LogoutRequest,
   RegisterRequest,
+  ResetPasswordRequest,
   UserResponse,
 } from "@/types/auth.dto";
 import { ApiResponse } from "@/types/api";
@@ -53,5 +54,31 @@ export const authService = {
       // 4. Redirect về login
       window.location.href = "/login";
     }
+  },
+
+  // Yêu cầu quên mật khẩu
+  forgotPassword: async (email: string) => {
+    const response = await http.post<ApiResponse<void>>(
+      "/identity/auth/forgot-password",
+      { email },
+    );
+    return response.data;
+  },
+
+  // Đặt lại mật khẩu với OTP
+  resetPassword: async (data: ResetPasswordRequest) => {
+    const response = await http.post<ApiResponse<void>>(
+      "/identity/auth/reset-password",
+      data,
+    );
+    return response.data;
+  },
+
+  loginGoogle: async (token: string) => {
+    const response = await http.post<ApiResponse<any>>(
+      "/identity/auth/google",
+      { token },
+    );
+    return response.data;
   },
 };

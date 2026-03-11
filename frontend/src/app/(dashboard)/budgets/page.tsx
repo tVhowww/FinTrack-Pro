@@ -2,36 +2,36 @@
 
 import { BudgetCard } from "@/components/budget/budget-card";
 import { BudgetDialog } from "@/components/budget/budget-dialog";
+import { BudgetFilter } from "@/components/budget/budget-filter";
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useBudgets } from "@/hooks/use-budgets";
 import { useWallets } from "@/hooks/use-wallets";
-import { BudgetCreationRequest } from "@/types/budget.dto";
-import { Plus } from "lucide-react";
-import { useState } from "react";
-import { toast } from "sonner";
+import { Plus, Search } from "lucide-react";
+import { useState, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
+import { useUser } from "@/hooks/use-user";
 
 export default function BudgetsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [editingBudget, setEditingBudget] = useState<any | null>(null);
 
-  const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
+  const searchParams = useSearchParams();
 
-  const currentYear = new Date().getFullYear();
-  const [month, setMonth] = useState(new Date().getMonth() + 1);
-  const [year, setYear] = useState(currentYear);
-  const [selectedWalletId, setSelectedWalletId] = useState<string>("all");
+  // Đọc params từ URL (Có fallback mặc định)
+  const month = Number(searchParams.get("month")) || new Date().getMonth() + 1;
+  const year = Number(searchParams.get("year")) || new Date().getFullYear();
+  const walletId = searchParams.get("walletId") || "all";
+  const keyword = searchParams.get("keyword") || undefined;
+  const statusFilter = searchParams.get("status") || "ALL";
 
   const { wallets } = useWallets();
+  const { user } = useUser();
+  const baseCurrency = user?.baseCurrency || "VND";
 
+  // Ném cục params xuống Hook
   const {
     budgets,
     isLoading,
@@ -39,21 +39,28 @@ export default function BudgetsPage() {
     deleteBudget,
     updateBudget,
     isDeleting,
-  } = useBudgets({
-    month,
-    year,
-    walletId: selectedWalletId,
-  });
+  } = useBudgets({ month, year, walletId, keyword });
+
+  // Lọc trạng thái bằng Frontend RAM (Dựa vào param URL)
+  const displayBudgets = useMemo(() => {
+    if (statusFilter === "ALL") return budgets;
+
+    return budgets.filter((b) => {
+      if (statusFilter === "SAFE") return b.percentage < 80;
+      if (statusFilter === "WARNING")
+        return b.percentage >= 80 && b.percentage <= 100;
+      if (statusFilter === "DANGER") return b.percentage > 100;
+      return true;
+    });
+  }, [budgets, statusFilter]);
 
   const handleSubmit = async (values: any) => {
     if (editingBudget) {
-      // Nếu là edit -> Chỉ gửi name và amount
       await updateBudget({
         id: editingBudget.id,
         data: { name: values.name, amount: values.amount },
       });
     } else {
-      // Nếu là create -> Gửi toàn bộ payload
       await createBudget(values);
     }
   };
@@ -72,9 +79,10 @@ export default function BudgetsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      {/* HEADER TỔNG */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">
+          <h2 className="text-2xl font-bold tracking-tight">
             Quản lý Ngân sách
           </h2>
           <p className="text-sm text-muted-foreground">
@@ -82,63 +90,17 @@ export default function BudgetsPage() {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Lọc Ví */}
-          <Select value={selectedWalletId} onValueChange={setSelectedWalletId}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Chọn ví" />
-            </SelectTrigger>
-            <SelectContent>
-              {/* Thêm lựa chọn Ngân sách chung ở đây */}
-              <SelectItem value="all">Tất cả các ví</SelectItem>
-              <SelectItem value="global">Ngân sách chung</SelectItem>
-              {wallets.map((w) => (
-                <SelectItem key={w.id} value={w.id}>
-                  {w.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          {/* Lọc Tháng */}
-          <Select
-            value={month.toString()}
-            onValueChange={(v) => setMonth(Number(v))}
-          >
-            <SelectTrigger className="w-[100px]">
-              <SelectValue placeholder="Tháng" />
-            </SelectTrigger>
-            <SelectContent>
-              {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-                <SelectItem key={m} value={m.toString()}>
-                  Tháng {m}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          {/* Lọc Năm */}
-          <Select
-            value={year.toString()}
-            onValueChange={(v) => setYear(Number(v))}
-          >
-            <SelectTrigger className="w-[100px]">
-              <SelectValue placeholder="Năm" />
-            </SelectTrigger>
-            <SelectContent>
-              {[currentYear - 1, currentYear, currentYear + 1].map((y) => (
-                <SelectItem key={y} value={y.toString()}>
-                  {y}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button onClick={() => setIsDialogOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" /> Tạo mới
-          </Button>
-        </div>
+        <Button
+          onClick={() => setIsDialogOpen(true)}
+          className="w-full md:w-auto"
+        >
+          <Plus className="mr-2 h-4 w-4" /> Tạo ngân sách mới
+        </Button>
       </div>
 
+      <BudgetFilter />
+
+      {/* DANH SÁCH HIỂN THỊ */}
       {isLoading ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3].map((i) => (
@@ -147,18 +109,29 @@ export default function BudgetsPage() {
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {budgets.length === 0 ? (
-            <div className="col-span-full flex flex-col items-center justify-center py-10 text-center">
-              <p className="text-muted-foreground mb-4">
-                Tháng {month}/{year} chưa có ngân sách nào.
+          {displayBudgets.length === 0 ? (
+            <div className="col-span-full flex flex-col items-center justify-center py-12 text-center border-2 border-dashed rounded-xl bg-muted/20">
+              <div className="bg-background p-4 rounded-full shadow-sm mb-4">
+                <Search className="h-8 w-8 text-muted-foreground opacity-50" />
+              </div>
+              <p className="text-muted-foreground font-medium">
+                {keyword || statusFilter !== "ALL"
+                  ? "Không tìm thấy ngân sách nào phù hợp với bộ lọc."
+                  : `Tháng ${month}/{year} chưa có ngân sách nào.`}
               </p>
+              {!keyword && statusFilter === "ALL" && (
+                <Button
+                  variant="outline"
+                  className="mt-4"
+                  onClick={() => setIsDialogOpen(true)}
+                >
+                  Bắt đầu lập kế hoạch ngay
+                </Button>
+              )}
             </div>
           ) : (
-            budgets.map((budget) => {
-              // 1. Ưu tiên lấy tên ví từ Backend (nếu bạn đã làm bước update BE trước đó)
+            displayBudgets.map((budget) => {
               let finalWalletName = budget.walletName;
-
-              // 2. Nếu Backend chưa có tên ví, ta tự dò từ danh sách wallets của Frontend
               if (!finalWalletName && budget.walletId) {
                 const matchedWallet = wallets.find(
                   (w) => w.id === budget.walletId,
@@ -167,17 +140,14 @@ export default function BudgetsPage() {
                   ? matchedWallet.name
                   : "Ví không xác định";
               }
-
-              // 3. Nếu là ngân sách chung (walletId bị null)
-              if (!budget.walletId) {
-                finalWalletName = "Ngân sách chung";
-              }
+              if (!budget.walletId) finalWalletName = "Ngân sách chung";
 
               return (
                 <BudgetCard
                   key={budget.id}
                   budget={budget}
-                  walletName={finalWalletName as string} // Truyền tên ví đã được chốt hạ vào đây
+                  walletName={finalWalletName as string}
+                  baseCurrency={baseCurrency}
                   onEdit={() => {
                     setEditingBudget(budget);
                     setIsDialogOpen(true);
@@ -187,24 +157,10 @@ export default function BudgetsPage() {
               );
             })
           )}
-
-          <button
-            onClick={() => setIsDialogOpen(true)}
-            className="group flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-muted-foreground/25 p-8 text-center hover:bg-accent/50 hover:text-accent-foreground transition-all h-full min-h-[180px]"
-          >
-            <div className="rounded-full bg-background p-3 shadow-sm group-hover:scale-110 transition-transform">
-              <Plus className="h-6 w-6 text-muted-foreground" />
-            </div>
-            <div className="space-y-1">
-              <h3 className="font-semibold">Tạo ngân sách cho T{month}</h3>
-              <p className="text-xs text-muted-foreground">
-                Lập kế hoạch chi tiêu mới
-              </p>
-            </div>
-          </button>
         </div>
       )}
 
+      {/* DIALOGS */}
       <BudgetDialog
         open={isDialogOpen}
         onOpenChange={handleOpenChange}

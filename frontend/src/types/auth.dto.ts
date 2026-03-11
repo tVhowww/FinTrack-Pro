@@ -31,3 +31,9 @@ export interface UserResponse {
 export interface LogoutRequest {
   token: string;
 }
+
+export interface ResetPasswordRequest {
+  email: string;
+  otp: string;
+  newPassword: string;
+}

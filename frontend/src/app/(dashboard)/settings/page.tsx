@@ -29,6 +29,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { CURRENCIES } from "@/lib/constants";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function SettingsPage() {
   const {
@@ -44,12 +52,19 @@ export default function SettingsPage() {
   } = useUser();
 
   // State cho Form Profile
-  const [profileForm, setProfileForm] = useState({
-    fullName: "",
-    phoneNumber: "",
-    city: "",
-    dob: "",
-  });
+  const [profileForm, setProfileForm] = useState<{
+    fullName: string;
+    phoneNumber: string;
+    city: string;
+    dob: string;
+    baseCurrency: string;
+  }>(() => ({
+    fullName: user?.fullName || "",
+    phoneNumber: user?.phoneNumber || "",
+    city: user?.city || "",
+    dob: user?.dob || "",
+    baseCurrency: user?.baseCurrency || "VND",
+  }));
 
   // State cho Form Password
   const [passForm, setPassForm] = useState({
@@ -69,6 +84,7 @@ export default function SettingsPage() {
         phoneNumber: user.phoneNumber || "",
         city: user.city || "",
         dob: user.dob || "",
+        baseCurrency: user.baseCurrency || "VND",
       });
     }
   }, [user]);
@@ -113,7 +129,7 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6 pb-10">
       <div>
-        <h2 className="text-3xl font-bold tracking-tight">Cài đặt</h2>
+        <h2 className="text-2xl font-bold tracking-tight">Cài đặt</h2>
         <p className="text-sm text-muted-foreground">
           Quản lý thông tin cá nhân và bảo mật.
         </p>
@@ -233,6 +249,35 @@ export default function SettingsPage() {
                   />
                   <p className="text-[0.8rem] text-muted-foreground">
                     Email không thể thay đổi.
+                  </p>
+                </div>
+                <div className="grid gap-2 md:col-span-2 pt-2">
+                  <Label>Đồng tiền cơ sở (Base Currency)</Label>
+                  <Select
+                    value={profileForm.baseCurrency}
+                    onValueChange={(val) =>
+                      setProfileForm({ ...profileForm, baseCurrency: val })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Chọn đồng tiền cơ sở" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CURRENCIES.map((cur) => (
+                        <SelectItem key={cur.code} value={cur.code}>
+                          <span className="font-bold w-12 inline-block">
+                            {cur.code}
+                          </span>
+                          <span className="text-muted-foreground">
+                            - {cur.name} ({cur.symbol})
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[0.8rem] text-muted-foreground">
+                    Đây là đồng tiền mặc định dùng để tính Tổng số dư và Thống
+                    kê biểu đồ.
                   </p>
                 </div>
               </div>

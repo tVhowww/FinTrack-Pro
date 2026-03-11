@@ -122,7 +122,7 @@ public class GlobalExceptionHandler {
             return ResponseEntity.status(status)
                     .body(ApiResponse.builder()
                             .code(status)
-                            .message("Lỗi từ Wallet Service: " + content)
+                            .message("Lỗi từ External Service: " + content)
                             .build());
         }
 

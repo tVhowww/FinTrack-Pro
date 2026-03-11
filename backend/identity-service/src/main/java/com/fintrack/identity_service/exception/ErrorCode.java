@@ -16,6 +16,9 @@ public enum ErrorCode {
     PASSWORD_INVALID(1004, "Password must be at least 6 characters", HttpStatus.BAD_REQUEST),
     INVALID_KEY_MESSAGE(1005, "Invalid message key", HttpStatus.BAD_REQUEST),
     PASSWORD_INCORRECT(1010, "Password is incorrect", HttpStatus.BAD_REQUEST),
+    OTP_EXPIRED(1011, "OTP has expired", HttpStatus.BAD_REQUEST),
+    INVALID_OTP(1012, "Invalid OTP", HttpStatus.BAD_REQUEST),
+    TOO_MANY_REQUESTS(1013, "Too many requests, please try again later", HttpStatus.TOO_MANY_REQUESTS),
 
     // 401
     UNAUTHENTICATED(1006, "Unauthenticated", HttpStatus.UNAUTHORIZED),

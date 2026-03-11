@@ -17,6 +17,8 @@ import { Activity, ArrowDown, ArrowUp, DollarSign, Wallet } from "lucide-react";
 export default function DashboardPage() {
   const { user } = useUser();
 
+  const baseCurrency = user?.baseCurrency || "VND";
+
   // 1. Lấy dữ liệu thống kê (Trend & Structure)
   const {
     trendData,
@@ -28,6 +30,7 @@ export default function DashboardPage() {
     monthlyStats,
     highestExpenses,
     isLoadingHighest,
+    totalBalance,
   } = useStatistics();
 
   // 2. Lấy dữ liệu Ví (để tính tổng số dư hiện tại)
@@ -40,9 +43,6 @@ export default function DashboardPage() {
     trendData.length > 0
       ? trendData[trendData.length - 1]
       : { income: 0, expense: 0, netSavings: 0 };
-
-  // Tính tổng số dư của tất cả các ví
-  const totalBalance = wallets.reduce((acc, w) => acc + w.balance, 0);
 
   return (
     <div className="space-y-6">
@@ -63,7 +63,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-primary">
-              {formatCurrency(totalBalance)}
+              {formatCurrency(totalBalance, baseCurrency)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Trên {wallets.length} ví đang hoạt động
@@ -81,7 +81,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-emerald-600">
-              {formatCurrency(monthlyStats.totalIncome)}
+              {formatCurrency(monthlyStats.totalIncome, baseCurrency)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">Dòng tiền vào</p>
           </CardContent>
@@ -97,7 +97,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">
-              {formatCurrency(monthlyStats.totalExpense)}
+              {formatCurrency(monthlyStats.totalExpense, baseCurrency)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">Dòng tiền ra</p>
           </CardContent>
@@ -113,7 +113,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {formatCurrency(monthlyStats.netSavings)}
+              {formatCurrency(monthlyStats.netSavings, baseCurrency)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Thu nhập - Chi tiêu
@@ -125,10 +125,18 @@ export default function DashboardPage() {
       {/* Khu vực Biểu đồ */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
         {/* Biểu đồ cột chiếm 4 phần */}
-        <BalanceChart data={trendData} isLoading={isLoadingTrend} />
+        <BalanceChart
+          data={trendData}
+          isLoading={isLoadingTrend}
+          baseCurrency={baseCurrency}
+        />
 
         {/* Biểu đồ tròn chiếm 3 phần */}
-        <ExpensePieChart data={structureData} isLoading={isLoadingStructure} />
+        <ExpensePieChart
+          data={structureData}
+          isLoading={isLoadingStructure}
+          baseCurrency={baseCurrency}
+        />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
