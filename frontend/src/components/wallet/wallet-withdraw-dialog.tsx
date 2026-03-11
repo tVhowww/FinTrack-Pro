@@ -26,7 +26,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useCategories } from "@/hooks/use-categories";
 import { useTransactions } from "@/hooks/use-transactions";
 import { useWallets } from "@/hooks/use-wallets";
 import { getCurrencySymbol } from "@/lib/constants";
@@ -53,20 +52,10 @@ export function WalletWithdrawDialog({
   const { createTransaction, isCreating, transferTransaction, isTransferring } =
     useTransactions();
   const { wallets, deleteWallet } = useWallets();
-  const { categories } = useCategories();
   const [activeTab, setActiveTab] = useState("transfer");
 
   const compatibleWallets = wallets.filter(
     (w) => w.type !== WalletType.SAVING && w.currency === wallet?.currency,
-  );
-
-  // Ép phẳng danh sách category để lấy được cả Sub-category
-  const flatCategories = categories.flatMap((c) => [
-    c,
-    ...(c.subCategories || []),
-  ]);
-  const incomeCategories = flatCategories.filter(
-    (c) => c.type === TransactionType.INCOME,
   );
 
   const WithdrawSchema = z
@@ -76,7 +65,6 @@ export function WalletWithdrawDialog({
         .min(1, "Số tiền phải lớn hơn 0")
         .max(wallet?.balance || 0, "Không được rút vượt quá số dư trong quỹ"),
       destinationWalletId: z.string().optional(),
-      categoryId: z.string().optional(),
       note: z.string().optional(),
     })
     .superRefine((data, ctx) => {
@@ -86,13 +74,6 @@ export function WalletWithdrawDialog({
             code: z.ZodIssueCode.custom,
             message: "Vui lòng chọn ví nhận tiền",
             path: ["destinationWalletId"],
-          });
-        }
-        if (!data.categoryId) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: "Vui lòng chọn danh mục",
-            path: ["categoryId"],
           });
         }
       }
@@ -105,25 +86,20 @@ export function WalletWithdrawDialog({
     defaultValues: {
       amount: 0,
       destinationWalletId: "",
-      categoryId: "",
       note: "",
     },
   });
 
-  // Tự động gán danh mục đầu tiên khi mở Modal
   useEffect(() => {
     if (open && wallet) {
-      const defaultCat =
-        incomeCategories.length > 0 ? incomeCategories[0].id : "";
       form.reset({
         amount: 0,
         destinationWalletId: "",
-        categoryId: defaultCat,
         note: "",
       });
       setActiveTab("transfer");
     }
-  }, [open, wallet, form, incomeCategories.length]);
+  }, [open, wallet, form]);
 
   const onSubmit = async (values: WithdrawFormValues) => {
     if (!wallet) return;
@@ -138,7 +114,7 @@ export function WalletWithdrawDialog({
           fromWalletId: wallet.id,
           toWalletId: values.destinationWalletId!,
           amount: values.amount,
-          categoryId: values.categoryId,
+          // categoryId đã bị xóa bỏ, phó mặc cho Backend lo!
           note: values.note || `Rút tiền chuyển về ví ${destWallet?.name}`,
         });
 
@@ -160,7 +136,7 @@ export function WalletWithdrawDialog({
 
       const remainingBalance = wallet.balance - values.amount;
       if (remainingBalance === 0) {
-        toast("Quỹ đã cạn! 🐷", {
+        toast("Quỹ đã cạn!", {
           description:
             "Bạn đã rút toàn bộ tiền. Bạn có muốn xóa quỹ này luôn không?",
           action: {
@@ -188,7 +164,7 @@ export function WalletWithdrawDialog({
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Hammer className="h-5 w-5 text-rose-500" /> Rút tiền quỹ (Đập Heo)
+            <Hammer className="h-5 w-5 text-rose-500" /> Rút tiền quỹ
           </DialogTitle>
           <DialogDescription>
             Bạn đang có{" "}
@@ -233,7 +209,7 @@ export function WalletWithdrawDialog({
                           type="number"
                           step="any"
                           placeholder="VD: 500000"
-                          className="pr-12"
+                          className="text-lg font-bold pr-12 h-12"
                           {...field}
                         />
                         <div className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">
@@ -268,68 +244,38 @@ export function WalletWithdrawDialog({
                     hoặc sử dụng chức năng <strong>Tiêu trực tiếp</strong>.
                   </div>
                 ) : (
-                  <>
-                    <FormField
-                      control={form.control}
-                      name="destinationWalletId"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Nhận tiền vào ví</FormLabel>
-                          <Select
-                            onValueChange={field.onChange}
-                            value={field.value}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Chọn ví nhận tiền" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {compatibleWallets.map((w) => (
-                                <SelectItem key={w.id} value={w.id}>
-                                  {w.name} (
-                                  {new Intl.NumberFormat("vi-VN", {
-                                    style: "currency",
-                                    currency: w.currency || "VND",
-                                  }).format(w.balance)}
-                                  )
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="categoryId"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Nguồn thu (Danh mục)</FormLabel>
-                          <Select
-                            onValueChange={field.onChange}
-                            value={field.value}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Chọn danh mục thu nhập" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {incomeCategories.map((c) => (
-                                <SelectItem key={c.id} value={c.id}>
-                                  {c.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </>
+                  <FormField
+                    control={form.control}
+                    name="destinationWalletId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Nhận tiền vào ví</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Chọn ví nhận tiền" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {compatibleWallets.map((w) => (
+                              <SelectItem key={w.id} value={w.id}>
+                                {w.name} (
+                                {new Intl.NumberFormat("vi-VN", {
+                                  style: "currency",
+                                  currency: w.currency || "VND",
+                                }).format(w.balance)}
+                                )
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 )}
               </TabsContent>
 
@@ -353,10 +299,12 @@ export function WalletWithdrawDialog({
                 <Button
                   type="submit"
                   variant="destructive"
-                  className="w-full"
+                  className="w-full h-11 text-md"
                   disabled={isCreating || isTransferring}
                 >
-                  {isCreating ? "Đang xử lý..." : "Xác nhận Rút tiền"}
+                  {isCreating || isTransferring
+                    ? "Đang xử lý..."
+                    : "Xác nhận Rút tiền"}
                 </Button>
               </DialogFooter>
             </form>

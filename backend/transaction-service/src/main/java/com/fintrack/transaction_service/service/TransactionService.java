@@ -614,6 +614,9 @@ public class TransactionService {
 
         Instant transactionDate = request.getDate() != null ? request.getDate() : Instant.now();
 
+        Category transferOutCategory = getOrCreateSystemCategory("Chuyển tiền đi", TransactionType.EXPENSE);
+        Category transferInCategory = getOrCreateSystemCategory("Nhận tiền đến", TransactionType.INCOME);
+
         // Phát súng 1: TRỪ TIỀN VÍ NGUỒN
         TransactionCreationRequest expenseReq = TransactionCreationRequest.builder()
                 .amount(request.getAmount())
@@ -621,7 +624,7 @@ public class TransactionService {
                 .walletId(request.getFromWalletId())
                 .date(transactionDate)
                 .note(request.getNote() != null && !request.getNote().isEmpty() ? request.getNote() : "Chuyển tiền sang ví " + toWallet.getName())
-                .categoryId("auto-saving-category") // Sẽ bị Backend đè lại nếu là ví SAVING
+                .categoryId(transferOutCategory.getId())
                 .build();
         createInternal(expenseReq); // Dùng hàm lõi để KHÔNG bị vướng Redis Lock
 
@@ -632,7 +635,7 @@ public class TransactionService {
                 .walletId(request.getToWalletId())
                 .date(transactionDate)
                 .note("Nhận tiền từ quỹ " + fromWallet.getName())
-                .categoryId(request.getCategoryId()) // ID Danh mục gửi từ form
+                .categoryId(transferInCategory.getId())
                 .build();
         createInternal(incomeReq);
     }

@@ -7,12 +7,13 @@ import { WalletCard } from "@/components/wallet/wallet-card";
 import { WalletFilter } from "@/components/wallet/wallet-filter";
 import { useWallets } from "@/hooks/use-wallets";
 import { Wallet, WalletType } from "@/types/wallet.dto";
-import { Plus, Search, Target, WalletIcon } from "lucide-react";
+import { ArrowRightLeft, Plus, Search, Target, WalletIcon } from "lucide-react";
 import { useState } from "react";
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { useSearchParams } from "next/navigation";
 import { WalletAddFundDialog } from "@/components/wallet/wallet-add-fund-dialog";
 import { WalletWithdrawDialog } from "@/components/wallet/wallet-withdraw-dialog";
+import { WalletTransferDialog } from "@/components/wallet/wallet-transfer-dialog";
 
 export default function WalletsPage() {
   const searchParams = useSearchParams();
@@ -34,6 +35,7 @@ export default function WalletsPage() {
   const [fundWallet, setFundWallet] = useState<Wallet | null>(null);
   const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
   const [withdrawWallet, setWithdrawWallet] = useState<Wallet | null>(null);
+  const [isTransferOpen, setIsTransferOpen] = useState(false);
 
   const handleAddFund = (wallet: Wallet) => {
     setFundWallet(wallet);
@@ -76,12 +78,21 @@ export default function WalletsPage() {
             Quản lý dòng tiền chi tiêu và mục tiêu tích lũy
           </p>
         </div>
-        <Button
-          onClick={() => handleCreate(WalletType.BASIC)}
-          className="w-full md:w-auto"
-        >
-          <Plus className="mr-2 h-4 w-4" /> Thêm ví mới
-        </Button>
+        <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+          <Button
+            variant="outline"
+            onClick={() => setIsTransferOpen(true)}
+            className="w-full sm:w-auto bg-blue-50 text-blue-600 hover:bg-blue-100 border-blue-200"
+          >
+            <ArrowRightLeft className="mr-2 h-4 w-4" /> Chuyển tiền
+          </Button>
+          <Button
+            onClick={() => handleCreate(WalletType.BASIC)}
+            className="w-full sm:w-auto"
+          >
+            <Plus className="mr-2 h-4 w-4" /> Thêm ví mới
+          </Button>
+        </div>
       </div>
 
       <WalletFilter />
@@ -214,6 +225,11 @@ export default function WalletsPage() {
         open={isWithdrawOpen}
         onOpenChange={setIsWithdrawOpen}
         wallet={withdrawWallet}
+      />
+
+      <WalletTransferDialog
+        open={isTransferOpen}
+        onOpenChange={setIsTransferOpen}
       />
     </div>
   );
