@@ -55,3 +55,11 @@ export interface AiReceiptResponse {
   currency?: string;
   type?: string;
 }
+
+export interface TransferRequest {
+  fromWalletId: string;
+  toWalletId: string;
+  amount: number;
+  categoryId?: string;
+  note?: string;
+}

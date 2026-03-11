@@ -2,6 +2,7 @@ package com.fintrack.transaction_service.controller;
 
 import com.fintrack.transaction_service.dto.request.TransactionCreationRequest;
 import com.fintrack.transaction_service.dto.request.TransactionUpdateRequest;
+import com.fintrack.transaction_service.dto.request.TransferRequest;
 import com.fintrack.transaction_service.dto.response.*;
 import com.fintrack.transaction_service.enums.TransactionType;
 import com.fintrack.transaction_service.service.TransactionService;
@@ -19,9 +20,17 @@ import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("transactions")
+@RequestMapping("/transactions")
 public class TransactionController {
     private final TransactionService transactionService;
+
+    @PostMapping("/transfer")
+    public ApiResponse<String> transferMoney(@RequestBody TransferRequest request) {
+        transactionService.transfer(request);
+        return ApiResponse.<String>builder()
+                .result("Chuyển tiền thành công")
+                .build();
+    }
 
     @GetMapping("/statistics/total-balance")
     public ApiResponse<BigDecimal> getTotalBalance() {

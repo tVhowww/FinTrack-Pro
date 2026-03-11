@@ -7,6 +7,7 @@ import {
   TransactionQueryParams,
   TransactionResponse,
   TransactionUpdateRequest,
+  TransferRequest,
 } from "@/types/transaction.dto";
 
 const BASE_URL = "/transaction/transactions";
@@ -94,6 +95,14 @@ export const transactionService = {
     const response = await http.post<ApiResponse<string>>(
       "/transaction/ai/chat",
       { message },
+    );
+    return response.data.result;
+  },
+
+  transfer: async (data: TransferRequest) => {
+    const response = await http.post<ApiResponse<string>>(
+      `${BASE_URL}/transfer`,
+      data,
     );
     return response.data.result;
   },

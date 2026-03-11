@@ -172,7 +172,24 @@ export function useTransactions(
   });
 
   // =================================================================
-  // 7. HELPER: Kiểm tra giao dịch liên quan
+  // 7. MUTATION: Chuyển tiền giữa các ví
+  // =================================================================
+
+  const transferMutation = useMutation({
+    mutationFn: transactionService.transfer,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["statistics"] });
+      queryClient.invalidateQueries({ queryKey: ["wallets"] });
+    },
+    onError: (error: any) => {
+      const msg = error?.response?.data?.message || "Chuyển tiền thất bại";
+      toast.error(msg);
+    },
+  });
+
+  // =================================================================
+  // 8. HELPER: Kiểm tra giao dịch liên quan
   // =================================================================
   const checkRelatedTransactions = async (categoryId: string) => {
     setIsCheckingRelated(true);
@@ -203,11 +220,13 @@ export function useTransactions(
     deleteTransaction: deleteMutation.mutateAsync,
     exportTransactions: exportMutation.mutateAsync,
     scanReceipt: scanMutation.mutateAsync,
+    transferTransaction: transferMutation.mutateAsync,
     isCreating: createMutation.isPending,
     isUpdating: updateMutation.isPending,
     isDeleting: deleteMutation.isPending,
     isExporting: exportMutation.isPending,
     isScanning: scanMutation.isPending,
+    isTransferring: transferMutation.isPending,
     checkRelatedTransactions,
     isCheckingRelated,
   };

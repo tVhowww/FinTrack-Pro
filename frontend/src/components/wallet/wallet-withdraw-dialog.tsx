@@ -50,7 +50,8 @@ export function WalletWithdrawDialog({
   onOpenChange,
   wallet,
 }: WalletWithdrawDialogProps) {
-  const { createTransaction, isCreating } = useTransactions();
+  const { createTransaction, isCreating, transferTransaction, isTransferring } =
+    useTransactions();
   const { wallets, deleteWallet } = useWallets();
   const { categories } = useCategories();
   const [activeTab, setActiveTab] = useState("transfer");
@@ -127,42 +128,25 @@ export function WalletWithdrawDialog({
   const onSubmit = async (values: WithdrawFormValues) => {
     if (!wallet) return;
 
-    const sleep = (ms: number) =>
-      new Promise((resolve) => setTimeout(resolve, ms));
-
     try {
       if (activeTab === "transfer") {
         const destWallet = wallets.find(
           (w) => w.id === values.destinationWalletId,
         );
 
-        // Bắn phát súng 1: Trừ tiền quỹ
-        await createTransaction({
+        await transferTransaction({
+          fromWalletId: wallet.id,
+          toWalletId: values.destinationWalletId!,
           amount: values.amount,
-          type: TransactionType.EXPENSE,
-          walletId: wallet.id,
-          date: new Date(),
-          note: `Rút tiền chuyển về ví ${destWallet?.name}`,
-          categoryId: "auto-saving-category",
-        });
-
-        await sleep(500);
-
-        // Bắn phát súng 2: Cộng tiền ví nhận kèm Category đàng hoàng
-        await createTransaction({
-          amount: values.amount,
-          type: TransactionType.INCOME,
-          walletId: values.destinationWalletId!,
-          date: new Date(),
-          note: `Nhận tiền từ quỹ ${wallet.name}`,
           categoryId: values.categoryId,
+          note: values.note || `Rút tiền chuyển về ví ${destWallet?.name}`,
         });
 
         toast.success(
           `Đã chuyển ${values.amount} về ví ${destWallet?.name} thành công!`,
         );
       } else {
-        // --- KỊCH BẢN 2: CHI TIÊU TRỰC TIẾP ---
+        // CHI TIÊU TRỰC TIẾP
         await createTransaction({
           amount: values.amount,
           type: TransactionType.EXPENSE,
@@ -174,7 +158,6 @@ export function WalletWithdrawDialog({
         toast.success("Đã ghi nhận khoản chi từ quỹ!");
       }
 
-      // XỬ LÝ HẬU SỰ RÚT SẠCH
       const remainingBalance = wallet.balance - values.amount;
       if (remainingBalance === 0) {
         toast("Quỹ đã cạn! 🐷", {
@@ -195,7 +178,6 @@ export function WalletWithdrawDialog({
       onOpenChange(false);
     } catch (error) {
       console.error(error);
-      toast.error("Có lỗi xảy ra khi thực hiện giao dịch!");
     }
   };
 
@@ -372,7 +354,7 @@ export function WalletWithdrawDialog({
                   type="submit"
                   variant="destructive"
                   className="w-full"
-                  disabled={isCreating}
+                  disabled={isCreating || isTransferring}
                 >
                   {isCreating ? "Đang xử lý..." : "Xác nhận Rút tiền"}
                 </Button>

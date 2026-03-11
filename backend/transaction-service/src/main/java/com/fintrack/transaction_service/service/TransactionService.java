@@ -3,6 +3,7 @@ package com.fintrack.transaction_service.service;
 import com.fintrack.transaction_service.dto.event.NotificationEvent;
 import com.fintrack.transaction_service.dto.request.TransactionCreationRequest;
 import com.fintrack.transaction_service.dto.request.TransactionUpdateRequest;
+import com.fintrack.transaction_service.dto.request.TransferRequest;
 import com.fintrack.transaction_service.dto.request.WalletBalanceUpdateRequest;
 import com.fintrack.transaction_service.dto.response.*;
 import com.fintrack.transaction_service.entity.Category;
@@ -585,9 +586,6 @@ public class TransactionService {
     @Transactional
     public TransactionResponse create(TransactionCreationRequest request) {
         String currentUserId = SecurityUtils.getCurrentUserId();
-
-        // Tạo ra một cái khóa duy nhất cho user này khi tạo giao dịch.
-        // TTL = 3 giây (Đủ dài để chặn double-click, đủ ngắn để không gây khó chịu nếu mạng lag thật)
         String lockKey = "lock:create_transaction:" + currentUserId;
         Boolean acquired = redisTemplate.opsForValue().setIfAbsent(lockKey, "LOCKED", 3, TimeUnit.SECONDS);
 
@@ -596,6 +594,51 @@ public class TransactionService {
             throw new AppException(ErrorCode.REQUEST_PROCESSING);
         }
 
+        return createInternal(request); // Chuyển xuống hàm lõi
+    }
+
+    @Transactional
+    public void transfer(TransferRequest request) {
+        String currentUserId = SecurityUtils.getCurrentUserId();
+        String lockKey = "lock:transfer_transaction:" + currentUserId;
+        Boolean acquired = redisTemplate.opsForValue().setIfAbsent(lockKey, "LOCKED", 3, TimeUnit.SECONDS);
+
+        if (Boolean.FALSE.equals(acquired)) {
+            log.warn("Phát hiện Double-Click chuyển tiền từ User {}", currentUserId);
+            throw new AppException(ErrorCode.REQUEST_PROCESSING);
+        }
+
+        // Validate trước 2 ví xem có quyền sở hữu không
+        WalletResponse fromWallet = validateAndGetWallet(request.getFromWalletId());
+        WalletResponse toWallet = validateAndGetWallet(request.getToWalletId());
+
+        Instant transactionDate = request.getDate() != null ? request.getDate() : Instant.now();
+
+        // Phát súng 1: TRỪ TIỀN VÍ NGUỒN
+        TransactionCreationRequest expenseReq = TransactionCreationRequest.builder()
+                .amount(request.getAmount())
+                .type(TransactionType.EXPENSE)
+                .walletId(request.getFromWalletId())
+                .date(transactionDate)
+                .note(request.getNote() != null && !request.getNote().isEmpty() ? request.getNote() : "Chuyển tiền sang ví " + toWallet.getName())
+                .categoryId("auto-saving-category") // Sẽ bị Backend đè lại nếu là ví SAVING
+                .build();
+        createInternal(expenseReq); // Dùng hàm lõi để KHÔNG bị vướng Redis Lock
+
+        // Phát súng 2: CỘNG TIỀN VÍ ĐÍCH
+        TransactionCreationRequest incomeReq = TransactionCreationRequest.builder()
+                .amount(request.getAmount())
+                .type(TransactionType.INCOME)
+                .walletId(request.getToWalletId())
+                .date(transactionDate)
+                .note("Nhận tiền từ quỹ " + fromWallet.getName())
+                .categoryId(request.getCategoryId()) // ID Danh mục gửi từ form
+                .build();
+        createInternal(incomeReq);
+    }
+
+    // LÕI XỬ LÝ (KHÔNG CÓ REDIS LOCK ĐỂ TÁI SỬ DỤNG)
+    private TransactionResponse createInternal(TransactionCreationRequest request) {
         WalletResponse wallet = validateAndGetWallet(request.getWalletId());
 
         Category category = null;
@@ -625,6 +668,7 @@ public class TransactionService {
                 .amount(updateAmount)
                 .build();
 
+        // GỌI SANG WALLET SERVICE (Nếu đứt mạng khúc này, @Transactional sẽ rollback DB ở trên)
         walletClient.updateBalance(request.getWalletId(), balanceRequest);
 
         // LẤY INFO TRƯỚC KHI XUỐNG ASYNC
@@ -639,15 +683,14 @@ public class TransactionService {
                 username = userResponse.getResult().getUsername();
             }
 
-            var walletResponse = walletClient.getWallet(request.getWalletId());
-            if (walletResponse != null && walletResponse.getResult() != null) {
-                currency = walletResponse.getResult().getCurrency();
+            if (wallet != null) {
+                currency = wallet.getCurrency();
             }
         } catch (Exception e) {
             log.error("Lỗi lấy thông tin user để gửi email: {}", e.getMessage());
         }
 
-        // 4. Gửi Notification qua Kafka (Truyền thêm Email và Tên)
+        // 4. Gửi Notification qua Kafka (ASYNC)
         sendTransactionNotification(transaction, category, recipientEmail, username, currency);
 
         budgetAlertEngine.checkAndAlert(transaction, recipientEmail, username);
