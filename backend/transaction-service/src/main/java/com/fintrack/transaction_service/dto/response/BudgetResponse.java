@@ -1,5 +1,6 @@
 package com.fintrack.transaction_service.dto.response;
 
+import com.fintrack.transaction_service.enums.BudgetStatus;
 import lombok.Builder;
 import lombok.Data;
 import java.math.BigDecimal;
@@ -18,4 +19,5 @@ public class BudgetResponse {
     private String categoryName;
     private Integer month;
     private Integer year;
+    private BudgetStatus status;
 }

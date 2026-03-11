@@ -41,15 +41,15 @@ export default function BudgetsPage() {
     isDeleting,
   } = useBudgets({ month, year, walletId, keyword });
 
-  // Lọc trạng thái bằng Frontend RAM (Dựa vào param URL)
+  // Lọc trạng thái bằng Frontend RAM (Dựa vào param URL và Status từ Backend)
   const displayBudgets = useMemo(() => {
     if (statusFilter === "ALL") return budgets;
 
     return budgets.filter((b) => {
-      if (statusFilter === "SAFE") return b.percentage < 80;
-      if (statusFilter === "WARNING")
-        return b.percentage >= 80 && b.percentage <= 100;
-      if (statusFilter === "DANGER") return b.percentage > 100;
+      if (statusFilter === "EXCEEDED") return b.status === "EXCEEDED";
+      if (statusFilter === "EXPIRED") return b.status === "EXPIRED";
+      if (statusFilter === "UPCOMING") return b.status === "UPCOMING";
+      if (statusFilter === "ACTIVE") return b.status === "ACTIVE";
       return true;
     });
   }, [budgets, statusFilter]);
@@ -99,6 +99,29 @@ export default function BudgetsPage() {
       </div>
 
       <BudgetFilter />
+
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted-foreground px-1">
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full bg-emerald-500 shadow-sm"></div>
+          <span>An toàn (&lt; 80%)</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full bg-amber-500 shadow-sm"></div>
+          <span>Sắp vượt (80% - 99%)</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full bg-rose-500 shadow-sm"></div>
+          <span className="font-medium text-rose-600/80">Đã vượt mức</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full bg-blue-400 shadow-sm"></div>
+          <span>Sắp tới</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full bg-slate-400 shadow-sm"></div>
+          <span>Đã kết thúc</span>
+        </div>
+      </div>
 
       {/* DANH SÁCH HIỂN THỊ */}
       {isLoading ? (

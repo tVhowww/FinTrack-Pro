@@ -7,6 +7,7 @@ import com.fintrack.transaction_service.dto.response.WalletResponse;
 import com.fintrack.transaction_service.entity.Budget;
 import com.fintrack.transaction_service.entity.Category;
 import com.fintrack.transaction_service.entity.Transaction;
+import com.fintrack.transaction_service.enums.BudgetStatus;
 import com.fintrack.transaction_service.enums.TransactionType;
 import com.fintrack.transaction_service.exception.AppException;
 import com.fintrack.transaction_service.exception.ErrorCode;
@@ -31,9 +32,7 @@ import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.YearMonth;
 import java.time.ZoneId;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -52,7 +51,7 @@ public class BudgetService {
     /**
      * Lấy danh sách Budget (Xử lý 3 trường hợp: Tất cả, Ví chung, Ví cụ thể)
      */
-    public List<BudgetResponse> getBudgets(String walletId, int month, int year, String keyword) { // 👇 [MỚI] Thêm param keyword
+    public List<BudgetResponse> getBudgets(String walletId, int month, int year, String keyword) {
         String userId = SecurityUtils.getCurrentUserId();
 
         // 1. Dùng Specification để build query động siêu mạnh
@@ -160,8 +159,18 @@ public class BudgetService {
         budgetRepository.delete(budget);
     }
 
+    // --- Helper: Gom ID của Danh mục cha và toàn bộ Danh mục con ---
+    private void collectCategoryIds(Category category, List<String> ids) {
+        ids.add(category.getId());
+        if (category.getSubCategories() != null) {
+            for (Category child : category.getSubCategories()) {
+                collectCategoryIds(child, ids); // Đệ quy lôi hết con cháu vào
+            }
+        }
+    }
+
     /**
-     * Helper: Map Entity -> Response và tính toán Spent Amount
+     * Helper: Map Entity -> Response và tính toán Spent Amount & Status
      */
     private BudgetResponse mapToBudgetResponse(Budget budget, List<WalletResponse> allMyWallets) {
         YearMonth yearMonth = YearMonth.of(budget.getYear(), budget.getMonth());
@@ -170,10 +179,10 @@ public class BudgetService {
 
         List<String> targetWalletIds = new ArrayList<>();
         String walletName = "Ngân sách chung";
-        String baseCurrency = getUserBaseCurrency(); // Lấy loại tiền của User
+        String baseCurrency = getUserBaseCurrency();
 
         // Tạo Map dò tiền tệ của từng ví
-        java.util.Map<String, String> walletCurrencyMap = new java.util.HashMap<>();
+        Map<String, String> walletCurrencyMap = new HashMap<>();
         for (WalletResponse w : allMyWallets) {
             walletCurrencyMap.put(w.getId(), w.getCurrency());
         }
@@ -193,11 +202,16 @@ public class BudgetService {
         BigDecimal spentAmount = BigDecimal.ZERO;
 
         if (!targetWalletIds.isEmpty()) {
-            // Lấy danh sách giao dịch thay vì cộng chay bằng Database
+            List<String> categoryIdsToFilter = new ArrayList<>();
+            categoryRepository.findById(budget.getCategoryId()).ifPresentOrElse(
+                    cat -> collectCategoryIds(cat, categoryIdsToFilter),
+                    () -> categoryIdsToFilter.add(budget.getCategoryId()) // Fallback nếu lỗi
+            );
+
             var spec = Specification.where(
                             TransactionSpecification.hasWalletIdIn(targetWalletIds)
                     ).and(TransactionSpecification.hasType(TransactionType.EXPENSE))
-                    .and(TransactionSpecification.hasCategoryIn(List.of(budget.getCategoryId())))
+                    .and(TransactionSpecification.hasCategoryIn(categoryIdsToFilter))
                     .and(TransactionSpecification.createdBetween(start, end));
 
             List<Transaction> transactions = transactionRepository.findAll(spec);
@@ -222,6 +236,20 @@ public class BudgetService {
             percentage = spentAmount.divide(displayAmount, 4, RoundingMode.HALF_UP).doubleValue() * 100;
         }
 
+        BudgetStatus status;
+        YearMonth currentYearMonth = YearMonth.now();
+        YearMonth budgetYearMonth = YearMonth.of(budget.getYear(), budget.getMonth());
+
+        if (spentAmount.compareTo(displayAmount) >= 0) {
+            status = BudgetStatus.EXCEEDED; // Ưu tiên 1: Đã tiêu lố (dù quá khứ hay hiện tại)
+        } else if (budgetYearMonth.isBefore(currentYearMonth)) {
+            status = BudgetStatus.EXPIRED; // Ưu tiên 2: Xài chưa hết nhưng đã qua tháng
+        } else if (budgetYearMonth.isAfter(currentYearMonth)) {
+            status = BudgetStatus.UPCOMING; // Ưu tiên 3: Ngân sách tháng sau
+        } else {
+            status = BudgetStatus.ACTIVE; // Ưu tiên 4: Đang trong tháng hiện tại và còn tiền
+        }
+
         String categoryName = categoryRepository.findById(budget.getCategoryId())
                 .map(Category::getName).orElse("Unknown");
 
@@ -237,6 +265,7 @@ public class BudgetService {
                 .categoryName(categoryName)
                 .month(budget.getMonth())
                 .year(budget.getYear())
+                .status(status)
                 .build();
     }
 

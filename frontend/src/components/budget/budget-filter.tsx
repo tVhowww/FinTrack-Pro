@@ -96,14 +96,15 @@ export function BudgetFilter() {
           value={currentStatus}
           onValueChange={(val) => updateFilter("status", val)}
         >
-          <SelectTrigger className="w-full sm:w-[150px] bg-background">
+          <SelectTrigger className="w-full sm:w-[160px] bg-background">
             <SelectValue placeholder="Trạng thái" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="ALL">Tất cả trạng thái</SelectItem>
-            <SelectItem value="SAFE">🟢 An toàn (&lt; 80%)</SelectItem>
-            <SelectItem value="WARNING">🟡 Sắp vượt (80-100%)</SelectItem>
-            <SelectItem value="DANGER">🔴 Đã vượt (&gt; 100%)</SelectItem>
+            <SelectItem value="ACTIVE">🟢 Đang hoạt động</SelectItem>
+            <SelectItem value="EXCEEDED">🔴 Đã vượt mức</SelectItem>
+            <SelectItem value="EXPIRED">⚪ Đã kết thúc</SelectItem>
+            <SelectItem value="UPCOMING">🔵 Sắp tới</SelectItem>
           </SelectContent>
         </Select>
 
