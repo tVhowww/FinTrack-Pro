@@ -1,4 +1,4 @@
-"use client";
+// src/app/(dashboard)/transactions/columns.tsx
 
 import { Button } from "@/components/ui/button";
 import {
@@ -9,19 +9,18 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { formatCurrency } from "@/lib/utils";
 import { TransactionResponse, TransactionType } from "@/types/transaction.dto";
+import { Wallet } from "@/types/wallet.dto";
 import { ColumnDef } from "@tanstack/react-table";
 import { format } from "date-fns";
 import { vi } from "date-fns/locale";
 import { Edit, MoreHorizontal, Trash } from "lucide-react";
 
-// Định nghĩa hành động (Sửa/Xóa) sẽ được truyền từ Component cha vào
 interface TransactionActionsProps {
   transaction: TransactionResponse;
   onEdit: (transaction: TransactionResponse) => void;
   onDelete: (transaction: TransactionResponse) => void;
 }
 
-// Component Action cell tách riêng để code gọn
 const ActionCell = ({
   transaction,
   onEdit,
@@ -50,17 +49,15 @@ const ActionCell = ({
   );
 };
 
-// Hàm tạo columns nhận vào các handler
 export const getColumns = (
   onEdit: (t: TransactionResponse) => void,
   onDelete: (t: TransactionResponse) => void,
-  wallets: any[],
+  wallets: Wallet[],
 ): ColumnDef<TransactionResponse>[] => [
   {
     accessorKey: "date",
     header: "Ngày",
     cell: ({ row }) => {
-      // Format ngày: 30 thg 1, 2026
       return (
         <div className="text-sm font-medium">
           {format(new Date(row.original.date), "dd MMM, yyyy", { locale: vi })}
@@ -73,7 +70,21 @@ export const getColumns = (
     header: "Danh mục",
     cell: ({ row }) => {
       const categoryName = row.original.categoryName || "Không phân loại";
-      return <div className="text-sm">{categoryName}</div>;
+      return <div className="text-sm font-medium">{categoryName}</div>;
+    },
+  },
+  {
+    accessorKey: "walletId",
+    header: "Ví / Nguồn tiền",
+    cell: ({ row }) => {
+      const walletName =
+        wallets.find((w) => w.id === row.original.walletId)?.name ||
+        "Ví không xác định";
+      return (
+        <div className="inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80 whitespace-nowrap">
+          {walletName}
+        </div>
+      );
     },
   },
   {
@@ -94,13 +105,9 @@ export const getColumns = (
       const amount = parseFloat(row.getValue("amount"));
       const type = row.original.type;
 
-      // Màu sắc: Xanh (Thu) - Đỏ (Chi)
       const colorClass =
-        type === TransactionType.INCOME ? "text-green-600" : "text-red-600";
-
-      // Dấu: + hoặc -
+        type === TransactionType.INCOME ? "text-emerald-600" : "text-rose-600";
       const prefix = type === TransactionType.INCOME ? "+" : "-";
-
       const txCurrency =
         wallets.find((w) => w.id === row.original.walletId)?.currency || "VND";
 
