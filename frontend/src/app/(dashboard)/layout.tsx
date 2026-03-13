@@ -1,6 +1,6 @@
 import { Header } from "@/components/layout/header";
 import { Sidebar } from "@/components/layout/sidebar";
-import { AiChatWidget } from "@/components/shared/AiChatWidget";
+import { AiChatWidget } from "@/components/shared/ai-chat-widget";
 
 export default function DashboardLayout({
   children,

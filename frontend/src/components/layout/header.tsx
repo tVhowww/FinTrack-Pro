@@ -1,6 +1,7 @@
 import { UserNav } from "@/components/ui/user-nav";
 import { Input } from "@/components/ui/input"; // Nếu chưa có thì cài shadcn input
 import { Search } from "lucide-react";
+import { ThemeToggle } from "../shared/theme-toggle";
 
 export function Header() {
   return (
@@ -12,6 +13,7 @@ export function Header() {
 
       {/* Right Side: User Nav + Theme Toggle */}
       <div className="flex items-center space-x-4">
+        <ThemeToggle />
         <UserNav />
       </div>
     </header>
