@@ -14,7 +14,7 @@ import {
   ChartBarStacked,
 } from "lucide-react";
 
-const sidebarItems = [
+export const sidebarItems = [
   { name: "Tổng quan", href: "/", icon: LayoutDashboard },
   { name: "Nhóm", href: "/categories", icon: ChartBarStacked },
   { name: "Ví của tôi", href: "/wallets", icon: Wallet },

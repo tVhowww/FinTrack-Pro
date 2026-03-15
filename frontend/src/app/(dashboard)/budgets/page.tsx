@@ -140,7 +140,7 @@ export default function BudgetsPage() {
               <p className="text-muted-foreground font-medium">
                 {keyword || statusFilter !== "ALL"
                   ? "Không tìm thấy ngân sách nào phù hợp với bộ lọc."
-                  : `Tháng ${month}/{year} chưa có ngân sách nào.`}
+                  : `Tháng ${month}/${year} chưa có ngân sách nào.`}
               </p>
               {!keyword && statusFilter === "ALL" && (
                 <Button
