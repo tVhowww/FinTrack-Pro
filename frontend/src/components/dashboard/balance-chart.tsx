@@ -27,48 +27,54 @@ export function BalanceChart({
   baseCurrency,
 }: BalanceChartProps) {
   if (isLoading) {
-    return <Skeleton className="h-[350px] w-full rounded-xl" />;
+    return <Skeleton className="h-full w-full rounded-xl" />;
   }
 
-  // Backend trả về từ Quá khứ -> Hiện tại (Ascending), phù hợp để vẽ trục X từ trái qua phải
   const chartData = data.map((item) => ({
     ...item,
     name: `T${item.month}`,
   }));
 
   return (
-    <Card className="col-span-4 shadow-sm">
-      <CardHeader>
-        <CardTitle>Xu hướng dòng tiền (6 tháng)</CardTitle>
+    <Card className="shadow-sm h-full flex flex-col">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base sm:text-lg">
+          Xu hướng dòng tiền (6 tháng)
+        </CardTitle>
       </CardHeader>
-      <CardContent className="pl-0">
-        <div className="h-[300px] w-full">
+      <CardContent className="flex-1 pl-0 pr-4 sm:pr-6 pb-4">
+        <div className="h-full w-full min-h-[250px]">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={chartData}
-              margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+              margin={{ top: 5, right: 0, left: -15, bottom: 0 }}
             >
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <CartesianGrid
+                strokeDasharray="3 3"
+                vertical={false}
+                stroke="#e5e7eb"
+              />
               <XAxis
                 dataKey="name"
-                stroke="#888888"
-                fontSize={12}
+                stroke="#6b7280"
+                fontSize={10}
                 tickLine={false}
                 axisLine={false}
+                dy={10}
               />
               <YAxis
-                stroke="#888888"
-                fontSize={12}
+                stroke="#6b7280"
+                fontSize={10}
                 tickLine={false}
                 axisLine={false}
-                width={50}
+                width={45} // Ép chiều rộng trục Y nhỏ lại
                 tickFormatter={(value) => {
                   if (value === 0) return "0";
                   if (value >= 1000000) {
-                    return `${(value / 1000000).toFixed(1).replace(/\.0$/, "")}M`;
+                    return `${(value / 1000000).toFixed(0)}M`;
                   }
                   if (value >= 1000) {
-                    return `${(value / 1000).toFixed(1).replace(/\.0$/, "")}k`;
+                    return `${(value / 1000).toFixed(0)}k`;
                   }
                   return value.toString();
                 }}
@@ -77,27 +83,34 @@ export function BalanceChart({
                 formatter={(value: number) =>
                   formatCurrency(value, baseCurrency)
                 }
-                cursor={{ fill: "transparent" }}
+                cursor={{ fill: "rgba(0,0,0,0.05)" }}
                 contentStyle={{
                   borderRadius: "8px",
-                  border: "none",
-                  boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                  border: "1px solid #e5e7eb",
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
+                  fontSize: "12px",
                 }}
               />
-              <Legend />
+              <Legend
+                wrapperStyle={{ fontSize: "12px", paddingTop: "10px" }}
+                iconType="circle"
+                iconSize={8}
+              />
               <Bar
                 dataKey="income"
                 name="Thu nhập"
-                fill="#10b981" // Màu xanh lá (Emerald)
+                fill="#10b981"
                 radius={[4, 4, 0, 0]}
-                barSize={30}
+                barSize={20}
+                maxBarSize={40}
               />
               <Bar
                 dataKey="expense"
                 name="Chi tiêu"
-                fill="#ef4444" // Màu đỏ (Red)
+                fill="#ef4444"
                 radius={[4, 4, 0, 0]}
-                barSize={30}
+                barSize={20}
+                maxBarSize={40}
               />
             </BarChart>
           </ResponsiveContainer>

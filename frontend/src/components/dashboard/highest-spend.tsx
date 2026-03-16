@@ -15,14 +15,11 @@ interface HighestSpendProps {
   isLoading: boolean;
 }
 
-export function HighestSpend({
-  data,
-  isLoading,
-}: HighestSpendProps) {
+export function HighestSpend({ data, isLoading }: HighestSpendProps) {
   const { wallets } = useWallets();
 
   return (
-    <Card className="col-span-3 shadow-sm h-full border-red-100 bg-red-50/10">
+    <Card className=" shadow-sm h-full border-red-100 bg-red-50/10">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-red-700 flex items-center gap-2">
