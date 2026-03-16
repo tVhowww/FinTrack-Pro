@@ -35,6 +35,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { AuthLayoutShell } from "@/components/auth/auth-layout-shell";
 
 type Step = "EMAIL" | "OTP" | "SUCCESS";
 
@@ -109,7 +110,10 @@ export default function ForgotPasswordPage() {
   });
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-muted/30 p-4">
+    <AuthLayoutShell
+      quote="Khôi phục quyền truy cập vào tài khoản của bạn một cách an toàn và nhanh chóng. Dữ liệu của bạn luôn được bảo vệ."
+      author="FinTrack Security"
+    >
       <Card className="w-full max-w-md shadow-lg">
         {/* ========================================== */}
         {/* STEP 1: NHẬP EMAIL */}
@@ -309,6 +313,6 @@ export default function ForgotPasswordPage() {
           </div>
         )}
       </Card>
-    </div>
+    </AuthLayoutShell>
   );
 }
