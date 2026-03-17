@@ -47,7 +47,6 @@ export function WalletTransferDialog({
   open,
   onOpenChange,
 }: WalletTransferDialogProps) {
-  // ... (TOÀN BỘ PHẦN KHAI BÁO LOGIC CỦA SẾP GIỮ Y NGUYÊN)
   const { transferTransaction, isTransferring } = useTransactions();
   const { wallets } = useWallets();
   const { categories } = useCategories();
@@ -140,8 +139,7 @@ export function WalletTransferDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      {/* Tăng max-width và ép padding chuẩn Mobile */}
-      <DialogContent className="sm:max-w-[450px] p-4 sm:p-6">
+      <DialogContent className="sm:max-w-[450px] p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl">
             <ArrowRightLeft className="h-5 w-5 text-blue-500" /> Chuyển tiền nội
@@ -155,32 +153,40 @@ export function WalletTransferDialog({
         <Form {...form}>
           <form
             onSubmit={form.handleSubmit(onSubmit)}
-            className="space-y-5 mt-2"
+            className="space-y-5 mt-2 w-full min-w-0"
           >
             <FormField
               control={form.control}
               name="fromWalletId"
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="flex flex-col w-full min-w-0">
                   <FormLabel className="text-base">
                     Từ ví nguồn (Bị trừ tiền)
                   </FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
-                      {/* Tăng chiều cao lên h-12 */}
-                      <SelectTrigger className="h-12 text-base">
+                      <SelectTrigger className="h-12 w-full max-w-full [&>span]:flex-1 [&>span]:text-left [&>span]:truncate [&>span]:overflow-hidden block text-base">
                         <SelectValue placeholder="Chọn ví nguồn" />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent>
+                    <SelectContent className="max-w-[85vw] sm:max-w-[400px]">
                       {basicWallets.map((w) => (
-                        <SelectItem key={w.id} value={w.id} className="py-3">
-                          {w.name} (Dư:{" "}
-                          {new Intl.NumberFormat("vi-VN", {
-                            style: "currency",
-                            currency: w.currency || "VND",
-                          }).format(w.balance)}
-                          )
+                        <SelectItem
+                          key={w.id}
+                          value={w.id}
+                          className="py-3 max-w-full overflow-hidden"
+                        >
+                          <div className="w-full text-left truncate pr-2">
+                            <span className="font-medium">{w.name}</span>
+                            <span className="text-muted-foreground ml-1">
+                              (Dư:{" "}
+                              {new Intl.NumberFormat("vi-VN", {
+                                style: "currency",
+                                currency: w.currency || "VND",
+                              }).format(w.balance)}
+                              )
+                            </span>
+                          </div>
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -194,7 +200,7 @@ export function WalletTransferDialog({
               control={form.control}
               name="toWalletId"
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="flex flex-col w-full min-w-0">
                   <FormLabel className="text-base">
                     Sang ví nhận (Cộng tiền)
                   </FormLabel>
@@ -207,14 +213,20 @@ export function WalletTransferDialog({
                     }
                   >
                     <FormControl>
-                      <SelectTrigger className="h-12 text-base">
+                      <SelectTrigger className="h-12 w-full max-w-full [&>span]:flex-1 [&>span]:text-left [&>span]:truncate [&>span]:overflow-hidden block text-base">
                         <SelectValue placeholder="Chọn ví nhận" />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent>
+                    <SelectContent className="max-w-[85vw] sm:max-w-[400px]">
                       {compatibleDestWallets.map((w) => (
-                        <SelectItem key={w.id} value={w.id} className="py-3">
-                          {w.name}
+                        <SelectItem
+                          key={w.id}
+                          value={w.id}
+                          className="py-3 max-w-full overflow-hidden"
+                        >
+                          <div className="w-full text-left truncate pr-2">
+                            {w.name}
+                          </div>
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -228,16 +240,15 @@ export function WalletTransferDialog({
               control={form.control}
               name="amount"
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="flex flex-col w-full min-w-0">
                   <FormLabel className="text-base">Số tiền chuyển</FormLabel>
                   <FormControl>
-                    <div className="relative">
-                      {/* Cỡ chữ to text-lg, h-12 cho Touch Device */}
+                    <div className="relative w-full min-w-0">
                       <Input
                         type="number"
                         step="any"
                         placeholder="VD: 500000"
-                        className="h-12 text-lg font-bold pr-14"
+                        className="h-12 text-lg font-bold pr-14 w-full min-w-0"
                         {...field}
                       />
                       <div className="absolute right-4 top-1/2 -translate-y-1/2 font-medium text-muted-foreground pointer-events-none">
@@ -270,12 +281,12 @@ export function WalletTransferDialog({
               control={form.control}
               name="note"
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="flex flex-col w-full min-w-0">
                   <FormLabel className="text-base">Ghi chú</FormLabel>
                   <FormControl>
                     <Input
                       placeholder="VD: Sang tiền ăn uống..."
-                      className="h-12 text-base"
+                      className="h-12 text-base w-full min-w-0"
                       {...field}
                     />
                   </FormControl>
@@ -284,7 +295,7 @@ export function WalletTransferDialog({
               )}
             />
 
-            <DialogFooter className="pt-4 pb-2">
+            <DialogFooter className="pt-4 pb-2 sticky bottom-0 bg-background/95 backdrop-blur-sm z-10">
               <Button
                 type="submit"
                 className="w-full h-12 text-lg font-semibold"

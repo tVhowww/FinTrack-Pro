@@ -114,7 +114,6 @@ export function WalletWithdrawDialog({
           fromWalletId: wallet.id,
           toWalletId: values.destinationWalletId!,
           amount: values.amount,
-          // categoryId đã bị xóa bỏ, phó mặc cho Backend lo!
           note: values.note || `Rút tiền chuyển về ví ${destWallet?.name}`,
         });
 
@@ -122,7 +121,6 @@ export function WalletWithdrawDialog({
           `Đã chuyển ${values.amount} về ví ${destWallet?.name} thành công!`,
         );
       } else {
-        // CHI TIÊU TRỰC TIẾP
         await createTransaction({
           amount: values.amount,
           type: TransactionType.EXPENSE,
@@ -158,15 +156,16 @@ export function WalletWithdrawDialog({
   };
 
   if (!wallet) return null;
+  const isLoading = isCreating || isTransferring;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[450px] p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+          <DialogTitle className="flex items-center gap-2 text-xl">
             <Hammer className="h-5 w-5 text-rose-500" /> Rút tiền quỹ
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-base truncate" title={wallet.name}>
             Bạn đang có{" "}
             <strong className="text-emerald-600">
               {new Intl.NumberFormat("vi-VN", {
@@ -181,7 +180,7 @@ export function WalletWithdrawDialog({
         <Tabs
           value={activeTab}
           onValueChange={setActiveTab}
-          className="w-full mt-2"
+          className="w-full mt-2 min-w-0"
         >
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="transfer" className="flex items-center gap-1">
@@ -195,33 +194,33 @@ export function WalletWithdrawDialog({
           <Form {...form}>
             <form
               onSubmit={form.handleSubmit(onSubmit)}
-              className="space-y-4 mt-4"
+              className="space-y-5 mt-5 w-full min-w-0"
             >
               <FormField
                 control={form.control}
                 name="amount"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Số tiền rút</FormLabel>
+                  <FormItem className="flex flex-col w-full min-w-0">
+                    <FormLabel className="text-base">Số tiền rút</FormLabel>
                     <FormControl>
-                      <div className="relative">
+                      <div className="relative w-full min-w-0">
                         <Input
                           type="number"
                           step="any"
                           placeholder="VD: 500000"
-                          className="h-12 text-lg font-bold pr-14"
+                          className="h-12 text-lg font-bold pr-14 w-full min-w-0"
                           {...field}
                         />
-                        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">
+                        <div className="absolute right-4 top-1/2 -translate-y-1/2 font-medium text-muted-foreground pointer-events-none">
                           {getCurrencySymbol(wallet.currency || "VND")}
                         </div>
                       </div>
                     </FormControl>
-                    <div className="flex justify-end mt-1">
+                    <div className="flex justify-end mt-2">
                       <Button
                         type="button"
-                        variant="link"
-                        className="h-auto p-0 text-xs text-rose-500"
+                        variant="secondary"
+                        className="h-8 text-xs font-semibold px-3 text-rose-600 bg-rose-50 hover:bg-rose-100"
                         onClick={() =>
                           form.setValue("amount", wallet.balance, {
                             shouldValidate: true,
@@ -248,26 +247,31 @@ export function WalletWithdrawDialog({
                     control={form.control}
                     name="destinationWalletId"
                     render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Nhận tiền vào ví</FormLabel>
+                      <FormItem className="flex flex-col w-full min-w-0">
+                        <FormLabel className="text-base">Nhận tiền vào ví</FormLabel>
                         <Select
                           onValueChange={field.onChange}
                           value={field.value}
                         >
                           <FormControl>
-                            <SelectTrigger className="h-12 text-base">
+                            <SelectTrigger className="h-12 w-full max-w-full [&>span]:flex-1 [&>span]:text-left [&>span]:truncate [&>span]:overflow-hidden block text-base">
                               <SelectValue placeholder="Chọn ví nhận tiền" />
                             </SelectTrigger>
                           </FormControl>
-                          <SelectContent>
+                          <SelectContent className="max-w-[85vw] sm:max-w-[400px]">
                             {compatibleWallets.map((w) => (
-                              <SelectItem key={w.id} value={w.id}>
-                                {w.name} (
-                                {new Intl.NumberFormat("vi-VN", {
-                                  style: "currency",
-                                  currency: w.currency || "VND",
-                                }).format(w.balance)}
-                                )
+                              <SelectItem key={w.id} value={w.id} className="py-3 max-w-full overflow-hidden">
+                                <div className="w-full text-left truncate pr-2">
+                                  <span className="font-medium">{w.name}</span>
+                                  <span className="text-muted-foreground ml-1">
+                                    (Dư:{" "}
+                                    {new Intl.NumberFormat("vi-VN", {
+                                      style: "currency",
+                                      currency: w.currency || "VND",
+                                    }).format(w.balance)}
+                                    )
+                                  </span>
+                                </div>
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -284,12 +288,12 @@ export function WalletWithdrawDialog({
                   control={form.control}
                   name="note"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Ghi chú chi tiêu</FormLabel>
+                    <FormItem className="flex flex-col w-full min-w-0">
+                      <FormLabel className="text-base">Ghi chú chi tiêu</FormLabel>
                       <FormControl>
                         <Input
                           placeholder="VD: Mua điện thoại..."
-                          className="h-12 text-lg font-bold pr-14"
+                          className="h-12 text-base w-full min-w-0"
                           {...field}
                         />
                       </FormControl>
@@ -299,16 +303,14 @@ export function WalletWithdrawDialog({
                 />
               </TabsContent>
 
-              <DialogFooter className="pt-2">
+              <DialogFooter className="pt-4 pb-2 sticky bottom-0 bg-background/95 backdrop-blur-sm z-10">
                 <Button
                   type="submit"
                   variant="destructive"
                   className="w-full h-12 text-lg font-semibold"
-                  disabled={isCreating || isTransferring}
+                  disabled={isLoading}
                 >
-                  {isCreating || isTransferring
-                    ? "Đang xử lý..."
-                    : "Xác nhận Rút tiền"}
+                  {isLoading ? "Đang xử lý..." : "Xác nhận Rút tiền"}
                 </Button>
               </DialogFooter>
             </form>

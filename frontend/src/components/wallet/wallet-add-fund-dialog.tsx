@@ -55,7 +55,6 @@ export function WalletAddFundDialog({
   const { wallets } = useWallets();
   const [activeTab, setActiveTab] = useState("transfer");
 
-  // Lọc các ví cơ bản cùng loại tiền tệ để làm nguồn nạp
   const compatibleWallets = wallets.filter(
     (w) => w.type !== WalletType.SAVING && w.currency === wallet?.currency,
   );
@@ -73,8 +72,6 @@ export function WalletAddFundDialog({
           path: ["sourceWalletId"],
         });
       }
-
-      // Check số dư ví nguồn có đủ để trích không
       if (activeTab === "transfer" && data.sourceWalletId) {
         const sourceWallet = compatibleWallets.find(
           (w) => w.id === data.sourceWalletId,
@@ -108,11 +105,9 @@ export function WalletAddFundDialog({
 
     try {
       if (activeTab === "transfer") {
-        // KỊCH BẢN 1: TRÍCH TỪ VÍ CƠ BẢN VÀO QUỸ
         const sourceWallet = wallets.find(
           (w) => w.id === values.sourceWalletId,
         );
-
         await transferTransaction({
           fromWalletId: values.sourceWalletId!,
           toWalletId: wallet.id,
@@ -120,7 +115,6 @@ export function WalletAddFundDialog({
           note: `Trích tiền từ ví ${sourceWallet?.name} vào quỹ`,
         });
       } else {
-        // KỊCH BẢN 2: NẠP TỪ NGUỒN BÊN NGOÀI
         await createTransaction({
           amount: values.amount,
           type: TransactionType.INCOME,
@@ -131,7 +125,6 @@ export function WalletAddFundDialog({
         });
       }
 
-      // KIỂM TRA MỤC TIÊU ĐỂ BẮN PHÁO HOA (Chung cho cả 2 kịch bản)
       const newBalance = wallet.balance + values.amount;
       if (wallet.targetAmount && newBalance >= wallet.targetAmount) {
         if (wallet.balance < wallet.targetAmount) {
@@ -186,7 +179,6 @@ export function WalletAddFundDialog({
           "#ff36ff",
         ],
       });
-
       if (new Date().getTime() < end) requestAnimationFrame(frame);
     };
     frame();
@@ -198,13 +190,13 @@ export function WalletAddFundDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[450px] p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Zap className="h-3 w-3 text-emerald-600" fill="currentColor" /> Nạp
+          <DialogTitle className="flex items-center gap-2 text-xl">
+            <Zap className="h-5 w-5 text-emerald-600" fill="currentColor" /> Nạp
             tiền nhanh
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-base truncate" title={wallet.name}>
             Bỏ ống heo vào quỹ{" "}
             <strong className="text-foreground">{wallet.name}</strong>
           </DialogDescription>
@@ -213,7 +205,7 @@ export function WalletAddFundDialog({
         <Tabs
           value={activeTab}
           onValueChange={setActiveTab}
-          className="w-full mt-2"
+          className="w-full mt-2 min-w-0"
         >
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="transfer" className="flex items-center gap-1">
@@ -227,22 +219,21 @@ export function WalletAddFundDialog({
           <Form {...form}>
             <form
               onSubmit={form.handleSubmit(onSubmit)}
-              className="space-y-4 mt-4"
+              className="space-y-5 mt-5 w-full min-w-0"
             >
-              {/* SỐ TIỀN (Dùng chung cho cả 2 Tab) */}
               <FormField
                 control={form.control}
                 name="amount"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Số tiền nạp</FormLabel>
+                  <FormItem className="flex flex-col w-full min-w-0">
+                    <FormLabel className="text-base">Số tiền nạp</FormLabel>
                     <FormControl>
-                      <div className="relative">
+                      <div className="relative w-full min-w-0">
                         <Input
                           type="number"
                           step="any"
                           placeholder="VD: 500000"
-                          className="h-12 text-lg font-bold pr-14"
+                          className="h-12 text-lg font-bold pr-14 w-full min-w-0"
                           autoFocus
                           {...field}
                         />
@@ -256,7 +247,6 @@ export function WalletAddFundDialog({
                 )}
               />
 
-              {/* TAB 1: TRÍCH TỪ VÍ CƠ BẢN */}
               <TabsContent value="transfer" className="mt-0 space-y-4">
                 {compatibleWallets.length === 0 ? (
                   <div className="text-sm text-rose-500 bg-rose-50 p-3 rounded-md border border-rose-200">
@@ -269,26 +259,37 @@ export function WalletAddFundDialog({
                     control={form.control}
                     name="sourceWalletId"
                     render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Trích tiền từ ví</FormLabel>
+                      <FormItem className="flex flex-col w-full min-w-0">
+                        <FormLabel className="text-base">
+                          Trích tiền từ ví
+                        </FormLabel>
                         <Select
                           onValueChange={field.onChange}
                           value={field.value}
                         >
                           <FormControl>
-                            <SelectTrigger className="h-12 text-base">
+                            <SelectTrigger className="h-12 w-full max-w-full [&>span]:flex-1 [&>span]:text-left [&>span]:truncate [&>span]:overflow-hidden block text-base">
                               <SelectValue placeholder="Chọn ví nguồn" />
                             </SelectTrigger>
                           </FormControl>
-                          <SelectContent>
+                          <SelectContent className="max-w-[85vw] sm:max-w-[400px]">
                             {compatibleWallets.map((w) => (
-                              <SelectItem key={w.id} value={w.id}>
-                                {w.name} (Số dư:{" "}
-                                {new Intl.NumberFormat("vi-VN", {
-                                  style: "currency",
-                                  currency: w.currency || "VND",
-                                }).format(w.balance)}
-                                )
+                              <SelectItem
+                                key={w.id}
+                                value={w.id}
+                                className="py-3 max-w-full overflow-hidden"
+                              >
+                                <div className="w-full text-left truncate pr-2">
+                                  <span className="font-medium">{w.name}</span>
+                                  <span className="text-muted-foreground ml-1">
+                                    (Số dư:{" "}
+                                    {new Intl.NumberFormat("vi-VN", {
+                                      style: "currency",
+                                      currency: w.currency || "VND",
+                                    }).format(w.balance)}
+                                    )
+                                  </span>
+                                </div>
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -300,15 +301,17 @@ export function WalletAddFundDialog({
                 )}
               </TabsContent>
 
-              {/* TAB 2: NGUỒN BÊN NGOÀI (Không cần chọn gì thêm) */}
               <TabsContent value="direct" className="mt-0">
-                <div className="text-sm text-muted-foreground bg-muted/30 p-3 rounded-md border border-dashed">
+                <div
+                  className="text-sm text-muted-foreground bg-muted/30 p-3 rounded-md border border-dashed truncate"
+                  title={wallet.name}
+                >
                   Khoản tiền này sẽ được tính là Thu nhập mới của bạn và cộng
                   thẳng vào quỹ <strong>{wallet.name}</strong>.
                 </div>
               </TabsContent>
 
-              <DialogFooter className="pt-2">
+              <DialogFooter className="pt-4 pb-2 sticky bottom-0 bg-background/95 backdrop-blur-sm z-10">
                 <Button
                   type="submit"
                   className="w-full h-12 text-lg font-semibold"
