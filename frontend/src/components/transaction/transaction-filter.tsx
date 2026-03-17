@@ -24,7 +24,6 @@ export function TransactionFilter() {
   const { wallets } = useWallets();
   const { categories } = useCategories();
 
-  // Lấy giá trị hiện tại từ URL
   const currentKeyword = searchParams.get("keyword") || "";
   const currentType = searchParams.get("type") || "all";
   const currentWallet = searchParams.get("walletId") || "all";
@@ -36,7 +35,6 @@ export function TransactionFilter() {
     setLocalKeyword(currentKeyword);
   }, [currentKeyword]);
 
-  // Hàm update URL
   const updateFilter = (key: string, value: string) => {
     const params = new URLSearchParams(searchParams);
 
@@ -46,8 +44,6 @@ export function TransactionFilter() {
       params.delete(key);
     }
 
-    // Nếu người dùng đổi Loại giao dịch (Thu/Chi)
-    // thì phải Reset (xóa) luôn cái Danh mục đang chọn để tránh xung đột
     if (key === "type") {
       params.delete("categoryId");
     }
@@ -61,7 +57,7 @@ export function TransactionFilter() {
   };
 
   const clearFilters = () => {
-    replace(pathname); // Xóa sạch param, về lại đường dẫn gốc
+    replace(pathname);
   };
 
   const flattenCategories = categories.flatMap((c) => [
@@ -69,38 +65,45 @@ export function TransactionFilter() {
     ...(c.subCategories || []),
   ]);
 
+  const hasActiveFilters =
+    currentKeyword ||
+    currentType !== "all" ||
+    currentWallet !== "all" ||
+    currentCategory !== "all";
+
   return (
-    <div className="flex flex-col md:flex-row gap-4 mb-6 bg-card p-4 rounded-lg border shadow-sm">
-      {/* Search Ô chữ */}
-      <div className="flex flex-1 items-center gap-2">
+    <div className="bg-card p-4 rounded-lg border shadow-sm flex flex-col gap-4 mb-6">
+      {/* KHU VỰC TÌM KIẾM (Luôn nằm 1 hàng riêng trên Mobile) */}
+      <div className="flex flex-1 items-center gap-2 w-full">
         <div className="relative flex-1">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Tìm theo ghi chú..."
-            className="pl-9"
+            className="pl-9 w-full bg-background"
             value={localKeyword}
             onChange={(e) => setLocalKeyword(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") handleSearchKeyword();
             }}
+            onBlur={handleSearchKeyword}
           />
         </div>
         <Button
           variant="default"
-          className="cursor-pointer"
           onClick={handleSearchKeyword}
+          className="shrink-0"
         >
           Tìm
         </Button>
       </div>
 
-      {/* Lọc theo Loại */}
-      <div className="w-full md:w-[150px]">
+      {/* KHU VỰC BỘ LỌC (Grid 2 cột trên Mobile, nằm ngang trên PC) */}
+      <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full">
         <Select
           value={currentType}
           onValueChange={(val) => updateFilter("type", val)}
         >
-          <SelectTrigger>
+          <SelectTrigger className="w-full sm:w-[150px] bg-background">
             <SelectValue placeholder="Loại giao dịch" />
           </SelectTrigger>
           <SelectContent>
@@ -109,15 +112,12 @@ export function TransactionFilter() {
             <SelectItem value={TransactionType.EXPENSE}>Chi tiêu</SelectItem>
           </SelectContent>
         </Select>
-      </div>
 
-      {/* Lọc theo Ví */}
-      <div className="w-full md:w-[180px]">
         <Select
           value={currentWallet}
           onValueChange={(val) => updateFilter("walletId", val)}
         >
-          <SelectTrigger>
+          <SelectTrigger className="w-full sm:w-[150px] bg-background">
             <SelectValue placeholder="Chọn ví" />
           </SelectTrigger>
           <SelectContent>
@@ -129,15 +129,12 @@ export function TransactionFilter() {
             ))}
           </SelectContent>
         </Select>
-      </div>
 
-      {/* Lọc theo Danh mục */}
-      <div className="w-full md:w-[180px]">
         <Select
           value={currentCategory}
           onValueChange={(val) => updateFilter("categoryId", val)}
         >
-          <SelectTrigger>
+          <SelectTrigger className="w-full sm:w-[180px] bg-background col-span-2 sm:col-span-1">
             <SelectValue placeholder="Danh mục" />
           </SelectTrigger>
           <SelectContent>
@@ -151,21 +148,17 @@ export function TransactionFilter() {
               ))}
           </SelectContent>
         </Select>
-      </div>
 
-      {/* Nút Xóa bộ lọc */}
-      {(currentKeyword ||
-        currentType !== "all" ||
-        currentWallet !== "all" ||
-        currentCategory !== "all") && (
-        <Button
-          variant="ghost"
-          className="px-3 text-muted-foreground"
-          onClick={clearFilters}
-        >
-          <X className="h-4 w-4 mr-1" /> Bỏ lọc
-        </Button>
-      )}
+        {hasActiveFilters && (
+          <Button
+            variant="ghost"
+            className="w-full sm:w-auto px-3 text-muted-foreground shrink-0 col-span-2 sm:col-span-1"
+            onClick={clearFilters}
+          >
+            <X className="h-4 w-4 mr-1" /> Bỏ lọc
+          </Button>
+        )}
+      </div>
     </div>
   );
 }
