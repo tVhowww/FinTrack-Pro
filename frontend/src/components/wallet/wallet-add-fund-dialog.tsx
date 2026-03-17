@@ -242,7 +242,7 @@ export function WalletAddFundDialog({
                           type="number"
                           step="any"
                           placeholder="VD: 500000"
-                          className="text-lg font-bold pr-12 h-12"
+                          className="h-12 text-lg font-bold pr-14"
                           autoFocus
                           {...field}
                         />
@@ -276,7 +276,7 @@ export function WalletAddFundDialog({
                           value={field.value}
                         >
                           <FormControl>
-                            <SelectTrigger>
+                            <SelectTrigger className="h-12 text-base">
                               <SelectValue placeholder="Chọn ví nguồn" />
                             </SelectTrigger>
                           </FormControl>
@@ -311,7 +311,7 @@ export function WalletAddFundDialog({
               <DialogFooter className="pt-2">
                 <Button
                   type="submit"
-                  className="w-full h-11 text-md "
+                  className="w-full h-12 text-lg font-semibold"
                   disabled={isLoading}
                 >
                   {isLoading ? "Đang xử lý..." : "Nạp tiền"}

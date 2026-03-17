@@ -209,7 +209,7 @@ export function WalletWithdrawDialog({
                           type="number"
                           step="any"
                           placeholder="VD: 500000"
-                          className="text-lg font-bold pr-12 h-12"
+                          className="h-12 text-lg font-bold pr-14"
                           {...field}
                         />
                         <div className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">
@@ -255,7 +255,7 @@ export function WalletWithdrawDialog({
                           value={field.value}
                         >
                           <FormControl>
-                            <SelectTrigger>
+                            <SelectTrigger className="h-12 text-base">
                               <SelectValue placeholder="Chọn ví nhận tiền" />
                             </SelectTrigger>
                           </FormControl>
@@ -287,7 +287,11 @@ export function WalletWithdrawDialog({
                     <FormItem>
                       <FormLabel>Ghi chú chi tiêu</FormLabel>
                       <FormControl>
-                        <Input placeholder="VD: Mua điện thoại..." {...field} />
+                        <Input
+                          placeholder="VD: Mua điện thoại..."
+                          className="h-12 text-lg font-bold pr-14"
+                          {...field}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -299,7 +303,7 @@ export function WalletWithdrawDialog({
                 <Button
                   type="submit"
                   variant="destructive"
-                  className="w-full h-11 text-md"
+                  className="w-full h-12 text-lg font-semibold"
                   disabled={isCreating || isTransferring}
                 >
                   {isCreating || isTransferring

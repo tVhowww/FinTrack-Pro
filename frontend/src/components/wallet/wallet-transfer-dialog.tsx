@@ -47,14 +47,13 @@ export function WalletTransferDialog({
   open,
   onOpenChange,
 }: WalletTransferDialogProps) {
+  // ... (TOÀN BỘ PHẦN KHAI BÁO LOGIC CỦA SẾP GIỮ Y NGUYÊN)
   const { transferTransaction, isTransferring } = useTransactions();
   const { wallets } = useWallets();
   const { categories } = useCategories();
 
-  // Chỉ lấy các ví cơ bản (Không lấy Quỹ tiết kiệm)
   const basicWallets = wallets.filter((w) => w.type !== WalletType.SAVING);
 
-  // Lấy sẵn 1 danh mục thu nhập để chữa cháy cho Backend (ẩn dưới UI)
   const incomeCategories = useMemo(() => {
     const flatCategories = categories.flatMap((c) => [
       c,
@@ -86,7 +85,7 @@ export function WalletTransferDialog({
       if (fromWallet && data.amount > fromWallet.balance) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: "Số tiền chuyển vượt quá số dư ví nguồn",
+          message: "Vượt quá số dư ví nguồn",
           path: ["amount"],
         });
       }
@@ -102,18 +101,15 @@ export function WalletTransferDialog({
   const selectedFromWalletId = form.watch("fromWalletId");
   const fromWallet = basicWallets.find((w) => w.id === selectedFromWalletId);
 
-  // Lọc ví nhận: Cùng loại tiền tệ và phải khác ví nguồn
   const compatibleDestWallets = basicWallets.filter(
     (w) => w.currency === fromWallet?.currency && w.id !== fromWallet?.id,
   );
 
   useEffect(() => {
-    if (open) {
+    if (open)
       form.reset({ fromWalletId: "", toWalletId: "", amount: 0, note: "" });
-    }
   }, [open, form]);
 
-  // Reset ví nhận nếu user đổi ví nguồn sang loại tiền khác
   useEffect(() => {
     const toWalletId = form.getValues("toWalletId");
     if (toWalletId && fromWallet) {
@@ -126,10 +122,8 @@ export function WalletTransferDialog({
 
   const onSubmit = async (values: TransferFormValues) => {
     try {
-      // Tự động mượn 1 danh mục Thu nhập bất kỳ đẩy xuống Backend
       const fallbackCategoryId =
         incomeCategories.length > 0 ? incomeCategories[0].id : undefined;
-
       await transferTransaction({
         fromWalletId: values.fromWalletId,
         toWalletId: values.toWalletId,
@@ -137,7 +131,6 @@ export function WalletTransferDialog({
         note: values.note || "Chuyển tiền nội bộ",
         categoryId: fallbackCategoryId,
       });
-
       toast.success("Chuyển tiền nội bộ thành công!");
       onOpenChange(false);
     } catch (error) {
@@ -147,36 +140,42 @@ export function WalletTransferDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      {/* Tăng max-width và ép padding chuẩn Mobile */}
+      <DialogContent className="sm:max-w-[450px] p-4 sm:p-6">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+          <DialogTitle className="flex items-center gap-2 text-xl">
             <ArrowRightLeft className="h-5 w-5 text-blue-500" /> Chuyển tiền nội
             bộ
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-base">
             Luân chuyển tiền giữa các ví chi tiêu của bạn.
           </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            {/* VÍ NGUỒN */}
+          <form
+            onSubmit={form.handleSubmit(onSubmit)}
+            className="space-y-5 mt-2"
+          >
             <FormField
               control={form.control}
               name="fromWalletId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Từ ví nguồn (Bị trừ tiền)</FormLabel>
+                  <FormLabel className="text-base">
+                    Từ ví nguồn (Bị trừ tiền)
+                  </FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
-                      <SelectTrigger>
+                      {/* Tăng chiều cao lên h-12 */}
+                      <SelectTrigger className="h-12 text-base">
                         <SelectValue placeholder="Chọn ví nguồn" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
                       {basicWallets.map((w) => (
-                        <SelectItem key={w.id} value={w.id}>
-                          {w.name} (Số dư:{" "}
+                        <SelectItem key={w.id} value={w.id} className="py-3">
+                          {w.name} (Dư:{" "}
                           {new Intl.NumberFormat("vi-VN", {
                             style: "currency",
                             currency: w.currency || "VND",
@@ -191,13 +190,14 @@ export function WalletTransferDialog({
               )}
             />
 
-            {/* VÍ NHẬN */}
             <FormField
               control={form.control}
               name="toWalletId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Sang ví nhận (Được cộng tiền)</FormLabel>
+                  <FormLabel className="text-base">
+                    Sang ví nhận (Cộng tiền)
+                  </FormLabel>
                   <Select
                     onValueChange={field.onChange}
                     value={field.value}
@@ -207,63 +207,57 @@ export function WalletTransferDialog({
                     }
                   >
                     <FormControl>
-                      <SelectTrigger>
+                      <SelectTrigger className="h-12 text-base">
                         <SelectValue placeholder="Chọn ví nhận" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
                       {compatibleDestWallets.map((w) => (
-                        <SelectItem key={w.id} value={w.id}>
+                        <SelectItem key={w.id} value={w.id} className="py-3">
                           {w.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                  {selectedFromWalletId &&
-                    compatibleDestWallets.length === 0 && (
-                      <p className="text-[0.8rem] text-muted-foreground mt-1">
-                        Không có ví nào cùng loại tiền tệ để chuyển.
-                      </p>
-                    )}
                   <FormMessage />
                 </FormItem>
               )}
             />
 
-            {/* SỐ TIỀN */}
             <FormField
               control={form.control}
               name="amount"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Số tiền chuyển</FormLabel>
+                  <FormLabel className="text-base">Số tiền chuyển</FormLabel>
                   <FormControl>
                     <div className="relative">
+                      {/* Cỡ chữ to text-lg, h-12 cho Touch Device */}
                       <Input
                         type="number"
                         step="any"
                         placeholder="VD: 500000"
-                        className="pr-12"
+                        className="h-12 text-lg font-bold pr-14"
                         {...field}
                       />
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2 font-medium text-muted-foreground pointer-events-none">
                         {getCurrencySymbol(fromWallet?.currency || "VND")}
                       </div>
                     </div>
                   </FormControl>
                   {fromWallet && (
-                    <div className="flex justify-end mt-1">
+                    <div className="flex justify-end mt-2">
                       <Button
                         type="button"
-                        variant="link"
-                        className="h-auto p-0 text-xs text-blue-500"
+                        variant="secondary"
+                        className="h-8 text-xs font-semibold px-3 text-blue-600 bg-blue-50 hover:bg-blue-100"
                         onClick={() =>
                           form.setValue("amount", fromWallet.balance, {
                             shouldValidate: true,
                           })
                         }
                       >
-                        Chuyển toàn bộ
+                        Chuyển tất cả
                       </Button>
                     </div>
                   )}
@@ -272,16 +266,16 @@ export function WalletTransferDialog({
               )}
             />
 
-            {/* GHI CHÚ */}
             <FormField
               control={form.control}
               name="note"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Ghi chú</FormLabel>
+                  <FormLabel className="text-base">Ghi chú</FormLabel>
                   <FormControl>
                     <Input
-                      placeholder="VD: Rút tiền mặt từ thẻ VCB..."
+                      placeholder="VD: Sang tiền ăn uống..."
+                      className="h-12 text-base"
                       {...field}
                     />
                   </FormControl>
@@ -290,10 +284,10 @@ export function WalletTransferDialog({
               )}
             />
 
-            <DialogFooter className="pt-2">
+            <DialogFooter className="pt-4 pb-2">
               <Button
                 type="submit"
-                className="w-full"
+                className="w-full h-12 text-lg font-semibold"
                 disabled={isTransferring}
               >
                 {isTransferring ? "Đang xử lý..." : "Xác nhận Chuyển tiền"}
