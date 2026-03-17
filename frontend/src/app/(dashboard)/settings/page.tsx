@@ -51,32 +51,22 @@ export default function SettingsPage() {
     isDeletingAccount,
   } = useUser();
 
-  // State cho Form Profile
-  const [profileForm, setProfileForm] = useState<{
-    fullName: string;
-    phoneNumber: string;
-    city: string;
-    dob: string;
-    baseCurrency: string;
-  }>(() => ({
+  const [profileForm, setProfileForm] = useState({
     fullName: user?.fullName || "",
     phoneNumber: user?.phoneNumber || "",
     city: user?.city || "",
     dob: user?.dob || "",
     baseCurrency: user?.baseCurrency || "VND",
-  }));
+  });
 
-  // State cho Form Password
   const [passForm, setPassForm] = useState({
     oldPassword: "",
     newPassword: "",
     confirmPassword: "",
   });
 
-  // Ref cho input file
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Load dữ liệu user vào form khi user thay đổi
   useEffect(() => {
     if (user) {
       setProfileForm({
@@ -89,12 +79,10 @@ export default function SettingsPage() {
     }
   }, [user]);
 
-  // Handle Submit Profile
   const handleSaveProfile = () => {
     updateProfile(profileForm);
   };
 
-  // Handle Submit Password
   const handleChangePassword = () => {
     if (passForm.newPassword !== passForm.confirmPassword) {
       toast.error("Mật khẩu xác nhận không khớp");
@@ -109,15 +97,12 @@ export default function SettingsPage() {
       oldPassword: passForm.oldPassword,
       newPassword: passForm.newPassword,
     });
-    // Reset form sau khi gửi (hoặc xử lý trong onSuccess của hook cũng được)
     setPassForm({ oldPassword: "", newPassword: "", confirmPassword: "" });
   };
 
-  // Handle Upload Avatar
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Validate file ảnh (ví dụ < 2MB)
       if (file.size > 2 * 1024 * 1024) {
         toast.error("Dung lượng ảnh phải nhỏ hơn 2MB");
         return;
@@ -127,44 +112,52 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="space-y-6 pb-10">
+    <div className="space-y-6 pb-10 max-w-5xl mx-auto">
       <div>
         <h2 className="text-2xl font-bold tracking-tight">Cài đặt</h2>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm text-muted-foreground mt-1">
           Quản lý thông tin cá nhân và bảo mật.
         </p>
       </div>
-      <Separator />
 
-      <Tabs defaultValue="general" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="general" className="gap-2">
+      <Tabs defaultValue="general" className="space-y-6">
+        <TabsList className="w-full justify-start h-12 p-1 bg-muted/50 rounded-xl overflow-x-auto overflow-y-hidden">
+          <TabsTrigger value="general" className="gap-2 h-full px-6 rounded-lg">
             <User className="h-4 w-4" /> Chung
           </TabsTrigger>
-          <TabsTrigger value="security" className="gap-2">
+          <TabsTrigger
+            value="security"
+            className="gap-2 h-full px-6 rounded-lg"
+          >
             <Lock className="h-4 w-4" /> Bảo mật
           </TabsTrigger>
         </TabsList>
 
         {/* --- TAB: CHUNG --- */}
-        <TabsContent value="general" className="space-y-4">
-          <Card>
+        <TabsContent value="general" className="space-y-6">
+          <Card className="shadow-sm">
             <CardHeader>
               <CardTitle>Thông tin cá nhân</CardTitle>
               <CardDescription>
                 Cập nhật thông tin hiển thị của bạn.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-8">
               {/* Avatar Section */}
-              <div className="flex items-center gap-6">
-                <Avatar className="h-20 w-20">
+              <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6 bg-muted/10 p-4 rounded-xl border">
+                <Avatar className="h-24 w-24 ring-2 ring-primary/10">
                   <AvatarImage src={user?.avatar} />
-                  <AvatarFallback className="text-xl">
+                  <AvatarFallback className="text-2xl bg-primary/5 text-primary">
                     {user?.fullName?.[0] || user?.username?.[0]}
                   </AvatarFallback>
                 </Avatar>
-                <div className="space-y-2">
+                <div className="space-y-3 text-center sm:text-left w-full sm:w-auto">
+                  <div className="space-y-1">
+                    <p className="font-medium leading-none">Ảnh đại diện</p>
+                    <p className="text-xs text-muted-foreground">
+                      Khuyên dùng ảnh vuông, JPG hoặc PNG, tối đa 2MB.
+                    </p>
+                  </div>
                   <input
                     type="file"
                     ref={fileInputRef}
@@ -174,28 +167,25 @@ export default function SettingsPage() {
                   />
                   <Button
                     variant="outline"
-                    size="sm"
-                    className="gap-2"
+                    className="gap-2 w-full sm:w-auto h-10"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isUploadingAvatar}
                   >
                     <Camera className="h-4 w-4" />
-                    {isUploadingAvatar ? "Đang tải..." : "Đổi ảnh đại diện"}
+                    {isUploadingAvatar ? "Đang tải lên..." : "Tải ảnh lên"}
                   </Button>
-                  <p className="text-xs text-muted-foreground">
-                    JPG, PNG tối đa 2MB.
-                  </p>
                 </div>
               </div>
 
               <Separator />
 
               {/* Form Fields */}
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="grid gap-2">
+              <div className="grid gap-5 md:grid-cols-2">
+                <div className="space-y-2">
                   <Label htmlFor="fullName">Họ và tên</Label>
                   <Input
                     id="fullName"
+                    className="h-12"
                     value={profileForm.fullName}
                     onChange={(e) =>
                       setProfileForm({
@@ -205,21 +195,23 @@ export default function SettingsPage() {
                     }
                   />
                 </div>
-                <div className="grid gap-2">
+                <div className="space-y-2">
                   <Label htmlFor="dob">Ngày sinh</Label>
                   <Input
                     id="dob"
                     type="date"
+                    className="h-12"
                     value={profileForm.dob}
                     onChange={(e) =>
                       setProfileForm({ ...profileForm, dob: e.target.value })
                     }
                   />
                 </div>
-                <div className="grid gap-2">
+                <div className="space-y-2">
                   <Label htmlFor="phone">Số điện thoại</Label>
                   <Input
                     id="phone"
+                    className="h-12"
                     value={profileForm.phoneNumber}
                     onChange={(e) =>
                       setProfileForm({
@@ -229,29 +221,34 @@ export default function SettingsPage() {
                     }
                   />
                 </div>
-                <div className="grid gap-2">
+                <div className="space-y-2">
                   <Label htmlFor="city">Thành phố / Tỉnh</Label>
                   <Input
                     id="city"
+                    className="h-12"
                     value={profileForm.city}
                     onChange={(e) =>
                       setProfileForm({ ...profileForm, city: e.target.value })
                     }
                   />
                 </div>
-                <div className="grid gap-2 md:col-span-2">
-                  <Label htmlFor="email">Email</Label>
+
+                <div className="space-y-2 md:col-span-2 bg-muted/20 p-4 rounded-xl border border-dashed">
+                  <Label htmlFor="email" className="text-muted-foreground">
+                    Email đăng nhập
+                  </Label>
                   <Input
                     id="email"
+                    className="h-12 bg-transparent opacity-70"
                     value={user?.email || ""}
                     disabled
-                    className="bg-muted"
                   />
-                  <p className="text-[0.8rem] text-muted-foreground">
-                    Email không thể thay đổi.
+                  <p className="text-xs text-muted-foreground ml-1">
+                    Email là định danh duy nhất và không thể thay đổi.
                   </p>
                 </div>
-                <div className="grid gap-2 md:col-span-2 pt-2">
+
+                <div className="space-y-2 md:col-span-2 pt-2">
                   <Label>Đồng tiền cơ sở (Base Currency)</Label>
                   <Select
                     value={profileForm.baseCurrency}
@@ -259,12 +256,16 @@ export default function SettingsPage() {
                       setProfileForm({ ...profileForm, baseCurrency: val })
                     }
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="h-12">
                       <SelectValue placeholder="Chọn đồng tiền cơ sở" />
                     </SelectTrigger>
                     <SelectContent>
                       {CURRENCIES.map((cur) => (
-                        <SelectItem key={cur.code} value={cur.code}>
+                        <SelectItem
+                          key={cur.code}
+                          value={cur.code}
+                          className="py-2.5"
+                        >
                           <span className="font-bold w-12 inline-block">
                             {cur.code}
                           </span>
@@ -275,15 +276,19 @@ export default function SettingsPage() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <p className="text-[0.8rem] text-muted-foreground">
-                    Đây là đồng tiền mặc định dùng để tính Tổng số dư và Thống
-                    kê biểu đồ.
+                  <p className="text-[0.8rem] text-muted-foreground ml-1">
+                    Đây là đồng tiền mặc định dùng để tính Tổng số dư và vẽ Biểu
+                    đồ.
                   </p>
                 </div>
               </div>
             </CardContent>
-            <CardFooter>
-              <Button onClick={handleSaveProfile} disabled={isUpdatingProfile}>
+            <CardFooter className="bg-muted/10 border-t px-6 py-4">
+              <Button
+                onClick={handleSaveProfile}
+                disabled={isUpdatingProfile}
+                className="w-full sm:w-auto h-11 px-8"
+              >
                 {isUpdatingProfile ? "Đang lưu..." : "Lưu thay đổi"}
               </Button>
             </CardFooter>
@@ -291,40 +296,46 @@ export default function SettingsPage() {
         </TabsContent>
 
         {/* --- TAB: BẢO MẬT --- */}
-        <TabsContent value="security" className="space-y-4">
-          <Card>
+        <TabsContent value="security" className="space-y-6">
+          <Card className="shadow-sm">
             <CardHeader>
               <CardTitle>Đổi mật khẩu</CardTitle>
-              <CardDescription>Nhập mật khẩu cũ để xác thực.</CardDescription>
+              <CardDescription>
+                Nhập mật khẩu hiện tại để xác thực trước khi đổi.
+              </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-2">
+            <CardContent className="space-y-5">
+              <div className="space-y-2 max-w-md">
                 <Label htmlFor="current">Mật khẩu hiện tại</Label>
                 <Input
                   id="current"
                   type="password"
+                  className="h-12"
                   value={passForm.oldPassword}
                   onChange={(e) =>
                     setPassForm({ ...passForm, oldPassword: e.target.value })
                   }
                 />
               </div>
-              <div className="grid gap-2">
+              <Separator className="max-w-md" />
+              <div className="space-y-2 max-w-md">
                 <Label htmlFor="new">Mật khẩu mới</Label>
                 <Input
                   id="new"
                   type="password"
+                  className="h-12"
                   value={passForm.newPassword}
                   onChange={(e) =>
                     setPassForm({ ...passForm, newPassword: e.target.value })
                   }
                 />
               </div>
-              <div className="grid gap-2">
+              <div className="space-y-2 max-w-md">
                 <Label htmlFor="confirm">Xác nhận mật khẩu mới</Label>
                 <Input
                   id="confirm"
                   type="password"
+                  className="h-12"
                   value={passForm.confirmPassword}
                   onChange={(e) =>
                     setPassForm({
@@ -335,30 +346,35 @@ export default function SettingsPage() {
                 />
               </div>
             </CardContent>
-            <CardFooter>
+            <CardFooter className="bg-muted/10 border-t px-6 py-4">
               <Button
                 onClick={handleChangePassword}
                 disabled={isChangingPassword}
+                className="w-full sm:w-auto h-11 px-8"
               >
-                {isChangingPassword ? "Đang xử lý..." : "Đổi mật khẩu"}
+                {isChangingPassword ? "Đang xử lý..." : "Cập nhật mật khẩu"}
               </Button>
             </CardFooter>
           </Card>
 
           {/* Danger Zone */}
-          <Card className="border-red-200 dark:border-red-900 bg-red-50/10">
+          <Card className="border-red-200 dark:border-red-900/50 bg-red-50/30 dark:bg-red-950/10 shadow-sm">
             <CardHeader>
-              <CardTitle className="text-red-600">Vùng nguy hiểm</CardTitle>
+              <CardTitle className="text-red-600 dark:text-red-400">
+                Vùng nguy hiểm
+              </CardTitle>
               <CardDescription>
-                Hành động này sẽ xóa vĩnh viễn tài khoản của bạn.
+                Hành động này sẽ xóa vĩnh viễn dữ liệu tài khoản của bạn.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center justify-between">
+              {/* Xếp dọc trên Mobile, Ngang trên PC */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-background p-4 rounded-xl border">
                 <div className="space-y-1">
-                  <p className="font-medium">Xóa tài khoản</p>
+                  <p className="font-semibold text-foreground">Xóa tài khoản</p>
                   <p className="text-sm text-muted-foreground">
-                    Không thể khôi phục sau khi xóa.
+                    Toàn bộ ví, quỹ, và lịch sử giao dịch sẽ bị xóa và không thể
+                    khôi phục.
                   </p>
                 </div>
 
@@ -367,28 +383,32 @@ export default function SettingsPage() {
                     <Button
                       variant="destructive"
                       disabled={isDeletingAccount}
-                      className="gap-2"
+                      className="gap-2 h-11 w-full sm:w-auto shrink-0"
                     >
                       <Trash2 className="h-4 w-4" /> Xóa tài khoản
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
-                      <AlertDialogTitle>
-                        Bạn có chắc chắn không?
+                      <AlertDialogTitle className="text-red-600">
+                        Bạn có chắc chắn muốn xóa tài khoản?
                       </AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Hành động này không thể hoàn tác. Tài khoản của bạn sẽ
-                        bị xóa vĩnh viễn và bạn sẽ không thể đăng nhập lại.
+                      <AlertDialogDescription className="text-base">
+                        Hành động này{" "}
+                        <strong className="text-foreground">KHÔNG THỂ</strong>{" "}
+                        hoàn tác. Toàn bộ dữ liệu tài chính của bạn sẽ bốc hơi
+                        khỏi server.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Hủy</AlertDialogCancel>
+                    <AlertDialogFooter className="mt-4 gap-2 sm:gap-0">
+                      <AlertDialogCancel className="h-11">
+                        Hủy bỏ
+                      </AlertDialogCancel>
                       <AlertDialogAction
                         onClick={() => deleteAccount()}
-                        className="bg-red-600 hover:bg-red-700"
+                        className="h-11 bg-red-600 hover:bg-red-700 text-white"
                       >
-                        Xác nhận xóa
+                        Tôi hiểu, xóa tài khoản
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
