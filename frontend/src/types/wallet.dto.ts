@@ -19,7 +19,10 @@ export interface Wallet {
 // Dùng superRefine để Validate chéo: Nếu chọn SAVING thì bắt buộc nhập 2 cái kia
 export const WalletSchema = z
   .object({
-    name: z.string().min(1, "Tên ví không được để trống"),
+    name: z
+      .string()
+      .min(1, "Vui lòng nhập tên ví")
+      .max(50, "Tên ví tối đa 50 ký tự"),
     balance: z.coerce.number().min(0, "Số dư không được âm"),
     currency: z.string().default("VND"),
     type: z.nativeEnum(WalletType).default(WalletType.BASIC),

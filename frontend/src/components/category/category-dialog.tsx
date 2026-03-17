@@ -36,6 +36,7 @@ import {
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
+import { Loader2 } from "lucide-react"; // Bổ sung icon Load
 
 interface CategoryDialogProps {
   open: boolean;
@@ -131,7 +132,7 @@ export function CategoryDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto px-4 sm:px-6">
         <DialogHeader>
           <DialogTitle>
             {isEditMode
@@ -148,29 +149,34 @@ export function CategoryDialog({
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form
+            onSubmit={form.handleSubmit(onSubmit)}
+            className="space-y-4 px-1"
+          >
             <FormField
               control={form.control}
               name="name"
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="flex flex-col w-full min-w-0">
                   <FormLabel>Tên danh mục</FormLabel>
                   <FormControl>
-                    <Input placeholder="Ví dụ: Ăn sáng, Cafe..." {...field} />
+                    <Input
+                      className="h-12 text-base"
+                      placeholder="Ví dụ: Ăn sáng, Cafe..."
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
-            <div className="grid grid-cols-2 gap-6">
-              {" "}
-              {/* Tăng gap lên 6 */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full min-w-0">
               <FormField
                 control={form.control}
                 name="type"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="flex flex-col w-full min-w-0 overflow-hidden">
                     <FormLabel>Loại giao dịch</FormLabel>
                     <Select
                       onValueChange={(val) => {
@@ -183,9 +189,9 @@ export function CategoryDialog({
                     >
                       <FormControl>
                         <SelectTrigger
-                          className={
+                          className={`h-12 w-full max-w-full [&>span]:flex-1 [&>span]:text-left [&>span]:truncate [&>span]:overflow-hidden block ${
                             isEditMode || isChildMode ? "bg-muted" : ""
-                          }
+                          }`}
                         >
                           <SelectValue placeholder="Chọn loại" />
                         </SelectTrigger>
@@ -207,7 +213,7 @@ export function CategoryDialog({
                 control={form.control}
                 name="parentId"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="flex flex-col w-full min-w-0 overflow-hidden">
                     <FormLabel>Danh mục cha</FormLabel>
                     <Select
                       onValueChange={field.onChange}
@@ -218,31 +224,31 @@ export function CategoryDialog({
                       }
                     >
                       <FormControl>
-                        <SelectTrigger className="w-full">
-                          {" "}
-                          {/* Đảm bảo full width */}
-                          {/* Thêm class truncate để cắt chữ nếu quá dài */}
-                          <div className="truncate">
-                            <SelectValue placeholder="Chọn danh mục cha" />
-                          </div>
+                        <SelectTrigger className="h-12 w-full max-w-full [&>span]:flex-1 [&>span]:text-left [&>span]:truncate [&>span]:overflow-hidden block">
+                          <SelectValue placeholder="Chọn danh mục cha" />
                         </SelectTrigger>
                       </FormControl>
-                      <SelectContent>
+                      <SelectContent className="max-w-[85vw] sm:max-w-[300px]">
                         <SelectItem
                           value="root"
                           className="font-semibold text-primary"
                         >
-                          -- Danh mục gốc (Không có cha) --
+                          -- Danh mục gốc --
                         </SelectItem>
                         {eligibleParents.map((parent) => (
-                          <SelectItem key={parent.id} value={parent.id}>
-                            {parent.name}
+                          <SelectItem
+                            key={parent.id}
+                            value={parent.id}
+                            className="py-2 max-w-full overflow-hidden"
+                          >
+                            <div className="w-full text-left truncate pr-2">
+                              {parent.name}
+                            </div>
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
 
-                    {/* Thông báo lỗi nếu không được di chuyển */}
                     {eligibleParents.length === 0 && isEditMode && (
                       <p className="text-[10px] text-red-500 mt-1">
                         Không thể di chuyển vì đã có danh mục con.
@@ -258,12 +264,12 @@ export function CategoryDialog({
               control={form.control}
               name="description"
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="flex flex-col w-full min-w-0">
                   <FormLabel>Mô tả (Tùy chọn)</FormLabel>
                   <FormControl>
                     <Textarea
                       placeholder="Ghi chú thêm về danh mục này..."
-                      className="resize-none"
+                      className="resize-none h-20"
                       {...field}
                     />
                   </FormControl>
@@ -272,8 +278,13 @@ export function CategoryDialog({
               )}
             />
 
-            <DialogFooter>
-              <Button type="submit" disabled={isLoading}>
+            <DialogFooter className="pt-2 sticky bottom-0 bg-background/95 backdrop-blur-sm z-10 pb-4 mt-4">
+              <Button
+                type="submit"
+                className="w-full h-12 text-lg font-semibold"
+                disabled={isLoading}
+              >
+                {isLoading && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
                 {isLoading
                   ? "Đang lưu..."
                   : isEditMode

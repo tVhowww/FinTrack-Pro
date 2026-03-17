@@ -20,11 +20,9 @@ export function BudgetFilter() {
   const { replace } = useRouter();
   const { wallets } = useWallets();
 
-  // Giá trị mặc định
   const defaultMonth = (new Date().getMonth() + 1).toString();
   const defaultYear = new Date().getFullYear().toString();
 
-  // Lấy giá trị từ URL
   const currentMonth = searchParams.get("month") || defaultMonth;
   const currentYear = searchParams.get("year") || defaultYear;
   const currentWallet = searchParams.get("walletId") || "all";
@@ -57,8 +55,8 @@ export function BudgetFilter() {
   };
 
   const clearFilters = () => {
-    setLocalKeyword(""); // Xóa chữ trên ô search
-    replace(pathname); // Quét sạch URL về trạng thái gốc
+    setLocalKeyword("");
+    replace(pathname);
   };
 
   const hasActiveFilters =
@@ -71,32 +69,32 @@ export function BudgetFilter() {
   const currentYearNum = new Date().getFullYear();
 
   return (
-    <div className="bg-card p-4 rounded-lg border shadow-sm flex flex-col lg:flex-row gap-4">
-      {/* Tìm kiếm */}
-      <div className="flex flex-1 items-center gap-2">
-        <div className="relative flex-1">
+    <div className="bg-card p-4 rounded-lg border shadow-sm flex flex-col gap-4">
+      {/* Tìm kiếm: Luôn trải dài 100% trên Mobile */}
+      <div className="flex flex-1 items-center gap-2 w-full">
+        <div className="relative flex-1 min-w-0">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Tìm tên ngân sách..."
-            className="pl-9 bg-background"
+            className="pl-9 bg-background w-full"
             value={localKeyword}
             onChange={(e) => setLocalKeyword(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSearch()}
             onBlur={handleSearch}
           />
         </div>
-        <Button variant="secondary" onClick={handleSearch}>
+        <Button variant="secondary" onClick={handleSearch} className="shrink-0">
           Tìm
         </Button>
       </div>
 
-      {/* Các Dropdown Lọc */}
-      <div className="flex flex-wrap items-center gap-2">
+      {/* Các Dropdown Lọc: Grid 2 cột trên Mobile */}
+      <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full">
         <Select
           value={currentStatus}
           onValueChange={(val) => updateFilter("status", val)}
         >
-          <SelectTrigger className="w-full sm:w-[160px] bg-background">
+          <SelectTrigger className="w-full sm:w-[160px] bg-background [&>span]:truncate">
             <SelectValue placeholder="Trạng thái" />
           </SelectTrigger>
           <SelectContent>
@@ -112,15 +110,19 @@ export function BudgetFilter() {
           value={currentWallet}
           onValueChange={(val) => updateFilter("walletId", val)}
         >
-          <SelectTrigger className="w-full sm:w-[160px] bg-background">
+          <SelectTrigger className="w-full sm:w-[160px] bg-background [&>span]:truncate">
             <SelectValue placeholder="Chọn ví" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="max-w-[85vw] sm:max-w-[300px]">
             <SelectItem value="all">Tất cả các ví</SelectItem>
             <SelectItem value="global">Ngân sách chung</SelectItem>
             {wallets.map((w) => (
-              <SelectItem key={w.id} value={w.id}>
-                {w.name}
+              <SelectItem
+                key={w.id}
+                value={w.id}
+                className="max-w-full overflow-hidden"
+              >
+                <div className="truncate w-full pr-2 text-left">{w.name}</div>
               </SelectItem>
             ))}
           </SelectContent>
@@ -163,7 +165,7 @@ export function BudgetFilter() {
         {hasActiveFilters && (
           <Button
             variant="ghost"
-            className="px-3 text-muted-foreground"
+            className="w-full sm:w-auto px-3 text-muted-foreground shrink-0 col-span-2 sm:col-span-1 mt-2 sm:mt-0"
             onClick={clearFilters}
           >
             <X className="h-4 w-4 mr-1" /> Bỏ lọc
