@@ -26,7 +26,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useCategories } from "@/hooks/use-categories";
 import { useWallets } from "@/hooks/use-wallets";
-import { Budget } from "@/types/budget.dto"; // Import Type Budget
+import { Budget } from "@/types/budget.dto";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
@@ -65,7 +65,7 @@ export function BudgetDialog({
     (c) => c.type === "EXPENSE",
   );
 
-  const isEditing = !!budgetToEdit; // Đánh dấu trạng thái Edit
+  const isEditing = !!budgetToEdit;
 
   const form = useForm<z.infer<typeof BudgetSchema>>({
     resolver: zodResolver(BudgetSchema),
@@ -114,7 +114,7 @@ export function BudgetDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto px-4 sm:px-6">
         <DialogHeader>
           <DialogTitle>
             {isEditing ? "Sửa hạn mức ngân sách" : "Tạo ngân sách mới"}
@@ -124,16 +124,20 @@ export function BudgetDialog({
         <Form {...form}>
           <form
             onSubmit={form.handleSubmit(handleSubmit)}
-            className="space-y-4"
+            className="space-y-4 px-1"
           >
             <FormField
               control={form.control}
               name="name"
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="flex flex-col w-full min-w-0">
                   <FormLabel>Tên ngân sách</FormLabel>
                   <FormControl>
-                    <Input placeholder="VD: Ăn uống tháng này" {...field} />
+                    <Input
+                      className="h-12 text-base"
+                      placeholder="VD: Ăn uống tháng này"
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -144,23 +148,27 @@ export function BudgetDialog({
               control={form.control}
               name="amount"
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="flex flex-col w-full min-w-0">
                   <FormLabel>Hạn mức</FormLabel>
                   <FormControl>
-                    <Input type="number" placeholder="5000000" {...field} />
+                    <Input
+                      className="h-12 text-lg font-bold"
+                      type="number"
+                      placeholder="5000000"
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
-            {/* CÁC TRƯỜNG BÊN DƯỚI BỊ KHÓA NẾU ĐANG EDIT */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full min-w-0">
               <FormField
                 control={form.control}
                 name="walletId"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="flex flex-col w-full min-w-0 overflow-hidden">
                     <FormLabel>Áp dụng cho ví</FormLabel>
                     <Select
                       onValueChange={field.onChange}
@@ -168,19 +176,26 @@ export function BudgetDialog({
                       disabled={isEditing}
                     >
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger className="h-12 w-full max-w-full [&>span]:flex-1 [&>span]:text-left [&>span]:truncate [&>span]:overflow-hidden block">
                           <SelectValue placeholder="Chọn ví" />
                         </SelectTrigger>
                       </FormControl>
-                      <SelectContent>
+                      <SelectContent className="max-w-[85vw] sm:max-w-[300px]">
                         <SelectItem value="all">Ngân sách chung</SelectItem>
                         {wallets.map((w) => (
-                          <SelectItem key={w.id} value={w.id}>
-                            {w.name}
+                          <SelectItem
+                            key={w.id}
+                            value={w.id}
+                            className="py-2 max-w-full overflow-hidden"
+                          >
+                            <div className="w-full text-left truncate pr-2">
+                              {w.name}
+                            </div>
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
+                    <FormMessage />
                   </FormItem>
                 )}
               />
@@ -189,7 +204,7 @@ export function BudgetDialog({
                 control={form.control}
                 name="categoryId"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="flex flex-col w-full min-w-0 overflow-hidden">
                     <FormLabel>Danh mục</FormLabel>
                     <Select
                       onValueChange={field.onChange}
@@ -197,32 +212,40 @@ export function BudgetDialog({
                       disabled={isEditing}
                     >
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger className="h-12 w-full max-w-full [&>span]:flex-1 [&>span]:text-left [&>span]:truncate [&>span]:overflow-hidden block">
                           <SelectValue placeholder="Chọn danh mục" />
                         </SelectTrigger>
                       </FormControl>
-                      <SelectContent>
+                      <SelectContent className="max-w-[85vw] sm:max-w-[300px]">
                         {expenseCategories.map((c) => (
-                          <SelectItem key={c.id} value={c.id}>
-                            {c.name}
+                          <SelectItem
+                            key={c.id}
+                            value={c.id}
+                            className="py-2 max-w-full overflow-hidden"
+                          >
+                            <div className="w-full text-left truncate pr-2">
+                              {c.name}
+                            </div>
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
+                    <FormMessage />
                   </FormItem>
                 )}
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4 w-full min-w-0">
               <FormField
                 control={form.control}
                 name="month"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="flex flex-col min-w-0">
                     <FormLabel>Tháng</FormLabel>
                     <FormControl>
                       <Input
+                        className="h-12 text-center text-lg"
                         type="number"
                         min={1}
                         max={12}
@@ -237,10 +260,11 @@ export function BudgetDialog({
                 control={form.control}
                 name="year"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="flex flex-col min-w-0">
                     <FormLabel>Năm</FormLabel>
                     <FormControl>
                       <Input
+                        className="h-12 text-center text-lg"
                         type="number"
                         min={2020}
                         {...field}
@@ -252,10 +276,14 @@ export function BudgetDialog({
               />
             </div>
 
-            <DialogFooter>
-              <Button type="submit" disabled={form.formState.isSubmitting}>
+            <DialogFooter className="pt-2 sticky bottom-0 bg-background/95 backdrop-blur-sm z-10 pb-4 mt-4">
+              <Button
+                type="submit"
+                className="w-full h-12 text-lg font-semibold"
+                disabled={form.formState.isSubmitting}
+              >
                 {form.formState.isSubmitting && (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                 )}
                 {form.formState.isSubmitting
                   ? "Đang xử lý..."

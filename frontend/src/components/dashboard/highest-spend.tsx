@@ -15,17 +15,14 @@ interface HighestSpendProps {
   isLoading: boolean;
 }
 
-export function HighestSpend({
-  data,
-  isLoading,
-}: HighestSpendProps) {
+export function HighestSpend({ data, isLoading }: HighestSpendProps) {
   const { wallets } = useWallets();
 
   return (
-    <Card className="col-span-3 shadow-sm h-full border-red-100 bg-red-50/10">
+    <Card className="shadow-sm h-full border-red-100 bg-red-50/10">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-red-700 flex items-center gap-2">
+          <CardTitle className="text-red-700 flex items-center gap-2 text-base sm:text-lg">
             <TrendingDown className="h-5 w-5" />
             Top chi tiêu
           </CardTitle>
@@ -48,11 +45,13 @@ export function HighestSpend({
                 "VND";
 
               return (
-                <div key={tx.id} className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    {/* Số thứ tự: 1, 2, 3 */}
+                <div
+                  key={tx.id}
+                  className="flex items-center justify-between gap-2 w-full min-w-0"
+                >
+                  <div className="flex items-center space-x-3 flex-1 min-w-0">
                     <span
-                      className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold 
+                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold 
                       ${
                         index === 0
                           ? "bg-red-500 text-white"
@@ -64,8 +63,11 @@ export function HighestSpend({
                       {index + 1}
                     </span>
 
-                    <div className="space-y-0.5">
-                      <p className="text-sm font-medium leading-none truncate max-w-[120px]">
+                    <div className="space-y-0.5 flex-1 min-w-0">
+                      <p
+                        className="text-sm font-medium leading-none truncate w-full"
+                        title={tx.categoryName || tx.note || "Chi tiêu"}
+                      >
                         {tx.categoryName || tx.note || "Chi tiêu"}
                       </p>
                       <p className="text-[10px] text-muted-foreground">
@@ -73,7 +75,11 @@ export function HighestSpend({
                       </p>
                     </div>
                   </div>
-                  <div className="font-bold text-red-600 text-sm">
+
+                  <div
+                    className="font-bold text-red-600 text-sm shrink-0 max-w-[45%] sm:max-w-[50%] truncate text-right"
+                    title={`-${formatCurrency(tx.amount, txCurrency)}`}
+                  >
                     -{formatCurrency(tx.amount, txCurrency)}
                   </div>
                 </div>

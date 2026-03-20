@@ -148,7 +148,6 @@ export function TransactionDialog({
   }, [open, transactionToEdit, form, wallets]);
 
   const handleListen = () => {
-    // Ép kiểu any để bypass TypeScript (vì trình duyệt có sẵn nhưng TS có thể ko nhận)
     const SpeechRecognition =
       (window as any).SpeechRecognition ||
       (window as any).webkitSpeechRecognition;
@@ -161,7 +160,7 @@ export function TransactionDialog({
     }
 
     const recognition = new SpeechRecognition();
-    recognition.lang = "vi-VN"; // Setup Tiếng Việt
+    recognition.lang = "vi-VN";
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
 
@@ -175,8 +174,7 @@ export function TransactionDialog({
 
     recognition.onresult = (event: any) => {
       const transcript = event.results[0][0].transcript;
-      setQuickText(transcript); // Ném chữ vào ô input
-      // Có thể tự động gọi gửi AI luôn ở đây nếu muốn: handleProcessAI(undefined, transcript);
+      setQuickText(transcript);
     };
 
     recognition.onerror = (event: any) => {
@@ -192,7 +190,6 @@ export function TransactionDialog({
     recognition.start();
   };
 
-  // HÀM XỬ LÝ GỬI AI (Text & File)
   const handleProcessAI = async (file?: File, text?: string) => {
     if ((!file && !text) || !onScan) return;
 
@@ -251,7 +248,6 @@ export function TransactionDialog({
       console.error("Lỗi AI:", error);
     } finally {
       if (fileInputRef.current) fileInputRef.current.value = "";
-      // Không xoá text ngay để user có thể nhìn thấy AI vừa nhận diện được câu gì
     }
   };
 
@@ -275,7 +271,6 @@ export function TransactionDialog({
     }
   };
 
-  // Lấy danh sách gốc và lọc theo Thu/Chi
   const flattenCategories = categories.flatMap((c) => [
     c,
     ...(c.subCategories || []),
@@ -315,7 +310,9 @@ export function TransactionDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className={`transition-all duration-300 ${previewUrl ? "sm:max-w-[800px]" : "sm:max-w-[500px]"}`}
+        className={`transition-all duration-300 max-h-[90vh] overflow-y-auto ${
+          previewUrl ? "sm:max-w-[800px]" : "sm:max-w-[500px]"
+        }`}
       >
         <DialogHeader className="pr-6">
           <DialogTitle>
@@ -325,8 +322,8 @@ export function TransactionDialog({
 
         {/* KHU VỰC TRỢ LÝ AI */}
         {!isEditMode && (
-          <div className="bg-purple-50/50 border border-purple-100 rounded-lg p-3 mb-2 space-y-2">
-            <div className="flex items-center text-sm font-semibold text-purple-700">
+          <div className="bg-purple-50/50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800/30 rounded-lg p-3 mb-2 space-y-2 transition-colors">
+            <div className="flex items-center text-sm font-semibold text-purple-700 dark:text-purple-400">
               <Sparkles className="h-4 w-4 mr-1.5" /> Trợ lý AI (Text & Giọng
               nói)
             </div>
@@ -334,8 +331,8 @@ export function TransactionDialog({
             <div className="flex gap-2 relative">
               <div className="relative flex-1">
                 <Input
-                  placeholder="VD: Nhận lương tháng này 20 triệu..."
-                  className="bg-white border-purple-100 focus-visible:ring-purple-300 pr-10" // Cấp chỗ cho nút Mic
+                  placeholder="VD: Nhận lương..."
+                  className="bg-white dark:bg-background border-purple-100 dark:border-purple-800/50 focus-visible:ring-purple-300 dark:focus-visible:ring-purple-700 pr-10 transition-colors"
                   value={quickText}
                   onChange={(e) => setQuickText(e.target.value)}
                   onKeyDown={(e) => {
@@ -353,7 +350,11 @@ export function TransactionDialog({
                   onClick={handleListen}
                   disabled={isScanning}
                   className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full transition-colors
-                    ${isListening ? "bg-red-100 text-red-600 animate-pulse" : "text-gray-400 hover:text-purple-600 hover:bg-purple-50"}`}
+                    ${
+                      isListening
+                        ? "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 animate-pulse"
+                        : "text-gray-400 hover:text-purple-600 hover:bg-purple-50 dark:hover:text-purple-300 dark:hover:bg-purple-900/30"
+                    }`}
                 >
                   <Mic className="h-4 w-4" />
                 </button>
@@ -361,7 +362,7 @@ export function TransactionDialog({
 
               <Button
                 type="button"
-                className="bg-purple-600 hover:bg-purple-700 text-white shrink-0"
+                className="bg-purple-600 hover:bg-purple-700 text-white dark:bg-purple-600 dark:hover:bg-purple-500 shrink-0 transition-colors"
                 onClick={() => handleProcessAI(undefined, quickText)}
                 disabled={isScanning || !quickText.trim()}
               >
@@ -372,7 +373,7 @@ export function TransactionDialog({
                 )}
               </Button>
 
-              <div className="flex items-center px-1 text-muted-foreground text-xs uppercase font-medium">
+              <div className="hidden sm:flex items-center px-1 text-muted-foreground text-xs uppercase font-medium">
                 Hoặc
               </div>
               <input
@@ -386,32 +387,32 @@ export function TransactionDialog({
               <Button
                 type="button"
                 variant="outline"
-                className="shrink-0 border-purple-200 text-purple-700 hover:bg-purple-50"
+                className="shrink-0 border-purple-200 text-purple-700 hover:bg-purple-50 dark:border-purple-800/50 dark:text-purple-400 dark:hover:bg-purple-900/30 dark:hover:text-purple-300 transition-colors"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isScanning}
               >
                 {isScanning && !quickText ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <Loader2 className="h-4 w-4 sm:mr-2 animate-spin" />
                 ) : (
-                  <Camera className="h-4 w-4 mr-2" />
+                  <Camera className="h-4 w-4 sm:mr-2" />
                 )}
-                Tải ảnh
+                <span className="hidden sm:inline">Tải ảnh</span>
               </Button>
             </div>
           </div>
         )}
 
         <div
-          className={previewUrl ? "grid grid-cols-1 md:grid-cols-2 gap-6" : ""}
+          className={`min-w-0 ${previewUrl ? "grid grid-cols-1 md:grid-cols-2 gap-6" : ""}`}
         >
           {/* CỘT TRÁI: HIỂN THỊ ẢNH BILL */}
           {previewUrl && (
-            <div className="flex flex-col items-center justify-start bg-muted/30 rounded-lg p-2 border">
+            <div className="flex flex-col items-center justify-start bg-muted/30 rounded-lg p-2 border min-w-0">
               <div className="relative w-full flex justify-end mb-2">
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-6 w-6 rounded-full bg-background border shadow-sm absolute top-0 right-0"
+                  className="h-6 w-6 rounded-full bg-background border shadow-sm absolute top-0 right-0 z-10"
                   onClick={() => setPreviewUrl(null)}
                 >
                   <X className="h-4 w-4" />
@@ -420,25 +421,24 @@ export function TransactionDialog({
               <img
                 src={previewUrl}
                 alt="Bill Preview"
-                className="max-h-[400px] object-contain rounded-md"
+                className="max-h-[300px] sm:max-h-[400px] object-contain rounded-md"
               />
             </div>
           )}
 
           {/* CỘT PHẢI: FORM NHẬP LIỆU */}
-          <div>
+          <div className="w-full min-w-0">
             <Form {...form}>
               <form
                 onSubmit={form.handleSubmit(onSubmit)}
-                className="space-y-4"
+                className="space-y-4 px-1 w-full min-w-0" // 👇 FIX ROOT 2: Thêm w-full min-w-0 vào form
               >
-                {/* TOÀN BỘ CÁC INPUT DƯỚI NÀY GIỮ NGUYÊN (Type, Amount, Wallet, Date, Note...) */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full min-w-0">
                   <FormField
                     control={form.control}
                     name="type"
                     render={({ field }) => (
-                      <FormItem>
+                      <FormItem className="flex flex-col w-full min-w-0">
                         <FormLabel>Loại giao dịch</FormLabel>
                         <Select
                           onValueChange={field.onChange}
@@ -447,11 +447,11 @@ export function TransactionDialog({
                           disabled={isEditMode}
                         >
                           <FormControl>
-                            <SelectTrigger>
+                            <SelectTrigger className="h-12 w-full min-w-0 [&>span]:flex-1 [&>span]:text-left [&>span]:truncate">
                               <SelectValue placeholder="Chọn loại" />
                             </SelectTrigger>
                           </FormControl>
-                          <SelectContent>
+                          <SelectContent className="max-w-[90vw] sm:max-w-xs">
                             <SelectItem value={TransactionType.EXPENSE}>
                               Chi tiêu
                             </SelectItem>
@@ -469,15 +469,15 @@ export function TransactionDialog({
                     control={form.control}
                     name="amount"
                     render={({ field }) => (
-                      <FormItem>
+                      <FormItem className="flex flex-col w-full min-w-0">
                         <FormLabel>Số tiền</FormLabel>
                         <FormControl>
-                          <div className="relative">
+                          <div className="relative w-full min-w-0">
                             <Input
                               type="number"
                               step="any"
                               placeholder="VD: 50000"
-                              className="pr-8"
+                              className="h-12 text-lg font-bold pr-14 w-full min-w-0"
                               {...field}
                             />
                             <div className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-medium text-muted-foreground pointer-events-none">
@@ -495,7 +495,7 @@ export function TransactionDialog({
                   control={form.control}
                   name="walletId"
                   render={({ field }) => (
-                    <FormItem>
+                    <FormItem className="flex flex-col w-full min-w-0 overflow-hidden">
                       <FormLabel>Ví thanh toán</FormLabel>
                       <Select
                         onValueChange={field.onChange}
@@ -504,14 +504,30 @@ export function TransactionDialog({
                         disabled={isEditMode}
                       >
                         <FormControl>
-                          <SelectTrigger>
+                          <SelectTrigger className="h-12 w-full min-w-0 [&>span]:flex-1 [&>span]:text-left [&>span]:truncate block">
                             <SelectValue placeholder="Chọn ví" />
                           </SelectTrigger>
                         </FormControl>
-                        <SelectContent>
+                        <SelectContent className="max-w-[90vw] sm:max-w-[450px]">
                           {wallets.map((wallet) => (
-                            <SelectItem key={wallet.id} value={wallet.id}>
-                              {wallet.name}
+                            <SelectItem
+                              key={wallet.id}
+                              value={wallet.id}
+                              className="py-2"
+                            >
+                              <div className="w-full text-left truncate pr-2">
+                                <span className="font-medium">
+                                  {wallet.name}
+                                </span>
+                                <span className="text-muted-foreground ml-1">
+                                  (Dư:{" "}
+                                  {new Intl.NumberFormat("vi-VN", {
+                                    style: "currency",
+                                    currency: wallet.currency || "VND",
+                                  }).format(wallet.balance)}
+                                  )
+                                </span>
+                              </div>
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -521,26 +537,32 @@ export function TransactionDialog({
                   )}
                 />
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full min-w-0">
                   <FormField
                     control={form.control}
                     name="categoryId"
                     render={({ field }) => (
-                      <FormItem>
+                      <FormItem className="flex flex-col w-full min-w-0 overflow-hidden">
                         <FormLabel>Danh mục</FormLabel>
                         <Select
                           onValueChange={field.onChange}
                           value={field.value || ""}
                         >
                           <FormControl>
-                            <SelectTrigger>
+                            <SelectTrigger className="h-12 w-full min-w-0 [&>span]:flex-1 [&>span]:text-left [&>span]:truncate block">
                               <SelectValue placeholder="Chọn danh mục" />
                             </SelectTrigger>
                           </FormControl>
-                          <SelectContent>
+                          <SelectContent className="max-w-[90vw] sm:max-w-[300px]">
                             {finalCategories.map((cat) => (
-                              <SelectItem key={cat.id} value={cat.id}>
-                                {cat.name}
+                              <SelectItem
+                                key={cat.id}
+                                value={cat.id}
+                                className="py-2"
+                              >
+                                <div className="w-full text-left truncate pr-2">
+                                  {cat.name}
+                                </div>
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -554,7 +576,7 @@ export function TransactionDialog({
                     control={form.control}
                     name="date"
                     render={({ field }) => (
-                      <FormItem>
+                      <FormItem className="flex flex-col w-full min-w-0">
                         <FormLabel>Ngày giao dịch</FormLabel>
                         <FormControl>
                           <DatePicker
@@ -572,12 +594,12 @@ export function TransactionDialog({
                   control={form.control}
                   name="note"
                   render={({ field }) => (
-                    <FormItem>
+                    <FormItem className="w-full min-w-0">
                       <FormLabel>Ghi chú</FormLabel>
                       <FormControl>
                         <Textarea
                           placeholder="VD: Ăn sáng..."
-                          className="resize-none"
+                          className="resize-none h-20 w-full min-w-0"
                           {...field}
                         />
                       </FormControl>
@@ -586,9 +608,10 @@ export function TransactionDialog({
                   )}
                 />
 
-                <DialogFooter className="pt-2">
+                <DialogFooter className="pt-2 sticky bottom-0 bg-background/95 backdrop-blur-sm z-10 pb-4">
                   <Button
                     type="submit"
+                    className="w-full h-12 text-lg font-semibold"
                     disabled={isLoading || isScanning || isListening}
                   >
                     {isLoading

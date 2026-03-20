@@ -19,7 +19,6 @@ export function CategoryFilter() {
   const pathname = usePathname();
   const { replace } = useRouter();
 
-  // Mặc định là EXPENSE giống như trước
   const currentType = searchParams.get("type") || TransactionType.EXPENSE;
   const currentKeyword = searchParams.get("keyword") || "";
 
@@ -48,8 +47,6 @@ export function CategoryFilter() {
   const clearFilters = () => {
     setLocalKeyword("");
     const params = new URLSearchParams();
-    // Khi clear, ta có thể giữ lại type mặc định là EXPENSE hoặc xóa trắng.
-    // Ở đây em giữ lại EXPENSE cho khỏi lỗi UI
     params.set("type", TransactionType.EXPENSE);
     replace(`${pathname}?${params.toString()}`);
   };
@@ -58,32 +55,30 @@ export function CategoryFilter() {
     currentKeyword !== "" || currentType !== TransactionType.EXPENSE;
 
   return (
-    <div className="bg-card p-4 rounded-lg border shadow-sm flex flex-col md:flex-row gap-4 mb-6">
-      {/* Tìm kiếm */}
-      <div className="flex flex-1 items-center gap-2">
-        <div className="relative flex-1">
+    <div className="bg-card p-4 rounded-lg border shadow-sm flex flex-col sm:flex-row gap-4 mb-6">
+      <div className="flex flex-1 items-center gap-2 w-full">
+        <div className="relative flex-1 min-w-0">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Tìm kiếm danh mục..."
-            className="pl-9 bg-background"
+            className="pl-9 bg-background w-full"
             value={localKeyword}
             onChange={(e) => setLocalKeyword(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSearch()}
             onBlur={handleSearch}
           />
         </div>
-        <Button variant="secondary" onClick={handleSearch}>
+        <Button variant="secondary" onClick={handleSearch} className="shrink-0">
           Tìm
         </Button>
       </div>
 
-      {/* Dropdown Lọc */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
         <Select
           value={currentType}
           onValueChange={(val) => updateFilter("type", val)}
         >
-          <SelectTrigger className="w-[200px] bg-background">
+          <SelectTrigger className="w-full sm:w-[200px] bg-background">
             <SelectValue placeholder="Loại danh mục" />
           </SelectTrigger>
           <SelectContent>
@@ -96,11 +91,10 @@ export function CategoryFilter() {
           </SelectContent>
         </Select>
 
-        {/* Nút Bỏ lọc */}
         {hasActiveFilters && (
           <Button
             variant="ghost"
-            className="px-3 text-muted-foreground"
+            className="w-full sm:w-auto px-3 text-muted-foreground mt-2 sm:mt-0"
             onClick={clearFilters}
           >
             <X className="h-4 w-4 mr-1" /> Bỏ lọc

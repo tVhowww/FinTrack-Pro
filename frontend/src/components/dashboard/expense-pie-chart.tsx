@@ -19,15 +19,14 @@ interface ExpensePieChartProps {
   baseCurrency?: string;
 }
 
-// Bảng màu đẹp cho các miếng bánh
 const COLORS = [
-  "#0ea5e9", // Sky Blue
-  "#f59e0b", // Amber
-  "#10b981", // Emerald
-  "#ef4444", // Red
-  "#8b5cf6", // Violet
-  "#ec4899", // Pink
-  "#6366f1", // Indigo
+  "#0ea5e9",
+  "#f59e0b",
+  "#10b981",
+  "#ef4444",
+  "#8b5cf6",
+  "#ec4899",
+  "#6366f1",
 ];
 
 export function ExpensePieChart({
@@ -36,17 +35,18 @@ export function ExpensePieChart({
   baseCurrency,
 }: ExpensePieChartProps) {
   if (isLoading) {
-    return <Skeleton className="h-[350px] w-full rounded-xl" />;
+    return <Skeleton className="h-full w-full rounded-xl" />;
   }
 
-  // Nếu không có dữ liệu chi tiêu
   if (!data || data.length === 0) {
     return (
-      <Card className="col-span-3 shadow-sm flex flex-col">
-        <CardHeader>
-          <CardTitle>Cơ cấu chi tiêu</CardTitle>
+      <Card className="shadow-sm h-full flex flex-col">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base sm:text-lg">
+            Cơ cấu chi tiêu
+          </CardTitle>
         </CardHeader>
-        <CardContent className="flex-1 flex items-center justify-center text-muted-foreground">
+        <CardContent className="flex-1 flex items-center justify-center text-sm text-muted-foreground text-center px-4">
           Chưa có dữ liệu chi tiêu tháng này
         </CardContent>
       </Card>
@@ -54,23 +54,24 @@ export function ExpensePieChart({
   }
 
   return (
-    <Card className="col-span-3 shadow-sm">
-      <CardHeader>
-        <CardTitle>Cơ cấu chi tiêu</CardTitle>
+    <Card className="shadow-sm h-full flex flex-col">
+      <CardHeader className="pb-0">
+        <CardTitle className="text-base sm:text-lg">Cơ cấu chi tiêu</CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="h-[300px] w-full">
+      <CardContent className="flex-1 pb-4">
+        <div className="h-full w-full min-h-[250px]">
           <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
+            <PieChart margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
               <Pie
                 data={data}
                 cx="50%"
                 cy="50%"
-                innerRadius={60} // Tạo hiệu ứng Donut Chart
-                outerRadius={80}
-                paddingAngle={5}
+                innerRadius="50%"
+                outerRadius="75%"
+                paddingAngle={3}
                 dataKey="amount"
                 nameKey="categoryName"
+                stroke="none"
               >
                 {data.map((entry, index) => (
                   <Cell
@@ -85,11 +86,19 @@ export function ExpensePieChart({
                 }
                 contentStyle={{
                   borderRadius: "8px",
-                  border: "none",
-                  boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                  border: "1px solid #e5e7eb",
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
+                  fontSize: "12px",
                 }}
               />
-              <Legend />
+              <Legend
+                layout="horizontal"
+                verticalAlign="bottom"
+                align="center"
+                wrapperStyle={{ fontSize: "11px", paddingTop: "10px" }}
+                iconType="circle"
+                iconSize={8}
+              />
             </PieChart>
           </ResponsiveContainer>
         </div>

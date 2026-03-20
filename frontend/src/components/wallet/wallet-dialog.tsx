@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
   Dialog,
   DialogContent,
@@ -18,7 +19,15 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useWallets } from "@/hooks/use-wallets";
+import { CURRENCIES } from "@/lib/constants";
 import {
   Wallet,
   WalletFormValues,
@@ -26,19 +35,10 @@ import {
   WalletType,
 } from "@/types/wallet.dto";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { format } from "date-fns";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../ui/select";
-import { CURRENCIES } from "@/lib/constants";
-import { DatePicker } from "../ui/date-picker";
-import { format } from "date-fns";
 
 interface WalletDialogProps {
   open: boolean;
@@ -84,7 +84,6 @@ export function WalletDialog({
           currency: walletToEdit.currency,
           type: walletToEdit.type || WalletType.BASIC,
           targetAmount: walletToEdit.targetAmount || 0,
-          // Convert ngày từ Backend (ISO String) sang định dạng của input type="date"
           deadline: walletToEdit.deadline
             ? walletToEdit.deadline.split("T")[0]
             : format(new Date(), "yyyy-MM-dd"),
@@ -103,7 +102,6 @@ export function WalletDialog({
   }, [open, walletToEdit, form, defaultType]);
 
   const onSubmit = (values: WalletFormValues) => {
-    // Ép kiểu Data gửi đi (Xóa mục tiêu nếu là ví thường)
     const payload = {
       ...values,
       targetAmount:
@@ -112,7 +110,6 @@ export function WalletDialog({
     };
 
     if (isEditMode && walletToEdit) {
-      // --- LOGIC SỬA (EDIT MODE) ---
       const isNameChanged = values.name !== walletToEdit.name;
       const isCurrencyChanged = values.currency !== walletToEdit.currency;
       const isTargetChanged = values.targetAmount !== walletToEdit.targetAmount;
@@ -126,17 +123,15 @@ export function WalletDialog({
         isTargetChanged ||
         isDeadlineChanged;
 
-      // TRƯỜNG HỢP 1: Có sửa thông tin cơ bản
       if (hasInfoChanges) {
         updateWallet(
           {
             id: walletToEdit.id,
-            data: payload, // Gửi payload đã xử lý
+            data: payload,
           },
           {
             onSuccess: () => {
               if (isBalanceChanged) {
-                // Gọi tiếp API thứ 2
                 adjustBalance(
                   { id: walletToEdit.id, newBalance: values.balance },
                   {
@@ -152,14 +147,10 @@ export function WalletDialog({
                 onOpenChange(false);
               }
             },
-            onError: () => {
-              // Lỗi update info thì thôi không update số dư nữa
-            },
+            onError: () => {},
           },
         );
-      }
-      // TRƯỜNG HỢP 2: Chỉ sửa số dư
-      else if (isBalanceChanged) {
+      } else if (isBalanceChanged) {
         adjustBalance(
           { id: walletToEdit.id, newBalance: values.balance },
           {
@@ -170,13 +161,10 @@ export function WalletDialog({
             onError: () => toast.error("Lỗi khi cập nhật số dư"),
           },
         );
-      }
-      // TRƯỜNG HỢP 3: Không sửa gì cả
-      else {
+      } else {
         onOpenChange(false);
       }
     } else {
-      // --- LOGIC TẠO MỚI ---
       createWallet(payload, { onSuccess: () => onOpenChange(false) });
     }
   };
@@ -186,7 +174,7 @@ export function WalletDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto px-4 sm:px-6">
         <DialogHeader>
           <DialogTitle>
             {isEditMode ? "Cập nhật ví" : "Thêm ví mới"}
@@ -199,7 +187,10 @@ export function WalletDialog({
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form
+            onSubmit={form.handleSubmit(onSubmit)}
+            className="space-y-4 px-1"
+          >
             <FormField
               control={form.control}
               name="type"
@@ -210,10 +201,10 @@ export function WalletDialog({
                     onValueChange={field.onChange}
                     defaultValue={field.value}
                     value={field.value}
-                    disabled={isEditMode || isLoading} // Không cho đổi loại ví khi đang Edit
+                    disabled={isEditMode || isLoading}
                   >
                     <FormControl>
-                      <SelectTrigger>
+                      <SelectTrigger className="h-12 text-base">
                         <SelectValue placeholder="Chọn loại ví" />
                       </SelectTrigger>
                     </FormControl>
@@ -231,7 +222,6 @@ export function WalletDialog({
               )}
             />
 
-            {/* Tên ví */}
             <FormField
               control={form.control}
               name="name"
@@ -240,6 +230,7 @@ export function WalletDialog({
                   <FormLabel>Tên ví / Tên mục tiêu</FormLabel>
                   <FormControl>
                     <Input
+                      className="h-12 text-lg font-bold pr-4"
                       placeholder={
                         currentType === WalletType.SAVING
                           ? "VD: Quỹ mua xe..."
@@ -254,7 +245,7 @@ export function WalletDialog({
             />
 
             {currentType === WalletType.SAVING && (
-              <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2">
                 <FormField
                   control={form.control}
                   name="targetAmount"
@@ -265,6 +256,7 @@ export function WalletDialog({
                         <Input
                           type="number"
                           placeholder="50000000"
+                          className="h-12 text-lg font-bold pr-4"
                           {...field}
                         />
                       </FormControl>
@@ -276,8 +268,8 @@ export function WalletDialog({
                   control={form.control}
                   name="deadline"
                   render={({ field }) => (
-                    <FormItem className="flex flex-col pt-2">
-                      <FormLabel>Hạn chót</FormLabel>
+                    <FormItem className="flex flex-col pt-2 sm:pt-0">
+                      <FormLabel className="sm:mt-0 mt-2">Hạn chót</FormLabel>
                       <FormControl>
                         <DatePicker
                           value={
@@ -297,8 +289,7 @@ export function WalletDialog({
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-4">
-              {/* Số dư */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="balance"
@@ -312,7 +303,12 @@ export function WalletDialog({
                         : `Số dư ${isEditMode ? "thực tế" : "ban đầu"}`}
                     </FormLabel>
                     <FormControl>
-                      <Input type="number" step="any" {...field} />
+                      <Input
+                        type="number"
+                        step="any"
+                        className="h-12 text-lg font-bold pr-4"
+                        {...field}
+                      />
                     </FormControl>
                     {isEditMode && (
                       <p className="text-[0.75rem] text-muted-foreground">
@@ -324,7 +320,6 @@ export function WalletDialog({
                 )}
               />
 
-              {/* Currency */}
               <FormField
                 control={form.control}
                 name="currency"
@@ -338,7 +333,7 @@ export function WalletDialog({
                       disabled={isLoading}
                     >
                       <FormControl>
-                        <SelectTrigger className="bg-background">
+                        <SelectTrigger className="h-12 text-base">
                           <SelectValue placeholder="Chọn đơn vị" />
                         </SelectTrigger>
                       </FormControl>
@@ -366,8 +361,12 @@ export function WalletDialog({
               />
             </div>
 
-            <DialogFooter className="pt-2">
-              <Button type="submit" disabled={isLoading}>
+            <DialogFooter className="pt-4 pb-2 sticky bottom-0 bg-background/95 backdrop-blur-sm z-10">
+              <Button
+                type="submit"
+                className="w-full h-12 text-lg font-semibold"
+                disabled={isLoading}
+              >
                 {isLoading
                   ? "Đang xử lý..."
                   : isEditMode

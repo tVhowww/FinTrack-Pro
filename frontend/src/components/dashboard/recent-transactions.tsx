@@ -21,7 +21,7 @@ export function RecentTransactions({
   const { wallets } = useWallets();
 
   return (
-    <Card className="col-span-3 shadow-sm h-full">
+    <Card className="shadow-sm h-full">
       <CardHeader>
         <CardTitle>Giao dịch gần đây</CardTitle>
       </CardHeader>

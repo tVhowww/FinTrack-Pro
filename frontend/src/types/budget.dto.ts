@@ -1,3 +1,5 @@
+export type BudgetStatus = "ACTIVE" | "EXCEEDED" | "EXPIRED" | "UPCOMING";
+
 export interface Budget {
   id: string;
   name: string;
@@ -10,6 +12,7 @@ export interface Budget {
   categoryName: string;
   month: number;
   year: number;
+  status: BudgetStatus;
 }
 
 export interface BudgetCreationRequest {
@@ -38,4 +41,5 @@ export interface BudgetResponse {
   categoryName: string;
   month: number;
   year: number;
+  status: BudgetStatus;
 }

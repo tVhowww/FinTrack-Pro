@@ -2,6 +2,8 @@
 
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { TransactionDialog } from "@/components/transaction/transaction-dialog";
+import { TransactionFilter } from "@/components/transaction/transaction-filter";
+import { TransactionCard } from "@/components/transaction/transaction-card";
 import { DataTable } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,20 +18,17 @@ import {
 import { generatePagination } from "@/lib/utils";
 import { useTransactions } from "@/hooks/use-transactions";
 import {
+  TransactionCreationRequest,
   TransactionQueryParams,
   TransactionResponse,
   TransactionType,
-} from "@/types/transaction.dto";
-import { Plus, Download, Loader2 } from "lucide-react";
-import { useState } from "react";
-import { getColumns } from "./columns";
-import {
-  TransactionCreationRequest,
   TransactionUpdateRequest,
 } from "@/types/transaction.dto";
+import { Download, Loader2, Plus } from "lucide-react";
+import { useState } from "react";
+import { getColumns } from "./columns";
 import { useSearchParams } from "next/navigation";
 import { useWallets } from "@/hooks/use-wallets";
-import { TransactionFilter } from "@/components/transaction/transaction-filter";
 
 export default function TransactionsPage() {
   const searchParams = useSearchParams();
@@ -46,7 +45,6 @@ export default function TransactionsPage() {
     categoryId: searchParams.get("categoryId") || undefined,
   };
 
-  // Gọi Hook
   const {
     data,
     isLoading,
@@ -62,8 +60,6 @@ export default function TransactionsPage() {
   } = useTransactions(queryParams);
 
   const handleExport = () => {
-    // có thể truyền thêm các tham số filter (tháng, năm, ví) vào đây nếu muốn lọc trước khi xuất.
-    // Hiện tại truyền rỗng để lấy hết hoặc theo logic mặc định.
     exportTransactions(queryParams);
   };
 
@@ -72,7 +68,6 @@ export default function TransactionsPage() {
     useState<TransactionResponse | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  // Handlers UI
   const handleCreate = () => {
     setTransactionToEdit(null);
     setIsDialogOpen(true);
@@ -116,7 +111,7 @@ export default function TransactionsPage() {
 
   return (
     <div className="h-full flex flex-col space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Giao dịch</h2>
           <p className="text-sm text-muted-foreground">
@@ -124,21 +119,25 @@ export default function TransactionsPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
           <Button
             variant="outline"
             onClick={handleExport}
             disabled={isExporting}
+            className="w-full sm:w-auto h-11 sm:h-10"
           >
             {isExporting ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
               <Download className="mr-2 h-4 w-4" />
             )}
-            Xuất Excel
+            Xuất
           </Button>
 
-          <Button onClick={handleCreate}>
+          <Button
+            onClick={handleCreate}
+            className="w-full sm:w-auto h-11 sm:h-10"
+          >
             <Plus className="mr-2 h-4 w-4" /> Thêm giao dịch
           </Button>
         </div>
@@ -151,9 +150,27 @@ export default function TransactionsPage() {
           <div className="text-center py-10 text-muted-foreground">
             Đang tải dữ liệu...
           </div>
+        ) : data.length === 0 ? (
+          <div className="text-center py-10 border-2 border-dashed rounded-xl bg-muted/20 text-muted-foreground">
+            Không tìm thấy giao dịch nào.
+          </div>
         ) : (
           <div className="space-y-4">
-            <DataTable columns={columns} data={data} />
+            <div className="hidden md:block">
+              <DataTable columns={columns} data={data} />
+            </div>
+
+            <div className="md:hidden space-y-3">
+              {data.map((tx) => (
+                <TransactionCard
+                  key={tx.id}
+                  transaction={tx}
+                  wallet={wallets.find((w) => w.id === tx.walletId)}
+                  onEdit={handleEdit}
+                  onDelete={setDeleteId}
+                />
+              ))}
+            </div>
 
             {/* Pagination Logic */}
             {totalPages > 1 && (
@@ -225,7 +242,7 @@ export default function TransactionsPage() {
         title="Xóa giao dịch này?"
         description="Số tiền sẽ được hoàn lại vào ví của bạn."
         onConfirm={handleDelete}
-        isLoading={isDeleting} // State từ Hook
+        isLoading={isDeleting}
         variant="destructive"
       />
     </div>

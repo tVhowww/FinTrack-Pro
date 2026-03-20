@@ -69,8 +69,17 @@ export default function WalletsPage() {
   const basicWallets = wallets.filter((w) => w.type !== WalletType.SAVING);
   const savingWallets = wallets.filter((w) => w.type === WalletType.SAVING);
 
+  // 👇 CSS VŨ KHÍ: Dùng để làm vuốt ngang trên Mobile, ẩn thanh cuộn, và thành Grid trên PC
+  const swipeableContainerClass =
+    "flex overflow-x-auto pb-6 pt-2 gap-4 snap-x snap-mandatory md:grid md:grid-cols-2 lg:grid-cols-3 md:overflow-visible md:pb-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]";
+
+  // Wrapper để mỗi Card chiếm 85% chiều rộng màn hình Mobile
+  const swipeableItemClass =
+    "min-w-[85vw] sm:min-w-[320px] snap-center md:min-w-0 h-full";
+
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Ví & Quỹ</h2>
@@ -82,13 +91,13 @@ export default function WalletsPage() {
           <Button
             variant="outline"
             onClick={() => setIsTransferOpen(true)}
-            className="w-full sm:w-auto bg-blue-50 text-blue-600 hover:bg-blue-100 border-blue-200"
+            className="w-full sm:w-auto bg-blue-50 text-blue-600 hover:bg-blue-100 border-blue-200 h-11 sm:h-10"
           >
             <ArrowRightLeft className="mr-2 h-4 w-4" /> Chuyển tiền
           </Button>
           <Button
             onClick={() => handleCreate(WalletType.BASIC)}
-            className="w-full sm:w-auto"
+            className="w-full sm:w-auto h-11 sm:h-10"
           >
             <Plus className="mr-2 h-4 w-4" /> Thêm ví mới
           </Button>
@@ -114,7 +123,11 @@ export default function WalletsPage() {
               : "Bạn chưa có ví hay quỹ nào. Hãy tạo mới để bắt đầu!"}
           </p>
           {!keyword && (!currency || currency === "all") && (
-            <Button variant="outline" className="mt-4" onClick={handleCreate}>
+            <Button
+              variant="outline"
+              className="mt-4 h-11"
+              onClick={handleCreate}
+            >
               Tạo mới ngay
             </Button>
           )}
@@ -132,25 +145,30 @@ export default function WalletsPage() {
                   Ví chi tiêu hàng ngày
                 </h3>
               </div>
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+
+              {/* 👇 Áp dụng Swipeable Carousel cho Mobile */}
+              <div className={swipeableContainerClass}>
                 {basicWallets.map((wallet) => (
-                  <WalletCard
-                    key={wallet.id}
-                    wallet={wallet}
-                    onEdit={handleEdit}
-                    onDelete={(id) => setDeleteId(id)}
-                  />
+                  <div key={wallet.id} className={swipeableItemClass}>
+                    <WalletCard
+                      wallet={wallet}
+                      onEdit={handleEdit}
+                      onDelete={(id) => setDeleteId(id)}
+                    />
+                  </div>
                 ))}
 
-                <button
-                  onClick={() => handleCreate(WalletType.BASIC)}
-                  className="group flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-muted-foreground/25 p-8 text-center hover:bg-accent/50 hover:text-accent-foreground transition-all h-full min-h-[120px]"
-                >
-                  <div className="rounded-full bg-background p-3 shadow-sm group-hover:scale-110 transition-transform">
-                    <Plus className="h-5 w-5 text-muted-foreground" />
-                  </div>
-                  <h3 className="font-semibold text-sm">Thêm ví mới</h3>
-                </button>
+                <div className={swipeableItemClass}>
+                  <button
+                    onClick={() => handleCreate(WalletType.BASIC)}
+                    className="group w-full flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-muted-foreground/25 p-8 text-center hover:bg-accent/50 hover:text-accent-foreground transition-all h-full min-h-[140px]"
+                  >
+                    <div className="rounded-full bg-background p-3 shadow-sm group-hover:scale-110 transition-transform">
+                      <Plus className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <h3 className="font-semibold text-sm">Thêm ví mới</h3>
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -172,26 +190,29 @@ export default function WalletsPage() {
                   Bạn chưa có quỹ tiết kiệm nào. Hãy đặt ra một mục tiêu mới!
                 </div>
               ) : (
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <div className={swipeableContainerClass}>
                   {savingWallets.map((wallet) => (
-                    <WalletCard
-                      key={wallet.id}
-                      wallet={wallet}
-                      onEdit={handleEdit}
-                      onDelete={(id) => setDeleteId(id)}
-                      onAddFund={handleAddFund}
-                      onWithdraw={handleWithdraw}
-                    />
-                  ))}
-                  <button
-                    onClick={() => handleCreate(WalletType.SAVING)}
-                    className="group flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-muted-foreground/25 p-8 text-center hover:bg-accent/50 hover:text-accent-foreground transition-all h-full min-h-[120px]"
-                  >
-                    <div className="rounded-full bg-background p-3 shadow-sm group-hover:scale-110 transition-transform">
-                      <Plus className="h-5 w-5 text-muted-foreground" />
+                    <div key={wallet.id} className={swipeableItemClass}>
+                      <WalletCard
+                        wallet={wallet}
+                        onEdit={handleEdit}
+                        onDelete={(id) => setDeleteId(id)}
+                        onAddFund={handleAddFund}
+                        onWithdraw={handleWithdraw}
+                      />
                     </div>
-                    <h3 className="font-semibold text-sm">Thêm ví mới</h3>
-                  </button>
+                  ))}
+                  <div className={swipeableItemClass}>
+                    <button
+                      onClick={() => handleCreate(WalletType.SAVING)}
+                      className="group w-full flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-muted-foreground/25 p-8 text-center hover:bg-accent/50 hover:text-accent-foreground transition-all h-full min-h-[140px]"
+                    >
+                      <div className="rounded-full bg-background p-3 shadow-sm group-hover:scale-110 transition-transform">
+                        <Plus className="h-5 w-5 text-muted-foreground" />
+                      </div>
+                      <h3 className="font-semibold text-sm">Thêm quỹ mới</h3>
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -199,34 +220,31 @@ export default function WalletsPage() {
         </div>
       )}
 
+      {/* Các Dialog giữ nguyên gọi từ component con */}
       <WalletDialog
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
         walletToEdit={selectedWallet}
         defaultType={createType}
       />
-
       <ConfirmDialog
         open={!!deleteId}
         onOpenChange={(open) => !open && setDeleteId(null)}
         title="Xóa ví/quỹ này?"
-        description="Dữ liệu này sẽ bị ẩn khỏi danh sách của bạn. Bạn sẽ không thể thực hiện giao dịch mới trên ví này nữa."
+        description="Dữ liệu này sẽ bị ẩn. Bạn sẽ không thể giao dịch trên ví này nữa."
         onConfirm={handleDeleteExecute}
         isLoading={isDeleting}
       />
-
       <WalletAddFundDialog
         open={isAddFundOpen}
         onOpenChange={setIsAddFundOpen}
         wallet={fundWallet}
       />
-
       <WalletWithdrawDialog
         open={isWithdrawOpen}
         onOpenChange={setIsWithdrawOpen}
         wallet={withdrawWallet}
       />
-
       <WalletTransferDialog
         open={isTransferOpen}
         onOpenChange={setIsTransferOpen}
