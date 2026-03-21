@@ -169,6 +169,8 @@ services:
     container_name: fintrack-notification-service
     ports:
       - "8083:8083"
+    env_file:
+      - ../backend/notification-service/.env
     environment:
       # Quan trọng: Kết nối Kafka nội bộ dùng port 9092
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
