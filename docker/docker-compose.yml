@@ -25,39 +25,54 @@ services:
     container_name: fintrack-identity-db
     restart: always
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=password
+      - POSTGRES_USER=${IDENTITY_DB_USER}
+      - POSTGRES_PASSWORD=${IDENTITY_DB_PASSWORD}
       - POSTGRES_DB=identity_service_db
     ports:
       - "5432:5432"
     volumes:
       - identity_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${IDENTITY_DB_USER} -d identity_service_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   wallet-db:
     image: postgres:16-alpine
     container_name: fintrack-wallet-db
     restart: always
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=password
+      - POSTGRES_USER=${WALLET_DB_USER}
+      - POSTGRES_PASSWORD=${WALLET_DB_PASSWORD}
       - POSTGRES_DB=wallet_service_db
     ports:
       - "5433:5432"
     volumes:
       - wallet_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${WALLET_DB_USER} -d wallet_service_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   transaction-db:
     image: postgres:16-alpine
     container_name: fintrack-transaction-db
     restart: always
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=password
+      - POSTGRES_USER=${TRANSACTION_DB_USER}
+      - POSTGRES_PASSWORD=${TRANSACTION_DB_PASSWORD}
       - POSTGRES_DB=transaction_service_db
     ports:
       - "5434:5432"
     volumes:
       - transaction_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${TRANSACTION_DB_USER} -d transaction_service_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # --- TOOLS ---
   # 1. Công cụ quản lý DB (pgAdmin) - Optional nhưng nên có để dễ debug
@@ -66,16 +81,19 @@ services:
     container_name: fintrack-pgadmin
     restart: always
     environment:
-      - PGADMIN_DEFAULT_EMAIL=admin@fintrack.com
-      - PGADMIN_DEFAULT_PASSWORD=root
+      - PGADMIN_DEFAULT_EMAIL=${PGADMIN_EMAIL}
+      - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_PASSWORD}
     ports:
       - "5050:80"
     volumes:
       - pgadmin_data:/var/lib/pgadmin
     depends_on:
-      - identity-db
-      - wallet-db
-      - transaction-db
+      identity-db:
+        condition: service_healthy
+      wallet-db:
+        condition: service_healthy
+      transaction-db:
+        condition: service_healthy
 
   # 2. Redis
   redis:
@@ -125,23 +143,26 @@ services:
 
   # --- Identity Service ---
   identity-service:
-    build: ../backend/identity-service  # Đường dẫn tới thư mục chứa code Identity
+    build: ../backend/identity-service
     container_name: fintrack-identity-service
     ports:
-      - "8080:8080" # Map port ra ngoài để bạn test Swagger
+      - "8080:8080"
     env_file:
       - ../backend/identity-service/.env
     environment:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://identity-db:5432/identity_service_db
-      - SPRING_DATASOURCE_USERNAME=postgres
-      - SPRING_DATASOURCE_PASSWORD=password
+      - SPRING_DATASOURCE_USERNAME=${IDENTITY_DB_USER}
+      - SPRING_DATASOURCE_PASSWORD=${IDENTITY_DB_PASSWORD}
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-service:8761/eureka/
       - SPRING_DATA_REDIS_HOST=redis
       - SPRING_DATA_REDIS_PORT=6379
     depends_on:
-      - identity-db
-      - discovery-service
-      - redis
+      identity-db:
+        condition: service_healthy
+      discovery-service:
+        condition: service_started
+      redis:
+        condition: service_started
 
   # --- Wallet Service ---
   wallet-service:
@@ -153,15 +174,18 @@ services:
       - ../backend/wallet-service/.env
     environment:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://wallet-db:5432/wallet_service_db
-      - SPRING_DATASOURCE_USERNAME=postgres
-      - SPRING_DATASOURCE_PASSWORD=password
+      - SPRING_DATASOURCE_USERNAME=${WALLET_DB_USER}
+      - SPRING_DATASOURCE_PASSWORD=${WALLET_DB_PASSWORD}
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-service:8761/eureka/
       - SPRING_DATA_REDIS_HOST=redis
       - SPRING_DATA_REDIS_PORT=6379
     depends_on:
-      - wallet-db
-      - discovery-service
-      - redis
+      wallet-db:
+        condition: service_healthy
+      discovery-service:
+        condition: service_started
+      redis:
+        condition: service_started
 
   # --- Notification Service ---
   notification-service:
@@ -184,30 +208,32 @@ services:
     build: ../backend/transaction-service
     container_name: fintrack-transaction-service
     ports:
-      - "8082:8082" # Để bạn vẫn test được cửa sau (Direct Access)
+      - "8082:8082"
     env_file:
       - ../backend/transaction-service/.env
     environment:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://transaction-db:5432/transaction_service_db
-      - SPRING_DATASOURCE_USERNAME=postgres
-      - SPRING_DATASOURCE_PASSWORD=password
+      - SPRING_DATASOURCE_USERNAME=${TRANSACTION_DB_USER}
+      - SPRING_DATASOURCE_PASSWORD=${TRANSACTION_DB_PASSWORD}
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-      # Cấu hình Feign Client trỏ sang container khác (Không dùng localhost)
-      # Lưu ý: Feign Client trong code của bạn phải hỗ trợ đọc URL từ biến môi trường
-      # Hoặc nếu bạn dùng Service Discovery thì không cần dòng này.
-      # Nếu bạn đang hardcode URL trong @FeignClient, bạn phải sửa code để nhận biến này.
       - IDENTITY_SERVICE_URL=http://identity-service:8080
       - WALLET_SERVICE_URL=http://wallet-service:8081
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-service:8761/eureka/
       - SPRING_DATA_REDIS_HOST=redis
       - SPRING_DATA_REDIS_PORT=6379
     depends_on:
-      - transaction-db
-      - kafka
-      - discovery-service
-      - identity-service
-      - wallet-service
-      - redis
+      transaction-db:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+      discovery-service:
+        condition: service_started
+      identity-service:
+        condition: service_started
+      wallet-service:
+        condition: service_started
+      redis:
+        condition: service_started
 
   # --- API Gateway ---
   api-gateway:

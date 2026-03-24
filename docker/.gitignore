@@ -1,0 +1,5 @@
+# Ignore the real secrets file — NEVER commit this
+.env
+
+# Allow the example template to be committed
+!.env.example
