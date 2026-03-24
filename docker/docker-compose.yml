@@ -150,6 +150,7 @@ services:
     env_file:
       - ../backend/identity-service/.env
     environment:
+      - SPRING_PROFILES_ACTIVE=prod
       - SPRING_DATASOURCE_URL=jdbc:postgresql://identity-db:5432/identity_service_db
       - SPRING_DATASOURCE_USERNAME=${IDENTITY_DB_USER}
       - SPRING_DATASOURCE_PASSWORD=${IDENTITY_DB_PASSWORD}
@@ -173,6 +174,7 @@ services:
     env_file:
       - ../backend/wallet-service/.env
     environment:
+      - SPRING_PROFILES_ACTIVE=prod
       - SPRING_DATASOURCE_URL=jdbc:postgresql://wallet-db:5432/wallet_service_db
       - SPRING_DATASOURCE_USERNAME=${WALLET_DB_USER}
       - SPRING_DATASOURCE_PASSWORD=${WALLET_DB_PASSWORD}
@@ -196,7 +198,7 @@ services:
     env_file:
       - ../backend/notification-service/.env
     environment:
-      # Quan trọng: Kết nối Kafka nội bộ dùng port 9092
+      - SPRING_PROFILES_ACTIVE=prod
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-service:8761/eureka/
     depends_on:
@@ -212,6 +214,7 @@ services:
     env_file:
       - ../backend/transaction-service/.env
     environment:
+      - SPRING_PROFILES_ACTIVE=prod
       - SPRING_DATASOURCE_URL=jdbc:postgresql://transaction-db:5432/transaction_service_db
       - SPRING_DATASOURCE_USERNAME=${TRANSACTION_DB_USER}
       - SPRING_DATASOURCE_PASSWORD=${TRANSACTION_DB_PASSWORD}
@@ -244,11 +247,10 @@ services:
     env_file:
       - ../backend/api-gateway/.env
     environment:
+      - SPRING_PROFILES_ACTIVE=prod
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-service:8761/eureka/
-      # Gateway phải trỏ các route về tên container
       - IDENTITY_SERVICE_URI=lb://identity-service
       - TRANSACTION_SERVICE_URI=lb://transaction-service
-      # Nếu gateway dùng Eureka thì không cần, nếu dùng hardcode URL thì cần sửa lại config Gateway
       - SPRING_DATA_REDIS_HOST=redis
       - SPRING_DATA_REDIS_PORT=6379
     depends_on:

@@ -14,10 +14,10 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
-    show-sql: true
+    show-sql: false
     properties:
       hibernate:
-        format_sql: true
+        format_sql: false
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
   kafka:
@@ -74,4 +74,18 @@ app:
   internal-secret: ${INTERNAL_SECRET}
   exchange-rate:
     url: https://open.er-api.com/v6
-    # Đã xóa dòng api-key cho nhẹ nợ
+
+---
+# ============================================================
+# DEV Profile — verbose SQL logging for local development
+# Activate with: SPRING_PROFILES_ACTIVE=dev
+# ============================================================
+spring:
+  config:
+    activate:
+      on-profile: dev
+  jpa:
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true

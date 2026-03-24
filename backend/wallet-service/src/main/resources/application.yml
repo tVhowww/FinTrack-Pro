@@ -16,10 +16,10 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
-    show-sql: true
+    show-sql: false
     properties:
       hibernate:
-        format_sql: true
+        format_sql: false
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
   kafka:
@@ -56,3 +56,18 @@ jwt:
 
 app:
   internal-secret: ${INTERNAL_SECRET}
+
+---
+# ============================================================
+# DEV Profile — verbose SQL logging for local development
+# Activate with: SPRING_PROFILES_ACTIVE=dev
+# ============================================================
+spring:
+  config:
+    activate:
+      on-profile: dev
+  jpa:
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
