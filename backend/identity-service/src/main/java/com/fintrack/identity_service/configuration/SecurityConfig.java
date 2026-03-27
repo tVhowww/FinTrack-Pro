@@ -20,6 +20,7 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 
 import javax.crypto.spec.SecretKeySpec;
@@ -30,6 +31,7 @@ import javax.crypto.spec.SecretKeySpec;
 @RequiredArgsConstructor
 public class SecurityConfig {
     private final StringRedisTemplate redisTemplate;
+    private final CookieToBearerFilter cookieToBearerFilter;
 
     @Value("${jwt.signerKey}")
     private String signerKey;
@@ -64,6 +66,10 @@ public class SecurityConfig {
                 oauth2.jwt(jwtConfigurer -> jwtConfigurer.decoder(jwtDecoder()))
                         .authenticationEntryPoint(new JwtAuthenticationEntryPoint())
         );
+
+        // Register the cookie-to-header filter BEFORE Spring's BearerTokenAuthenticationFilter
+        // so that HttpOnly cookie tokens are translated into Authorization headers.
+        httpSecurity.addFilterBefore(cookieToBearerFilter, UsernamePasswordAuthenticationFilter.class);
 
         return httpSecurity.build();
     }
