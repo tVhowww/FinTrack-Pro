@@ -86,3 +86,5 @@ eureka:
 app:
   # Lấy giá trị từ biến môi trường vào đây
   internal-secret: ${INTERNAL_SECRET}
+  # Comma-separated list of allowed CORS origins. Override with ALLOWED_ORIGINS env var.
+  allowed-origins: ${ALLOWED_ORIGINS:http://localhost:3000}

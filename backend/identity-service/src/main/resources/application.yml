@@ -38,6 +38,8 @@ eureka:
 
 app:
   internal-secret: ${INTERNAL_SECRET}
+  cookie:
+    secure: ${COOKIE_SECURE:false}
 
 cloudinary:
   cloud-name: ${CLOUDINARY_CLOUD_NAME}

@@ -30,7 +30,6 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { SocialAuth } from "./social-auth";
-import Cookies from "js-cookie";
 
 export function LoginForm() {
   const router = useRouter();
@@ -42,10 +41,8 @@ export function LoginForm() {
 
   const mutation = useMutation({
     mutationFn: authService.login,
-    onSuccess: (data) => {
-      const token = data.result.token;
-      localStorage.setItem("accessToken", token);
-      Cookies.set("accessToken", token, { expires: 1 / 24 });
+    onSuccess: () => {
+      // No token handling needed — the HttpOnly cookie was set by the server.
       toast.success("Đăng nhập thành công!");
       router.push("/");
     },

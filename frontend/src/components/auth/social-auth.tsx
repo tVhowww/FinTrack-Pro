@@ -6,7 +6,6 @@ import { GoogleOAuthProvider, GoogleLogin } from "@react-oauth/google";
 import { authService } from "@/services/auth.service";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import Cookies from "js-cookie";
 
 export function SocialAuth() {
   const router = useRouter();
@@ -18,14 +17,10 @@ export function SocialAuth() {
       // 1. Lấy ID Token từ Google trả về
       const idToken = credentialResponse.credential;
 
-      // 2. Ném xuống Backend của mình để kiểm tra và lấy Token nội bộ
-      const data = await authService.loginGoogle(idToken);
-      const token = data.result.token;
+      // 2. Ném xuống Backend của mình để kiểm tra và đặt HttpOnly cookie
+      await authService.loginGoogle(idToken);
 
-      // 3. Lưu JWT và chuyển hướng (Y hệt login thường)
-      localStorage.setItem("accessToken", token);
-      Cookies.set("accessToken", token, { expires: 1 / 24 });
-
+      // 3. Cookie đã được set bởi server — chỉ cần chuyển hướng
       toast.success("Đăng nhập bằng Google thành công!");
       router.push("/");
     } catch (error: any) {

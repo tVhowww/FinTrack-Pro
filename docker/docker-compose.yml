@@ -253,6 +253,8 @@ services:
       - TRANSACTION_SERVICE_URI=lb://transaction-service
       - SPRING_DATA_REDIS_HOST=redis
       - SPRING_DATA_REDIS_PORT=6379
+      # CORS: set to your production frontend URL when deploying
+      - ALLOWED_ORIGINS=http://localhost:3000
     depends_on:
       - identity-service
       - transaction-service

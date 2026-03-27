@@ -8,8 +8,8 @@ const authPaths = ["/login", "/register", "/forgot-password"];
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // 1. Lấy token từ Cookie
-  const token = request.cookies.get("accessToken")?.value;
+  // Read the HttpOnly cookie set by the backend (CookieUtils.COOKIE_NAME = "access_token")
+  const token = request.cookies.get("access_token")?.value;
 
   // 2. Kiểm tra logic chặn đường:
 

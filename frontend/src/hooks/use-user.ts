@@ -4,7 +4,6 @@ import { userService } from "@/services/user.service";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import Cookies from "js-cookie";
 
 export function useUser() {
   const queryClient = useQueryClient();
@@ -58,9 +57,7 @@ export function useUser() {
     mutationFn: userService.deleteAccount,
     onSuccess: () => {
       toast.success("Đã xóa tài khoản. Hẹn gặp lại!");
-      // Xóa token và redirect
-      localStorage.removeItem("accessToken");
-      Cookies.remove("accessToken");
+      // Call the server logout to clear the HttpOnly cookie, then redirect
       router.push("/login");
     },
     onError: (error: any) => {

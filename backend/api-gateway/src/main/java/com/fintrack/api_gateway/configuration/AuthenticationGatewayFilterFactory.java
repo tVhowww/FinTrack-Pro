@@ -40,31 +40,49 @@ public class AuthenticationGatewayFilterFactory extends AbstractGatewayFilterFac
                 return chain.filter(exchange);
             }
 
-            // 1. Lấy giá trị Header Authorization ra
-            // Thay vì kiểm tra containsKey, ta lấy thẳng ra xem có null không
-            String authHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
+            // --- TOKEN EXTRACTION ---
+            // Strategy: Try Authorization header first, then fall back to HttpOnly cookie.
+            // This supports both API clients (Postman/Swagger with Bearer header)
+            // and the browser frontend (HttpOnly cookie via withCredentials).
+            String token = null;
 
-            // 2. Kiểm tra null và định dạng "Bearer "
-            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-                return onError(exchange, "Missing or invalid authorization header", HttpStatus.UNAUTHORIZED);
+            // 1. Try the Authorization header
+            String authHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
+            if (authHeader != null && authHeader.startsWith("Bearer ")) {
+                token = authHeader.substring(7);
             }
 
-            String token = authHeader.substring(7); // Cắt bỏ chữ "Bearer "
+            // 2. Fallback: read from the HttpOnly "access_token" cookie
+            if (token == null) {
+                org.springframework.http.HttpCookie cookie =
+                        exchange.getRequest().getCookies().getFirst("access_token");
+                if (cookie != null) {
+                    token = cookie.getValue();
+                }
+            }
 
-            // 3. Nếu OK thì cho đi tiếp
-            return identityService.introspect(token)
+            // 3. No token found anywhere → reject
+            if (token == null || token.isBlank()) {
+                return onError(exchange, "Missing authorization token", HttpStatus.UNAUTHORIZED);
+            }
+
+            // --- INTROSPECT & PROPAGATE ---
+            final String validatedToken = token;
+            return identityService.introspect(validatedToken)
                     .flatMap(introspectResponse -> {
                         if (introspectResponse.isValid()) {
-                            // Token ngon -> Cho đi tiếp
-                            return chain.filter(exchange);
+                            // HEADER PROPAGATION: Inject the "Authorization: Bearer" header
+                            // into the downstream request so microservices (wallet-service,
+                            // transaction-service, etc.) don't need any code changes.
+                            ServerWebExchange mutatedExchange = exchange.mutate()
+                                    .request(r -> r.header(HttpHeaders.AUTHORIZATION, "Bearer " + validatedToken))
+                                    .build();
+                            return chain.filter(mutatedExchange);
                         } else {
-                            // Token rác -> Chặn
                             return onError(exchange, "Invalid Token", HttpStatus.UNAUTHORIZED);
                         }
                     })
-                    // Xử lý lỗi nếu gọi Identity Service thất bại (ví dụ Service chết)
                     .onErrorResume(throwable -> {
-                        // LOGGING QUAN TRỌNG: Nếu rơi vào đây nghĩa là Gateway KHÔNG GỌI ĐƯỢC Identity Service
                         log.error("GATEWAY: Error calling Identity Service", throwable);
                         return onError(exchange, "Identity Service Unreachable", HttpStatus.UNAUTHORIZED);
                     });
@@ -74,10 +92,14 @@ public class AuthenticationGatewayFilterFactory extends AbstractGatewayFilterFac
     private boolean isPublicEndpoint(String path) {
         // Danh sách các API không cần token
         List<String> publicPaths = List.of(
-                "/identity/auth/token",      // Login
-                "/identity/auth/introspect", // Check token
-                "/identity/auth/logout",     // Logout
-                "/identity/users"            // Register (Đăng ký)
+                "/identity/auth/token",           // Login
+                "/identity/auth/google",          // Google OAuth login
+                "/identity/auth/introspect",      // Check token (internal)
+                "/identity/auth/logout",          // Logout (reads cookie itself)
+                "/identity/auth/refresh",         // Silent token refresh (reads cookie itself)
+                "/identity/auth/forgot-password", // Password recovery
+                "/identity/auth/reset-password",  // Password reset
+                "/identity/users"                 // Register
         );
 
         // Kiểm tra xem path hiện tại có chứa đoạn nào trong list trên không

@@ -1,124 +1,80 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
-import Cookies from "js-cookie";
 
 const http = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_BASE_URL,
   headers: {
     "Content-Type": "application/json",
   },
+  // SECURITY: withCredentials=true makes the browser automatically attach the
+  // HttpOnly 'access_token' cookie on every request. We never read or write
+  // this cookie from JavaScript — the browser handles it entirely.
+  withCredentials: true,
 });
 
-// --- CƠ CHẾ KHÓA (LOCKING) ---
-// Biến cờ để kiểm soát: Có đang refresh không?
+// --- TOKEN REFRESH WITH QUEUING ---
+// Prevents multiple parallel 401 errors from each triggering a separate refresh.
 let isRefreshing = false;
-// Hàng đợi chứa các request bị lỗi 401 đang chờ token mới
-let failedQueue: any[] = [];
+let failedQueue: { resolve: (token: null) => void; reject: (err: unknown) => void }[] = [];
 
-// Hàm xử lý hàng đợi: Duyệt qua các request đang chờ và trả về kết quả
-const processQueue = (error: any, token: string | null = null) => {
+const processQueue = (error: unknown) => {
   failedQueue.forEach((prom) => {
     if (error) {
       prom.reject(error);
     } else {
-      prom.resolve(token);
+      prom.resolve(null);
     }
   });
   failedQueue = [];
 };
 
-// 1. Interceptor Request: Tự động gắn Token
-http.interceptors.request.use(
-  (config) => {
-    if (typeof window !== "undefined") {
-      const token = localStorage.getItem("accessToken");
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
-
-// 2. Interceptor Response: Xử lý Lỗi 401 & Refresh Token (Có hàng đợi)
+// Response interceptor: silently refresh the HttpOnly cookie on 401
 http.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
-    const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+    const originalRequest = error.config as InternalAxiosRequestConfig & {
+      _retry?: boolean;
+    };
 
-    // Nếu lỗi không phải 401 thì reject luôn
     if (error.response?.status !== 401) {
       return Promise.reject(error);
     }
 
-    // Nếu request này đã từng thử refresh rồi mà vẫn lỗi -> Logout luôn (tránh lặp vô tận)
+    // Avoid infinite retry loops
     if (originalRequest._retry) {
       return Promise.reject(error);
     }
 
-    // --- LOGIC HÀNG ĐỢI ---
-    
-    // Nếu đang có một tiến trình refresh chạy rồi -> Request này phải XẾP HÀNG CHỜ
+    // Queue subsequent 401s while a refresh is already in flight
     if (isRefreshing) {
-      return new Promise(function (resolve, reject) {
+      return new Promise((resolve, reject) => {
         failedQueue.push({ resolve, reject });
       })
-        .then((token) => {
-          // Khi hàng đợi được giải phóng, lấy token mới gắn vào và chạy lại
-          if (originalRequest.headers) {
-             originalRequest.headers.Authorization = "Bearer " + token;
-          }
-          return http(originalRequest);
-        })
-        .catch((err) => {
-          return Promise.reject(err);
-        });
+        .then(() => http(originalRequest))
+        .catch((err) => Promise.reject(err));
     }
 
-    // Nếu chưa ai refresh -> Request này nhận trách nhiệm đi Refresh
     originalRequest._retry = true;
     isRefreshing = true;
 
     try {
-      // Gọi API Refresh (Dùng axios gốc để tránh lặp interceptor)
-      const currentToken = localStorage.getItem("accessToken");
-      const { data } = await axios.post(
+      // POST with empty body — the backend reads the token from the HttpOnly cookie
+      // and sets a new rotated cookie in the response.
+      await axios.post(
         `${process.env.NEXT_PUBLIC_API_BASE_URL}/identity/auth/refresh`,
-        { token: currentToken }
+        {},
+        { withCredentials: true }
       );
 
-      const newAccessToken = data.result.token;
-
-      // 1. Lưu token mới
-      localStorage.setItem("accessToken", newAccessToken);
-      Cookies.set("accessToken", newAccessToken); 
-
-      // 2. Cập nhật default header cho các request sau này
-      http.defaults.headers.common["Authorization"] = `Bearer ${newAccessToken}`;
-
-      // 3. Xử lý hàng đợi: Báo cho các request đang chờ biết là có token mới rồi
-      processQueue(null, newAccessToken);
-
-      // 4. Gọi lại chính request này
-      if (originalRequest.headers) {
-          originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
-      }
+      processQueue(null);
       return http(originalRequest);
-
     } catch (refreshError) {
-      // Nếu refresh thất bại (Hết hạn thật sự hoặc lỗi mạng)
-      // Báo lỗi cho toàn bộ hàng đợi
-      processQueue(refreshError, null);
-      
-      // Xóa dữ liệu và logout
-      localStorage.removeItem("accessToken");
-      Cookies.remove("accessToken");
+      processQueue(refreshError);
+      // Redirect to login on refresh failure
       if (typeof window !== "undefined") {
-         window.location.href = "/login";
+        window.location.href = "/login";
       }
       return Promise.reject(refreshError);
     } finally {
-      // Dù thành công hay thất bại cũng phải mở khóa cho lần sau
       isRefreshing = false;
     }
   }
