@@ -15,6 +15,7 @@ export interface TransactionResponse {
   category: Category | null;
   note?: string;
   date: string;
+  transferStatus?: string;
   createdAt: string;
 }
 

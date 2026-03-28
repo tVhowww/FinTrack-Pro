@@ -130,7 +130,6 @@ export function WalletTransferDialog({
         note: values.note || "Chuyển tiền nội bộ",
         categoryId: fallbackCategoryId,
       });
-      toast.success("Chuyển tiền nội bộ thành công!");
       onOpenChange(false);
     } catch (error) {
       console.error(error);

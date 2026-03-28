@@ -1,6 +1,7 @@
 package com.fintrack.transaction_service.entity;
 
 import com.fintrack.transaction_service.enums.TransactionType;
+import com.fintrack.transaction_service.enums.TransferStatus;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -45,6 +46,13 @@ public class Transaction {
 
     @Column(nullable = false)
     private Instant date;
+
+    @Column(name = "saga_id")
+    private String sagaId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "transfer_status")
+    private TransferStatus transferStatus;
 
     @Column(name = "is_deleted", nullable = false, columnDefinition = "boolean default false")
     private boolean deleted = false;

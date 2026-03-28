@@ -69,4 +69,9 @@ public class TransactionSpecification {
             );
         };
     }
+
+    public static Specification<Transaction> isNotTransfer() {
+        return (root, query, criteriaBuilder) ->
+                criteriaBuilder.isNull(root.get("sagaId"));
+    }
 }

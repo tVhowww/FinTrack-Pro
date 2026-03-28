@@ -1,6 +1,7 @@
 package com.fintrack.transaction_service.service;
 
 import com.fintrack.transaction_service.dto.event.NotificationEvent;
+import com.fintrack.transaction_service.dto.event.TransferDebitEvent;
 import com.fintrack.transaction_service.dto.request.TransactionCreationRequest;
 import com.fintrack.transaction_service.dto.request.TransactionUpdateRequest;
 import com.fintrack.transaction_service.dto.request.TransferRequest;
@@ -9,6 +10,7 @@ import com.fintrack.transaction_service.dto.response.*;
 import com.fintrack.transaction_service.entity.Category;
 import com.fintrack.transaction_service.entity.Transaction;
 import com.fintrack.transaction_service.enums.TransactionType;
+import com.fintrack.transaction_service.enums.TransferStatus;
 import com.fintrack.transaction_service.exception.AppException;
 import com.fintrack.transaction_service.exception.ErrorCode;
 import com.fintrack.transaction_service.mapper.TransactionMapper;
@@ -61,7 +63,6 @@ public class TransactionService {
         return transactionRepository.countByWalletId(walletId);
     }
 
-    // Thêm hàm này vào TransactionService.java
     public BigDecimal getTotalBalance() {
         // 1. Lấy đồng tiền cơ sở của User
         String baseCurrency = getUserBaseCurrency();
@@ -103,7 +104,8 @@ public class TransactionService {
         // 2. Lấy TẤT CẢ giao dịch CHI TIÊU trong tháng
         Specification<Transaction> spec = Specification.where(TransactionSpecification.hasWalletIdIn(walletIds))
                 .and(TransactionSpecification.hasType(TransactionType.EXPENSE))
-                .and(TransactionSpecification.createdBetween(start, end));
+                .and(TransactionSpecification.createdBetween(start, end))
+                .and(TransactionSpecification.isNotTransfer());
 
         List<Transaction> transactions = transactionRepository.findAll(spec);
 
@@ -134,7 +136,7 @@ public class TransactionService {
         if (walletIds.isEmpty()) return new ArrayList<>();
 
         String baseCurrency = getUserBaseCurrency();
-        java.util.Map<String, String> walletCurrencyMap = getWalletCurrencyMap();
+        Map<String, String> walletCurrencyMap = getWalletCurrencyMap();
         List<BalanceTrendResponse> trends = new ArrayList<>();
         YearMonth currentMonth = YearMonth.now();
 
@@ -144,7 +146,8 @@ public class TransactionService {
             Instant end = targetMonth.atEndOfMonth().atTime(23, 59, 59).atZone(ZoneId.systemDefault()).toInstant();
 
             Specification<Transaction> spec = Specification.where(TransactionSpecification.hasWalletIdIn(walletIds))
-                    .and(TransactionSpecification.createdBetween(start, end));
+                    .and(TransactionSpecification.createdBetween(start, end))
+                    .and(TransactionSpecification.isNotTransfer());
             List<Transaction> transactions = transactionRepository.findAll(spec);
 
             BigDecimal mIncome = BigDecimal.ZERO;
@@ -180,7 +183,7 @@ public class TransactionService {
         if (walletIds.isEmpty()) return new ArrayList<>();
 
         String baseCurrency = getUserBaseCurrency();
-        java.util.Map<String, String> walletCurrencyMap = getWalletCurrencyMap();
+        Map<String, String> walletCurrencyMap = getWalletCurrencyMap();
 
         YearMonth yearMonth = YearMonth.of(year, month);
         Instant start = yearMonth.atDay(1).atStartOfDay(ZoneId.systemDefault()).toInstant();
@@ -189,7 +192,8 @@ public class TransactionService {
         // Chỉ lấy giao dịch CHI TIÊU
         Specification<Transaction> spec = Specification.where(TransactionSpecification.hasWalletIdIn(walletIds))
                 .and(TransactionSpecification.hasType(TransactionType.EXPENSE))
-                .and(TransactionSpecification.createdBetween(start, end));
+                .and(TransactionSpecification.createdBetween(start, end))
+                .and(TransactionSpecification.isNotTransfer());
 
         List<Transaction> transactions = transactionRepository.findAll(spec);
 
@@ -324,7 +328,7 @@ public class TransactionService {
 
         // 1. Chuẩn bị dữ liệu quy đổi
         String baseCurrency = getUserBaseCurrency();
-        java.util.Map<String, String> walletCurrencyMap = getWalletCurrencyMap();
+        Map<String, String> walletCurrencyMap = getWalletCurrencyMap();
 
         YearMonth yearMonth = YearMonth.of(year, month);
         Instant start = yearMonth.atDay(1).atStartOfDay(ZoneId.systemDefault()).toInstant();
@@ -332,7 +336,8 @@ public class TransactionService {
 
         // 2. Lấy toàn bộ giao dịch trong tháng của các ví này
         Specification<Transaction> spec = Specification.where(TransactionSpecification.hasWalletIdIn(walletIds))
-                .and(TransactionSpecification.createdBetween(start, end));
+                .and(TransactionSpecification.createdBetween(start, end))
+                .and(TransactionSpecification.isNotTransfer());
         List<Transaction> transactions = transactionRepository.findAll(spec);
 
         // 3. Tính toán trên RAM (Java)
@@ -598,7 +603,7 @@ public class TransactionService {
     }
 
     @Transactional
-    public void transfer(TransferRequest request) {
+    public TransactionResponse transfer(TransferRequest request) {
         String currentUserId = SecurityUtils.getCurrentUserId();
         String lockKey = "lock:transfer_transaction:" + currentUserId;
         Boolean acquired = redisTemplate.opsForValue().setIfAbsent(lockKey, "LOCKED", 3, TimeUnit.SECONDS);
@@ -617,27 +622,55 @@ public class TransactionService {
         Category transferOutCategory = getOrCreateSystemCategory("Chuyển tiền đi", TransactionType.EXPENSE);
         Category transferInCategory = getOrCreateSystemCategory("Nhận tiền đến", TransactionType.INCOME);
 
-        // Phát súng 1: TRỪ TIỀN VÍ NGUỒN
-        TransactionCreationRequest expenseReq = TransactionCreationRequest.builder()
+        // 0. KHỞI TẠO SAGA ID
+        String sagaId = java.util.UUID.randomUUID().toString();
+
+        // 1. LƯU GIAO DỊCH TRỪ TIỀN (Trạng thái: PENDING)
+        Transaction expenseTx = Transaction.builder()
                 .amount(request.getAmount())
                 .type(TransactionType.EXPENSE)
                 .walletId(request.getFromWalletId())
                 .date(transactionDate)
                 .note(request.getNote() != null && !request.getNote().isEmpty() ? request.getNote() : "Chuyển tiền sang ví " + toWallet.getName())
-                .categoryId(transferOutCategory.getId())
+                .category(transferOutCategory)
+                .sagaId(sagaId)
+                .transferStatus(TransferStatus.PENDING) // Đánh dấu đang chờ
                 .build();
-        createInternal(expenseReq); // Dùng hàm lõi để KHÔNG bị vướng Redis Lock
+        transactionRepository.save(expenseTx);
 
-        // Phát súng 2: CỘNG TIỀN VÍ ĐÍCH
-        TransactionCreationRequest incomeReq = TransactionCreationRequest.builder()
+        // 2. LƯU GIAO DỊCH CỘNG TIỀN (Trạng thái: PENDING)
+        Transaction incomeTx = Transaction.builder()
                 .amount(request.getAmount())
                 .type(TransactionType.INCOME)
                 .walletId(request.getToWalletId())
                 .date(transactionDate)
                 .note("Nhận tiền từ quỹ " + fromWallet.getName())
-                .categoryId(transferInCategory.getId())
+                .category(transferInCategory)
+                .sagaId(sagaId)
+                .transferStatus(TransferStatus.PENDING) // Đánh dấu đang chờ
                 .build();
-        createInternal(incomeReq);
+        transactionRepository.save(incomeTx);
+
+        // 3. THỰC THI TRỪ TIỀN VÍ NGUỒN TRỰC TIẾP
+        // Nếu lỗi mạng ở đây, @Transactional sẽ Rollback lại 2 cái db save() ở trên.
+        WalletBalanceUpdateRequest debitRequest = WalletBalanceUpdateRequest.builder()
+                .amount(request.getAmount().negate()) // Trừ tiền
+                .build();
+        walletClient.updateBalance(request.getFromWalletId(), debitRequest);
+
+        // 4. BẮN EVENT SANG WALLET-SERVICE ĐỂ CỘNG TIỀN (Saga Choreography)
+        TransferDebitEvent event = TransferDebitEvent.builder()
+                .sagaId(sagaId)
+                .fromWalletId(request.getFromWalletId())
+                .toWalletId(request.getToWalletId())
+                .amount(request.getAmount())
+                .note(request.getNote())
+                .date(transactionDate)
+                .build();
+
+        kafkaTemplate.send("transfer.debit-completed", event);
+
+        return transactionMapper.toTransactionResponse(expenseTx);
     }
 
     // LÕI XỬ LÝ (KHÔNG CÓ REDIS LOCK ĐỂ TÁI SỬ DỤNG)

@@ -25,10 +25,11 @@ public class TransactionController {
     private final TransactionService transactionService;
 
     @PostMapping("/transfer")
-    public ApiResponse<String> transferMoney(@RequestBody TransferRequest request) {
-        transactionService.transfer(request);
-        return ApiResponse.<String>builder()
-                .result("Chuyển tiền thành công")
+    public ApiResponse<TransactionResponse> transferMoney(@RequestBody TransferRequest request) {
+        TransactionResponse response = transactionService.transfer(request);
+        return ApiResponse.<TransactionResponse>builder()
+                .result(response)
+                .message("Đã tiếp nhận yêu cầu chuyển tiền")
                 .build();
     }
 

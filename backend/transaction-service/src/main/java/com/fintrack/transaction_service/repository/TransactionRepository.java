@@ -94,4 +94,6 @@ public interface TransactionRepository extends JpaRepository<Transaction, String
     @Modifying
     @Query("DELETE FROM Transaction t WHERE t.walletId IN :walletIds")
     void deleteByWalletIdIn(List<String> walletIds);
+
+    List<Transaction> findBySagaId(String sagaId);
 }

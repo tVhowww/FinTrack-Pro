@@ -5,6 +5,7 @@ import {
   TransactionCreationRequest,
   TransactionQueryParams,
   TransactionUpdateRequest,
+  TransferRequest,
 } from "@/types/transaction.dto";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -172,12 +173,56 @@ export function useTransactions(
   });
 
   // =================================================================
-  // 7. MUTATION: Chuyển tiền giữa các ví
+  // 7. MUTATION: Chuyển tiền giữa các ví (CÓ POLLING NGẦM & CHUẨN TYPE)
   // =================================================================
-
   const transferMutation = useMutation({
-    mutationFn: transactionService.transfer,
-    onSuccess: () => {
+    mutationFn: async (payload: TransferRequest) => {
+      // 1. Gọi API chuyển tiền gốc (hàm này return response.data)
+      const response = await transactionService.transfer(payload);
+
+      // Lúc này response chính là ApiResponse, nên chỉ cần chấm tới result
+      const transactionId = response.result?.id;
+
+      if (!transactionId) return response;
+
+      // 2. Tự động Polling ngầm hỏi thăm Backend
+      let finalStatus = "PENDING";
+      let attempts = 0;
+      const MAX_ATTEMPTS = 10;
+
+      while (finalStatus === "PENDING" && attempts < MAX_ATTEMPTS) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        try {
+          // Hàm này return response.data.result (chính là TransactionResponse)
+          const checkRes = await transactionService.getTransaction(transactionId);
+
+          // Nên chỉ cần chấm thẳng tới transferStatus
+          finalStatus = checkRes?.transferStatus || "PENDING";
+        } catch (error) {
+          console.error("Lỗi polling ngầm:", error);
+        }
+        attempts++;
+      }
+
+      // 3. Ép cái status cuối cùng vào response để trả về cho onSuccess
+      if (response.result) {
+        response.result.transferStatus = finalStatus;
+      }
+
+      return response;
+    },
+    onSuccess: (data) => {
+      const finalStatus = data.result?.transferStatus || "PENDING";
+
+      if (finalStatus === "COMPLETED") {
+        toast.success("Chuyển tiền nội bộ thành công!");
+      } else if (finalStatus === "COMPENSATED") {
+        toast.error("Lỗi kết nối ví đích. Hệ thống đã hoàn tiền an toàn!");
+      } else {
+        toast.warning("Hệ thống đang xử lý ngầm. Vui lòng kiểm tra lại sau.");
+      }
+
+      // Vòng lặp xong xuôi mới gọi Invalidate để web tải lại số dư & biểu đồ
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
       queryClient.invalidateQueries({ queryKey: ["statistics"] });
       queryClient.invalidateQueries({ queryKey: ["wallets"] });

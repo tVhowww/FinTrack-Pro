@@ -23,4 +23,5 @@ public class TransactionResponse {
     private String note;
     private Instant date;
     private Instant createdAt;
+    private String transferStatus;
 }

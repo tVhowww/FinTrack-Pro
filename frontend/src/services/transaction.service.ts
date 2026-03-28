@@ -100,10 +100,10 @@ export const transactionService = {
   },
 
   transfer: async (data: TransferRequest) => {
-    const response = await http.post<ApiResponse<string>>(
+    const response = await http.post<ApiResponse<TransactionResponse>>(
       `${BASE_URL}/transfer`,
       data,
     );
-    return response.data.result;
+    return response.data;
   },
 };
