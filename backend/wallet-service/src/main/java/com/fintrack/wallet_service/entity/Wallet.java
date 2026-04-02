@@ -56,4 +56,7 @@ public class Wallet {
         if (balance == null) balance = BigDecimal.ZERO;
         if (currency == null) currency = "VND";
     }
+
+    @Version
+    private Long version;
 }

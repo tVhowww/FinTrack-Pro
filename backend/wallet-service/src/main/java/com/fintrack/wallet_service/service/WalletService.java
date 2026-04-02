@@ -18,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -77,7 +78,11 @@ public class WalletService {
 
         // 4. Cập nhật số dư ví TRƯỚC
         wallet.setBalance(newBalance);
-        wallet = walletRepository.save(wallet);
+        try {
+            walletRepository.save(wallet);
+        } catch (ObjectOptimisticLockingFailureException e) {
+            throw new RuntimeException("Hệ thống đang xử lý một giao dịch khác trên ví này. Vui lòng thử lại sau!");
+        }
 
         // 5. Gọi Transaction Service để lưu lịch sử
         // Nếu bước này lỗi -> @Transactional sẽ rollback việc cập nhật ví
@@ -232,7 +237,11 @@ public class WalletService {
 
         // Soft Delete
         wallet.setActive(false);
-        walletRepository.save(wallet);
+        try {
+            walletRepository.save(wallet);
+        } catch (ObjectOptimisticLockingFailureException e) {
+            throw new RuntimeException("Hệ thống đang xử lý một giao dịch khác trên ví này. Vui lòng thử lại sau!");
+        }
     }
 
     public WalletResponse getWallet(String id) {
