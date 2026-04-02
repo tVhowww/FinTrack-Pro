@@ -1,8 +1,8 @@
 package com.fintrack.transaction_service.configuration;
 
 import com.fintrack.transaction_service.dto.response.*;
-import com.fintrack.transaction_service.service.BudgetService;
-import com.fintrack.transaction_service.service.TransactionService;
+import com.fintrack.transaction_service.service.budget.BudgetService;
+import com.fintrack.transaction_service.service.transaction.TransactionStatisticsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
@@ -16,14 +16,14 @@ import java.util.List;
 @Slf4j
 public class AiToolConfig {
 
-    private final TransactionService transactionService;
+    private final TransactionStatisticsService statisticsService;
     private final BudgetService budgetService;
 
     @Tool(description = "Tra cứu dữ liệu thống kê tài chính, tổng thu, tổng chi và danh sách khoản chi tiêu của người dùng theo tháng và năm.")
     public String getFinancialData(int month, int year) {
-        MonthlyStatisticsResponse stats = transactionService.getMonthlyStatistics(null, month, year);
-        List<ExpenseStructureResponse> structures = transactionService.getExpenseStructure(null, month, year);
-        List<TransactionResponse> topExpenses = transactionService.getHighestExpenses(null, month, year);
+        MonthlyStatisticsResponse stats = statisticsService.getMonthlyStatistics(null, month, year);
+        List<ExpenseStructureResponse> structures = statisticsService.getExpenseStructure(null, month, year);
+        List<TransactionResponse> topExpenses = statisticsService.getHighestExpenses(null, month, year);
 
         StringBuilder data = new StringBuilder();
         data.append("DỮ LIỆU THÁNG ").append(month).append("/").append(year).append(":\n");

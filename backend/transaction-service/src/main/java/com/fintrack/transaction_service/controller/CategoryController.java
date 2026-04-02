@@ -4,7 +4,7 @@ import com.fintrack.transaction_service.dto.request.CategoryCreationRequest;
 import com.fintrack.transaction_service.dto.response.ApiResponse;
 import com.fintrack.transaction_service.dto.response.CategoryResponse;
 import com.fintrack.transaction_service.enums.TransactionType;
-import com.fintrack.transaction_service.service.CategoryService;
+import com.fintrack.transaction_service.service.category.CategoryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 

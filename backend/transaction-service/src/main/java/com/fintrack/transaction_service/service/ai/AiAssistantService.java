@@ -1,4 +1,4 @@
-package com.fintrack.transaction_service.service;
+package com.fintrack.transaction_service.service.ai;
 
 import com.fintrack.transaction_service.dto.response.AiReceiptResponse;
 import com.fintrack.transaction_service.entity.Category;

@@ -1,4 +1,4 @@
-package com.fintrack.transaction_service.service;
+package com.fintrack.transaction_service.service.currency;
 
 import com.fintrack.transaction_service.dto.response.ExchangeRateApiResponse;
 import com.fintrack.transaction_service.entity.ExchangeRate;
@@ -6,8 +6,6 @@ import com.fintrack.transaction_service.repository.ExchangeRateRepository;
 import com.fintrack.transaction_service.repository.httpclient.ExchangeRateClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.context.event.EventListener;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;

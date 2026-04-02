@@ -1,4 +1,4 @@
-package com.fintrack.transaction_service.service;
+package com.fintrack.transaction_service.service.ai;
 
 import com.fintrack.transaction_service.configuration.AiToolConfig;
 import com.fintrack.transaction_service.utils.SecurityUtils;

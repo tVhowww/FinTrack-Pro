@@ -2,8 +2,8 @@ package com.fintrack.transaction_service.controller;
 
 import com.fintrack.transaction_service.dto.response.AiReceiptResponse;
 import com.fintrack.transaction_service.dto.response.ApiResponse;
-import com.fintrack.transaction_service.service.AiAdvisorService;
-import com.fintrack.transaction_service.service.AiAssistantService;
+import com.fintrack.transaction_service.service.ai.AiAdvisorService;
+import com.fintrack.transaction_service.service.ai.AiAssistantService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;

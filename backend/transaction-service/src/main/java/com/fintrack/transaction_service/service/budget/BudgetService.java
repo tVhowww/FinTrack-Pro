@@ -1,4 +1,4 @@
-package com.fintrack.transaction_service.service;
+package com.fintrack.transaction_service.service.budget;
 
 import com.fintrack.transaction_service.dto.request.BudgetCreationRequest;
 import com.fintrack.transaction_service.dto.request.BudgetUpdateRequest;
@@ -18,6 +18,7 @@ import com.fintrack.transaction_service.repository.TransactionRepository;
 import com.fintrack.transaction_service.repository.httpclient.IdentityClient;
 import com.fintrack.transaction_service.repository.httpclient.WalletClient;
 import com.fintrack.transaction_service.repository.specification.TransactionSpecification;
+import com.fintrack.transaction_service.service.currency.CurrencyConverterService;
 import com.fintrack.transaction_service.utils.SecurityUtils;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;

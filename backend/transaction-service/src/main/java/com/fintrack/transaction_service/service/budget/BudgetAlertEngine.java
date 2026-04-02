@@ -1,4 +1,4 @@
-package com.fintrack.transaction_service.service;
+package com.fintrack.transaction_service.service.budget;
 
 import com.fintrack.transaction_service.dto.event.NotificationEvent;
 import com.fintrack.transaction_service.dto.response.BudgetResponse;

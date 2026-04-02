@@ -1,7 +1,8 @@
 package com.fintrack.transaction_service.controller;
 
 import com.fintrack.transaction_service.dto.request.TransactionCreationRequest;
-import com.fintrack.transaction_service.service.TransactionService;
+import com.fintrack.transaction_service.service.transaction.TransactionCommandService;
+import com.fintrack.transaction_service.service.transaction.TransactionQueryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -9,15 +10,17 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/internal/transactions") // Endpoint nội bộ
 @RequiredArgsConstructor
 public class TransactionInternalController {
-    private final TransactionService transactionService;
+
+    private final TransactionCommandService commandService;
+    private final TransactionQueryService queryService;
 
     @PostMapping("/adjustment")
     public void createAdjustment(@RequestBody TransactionCreationRequest request) {
-        transactionService.createAdjustmentTransaction(request);
+        commandService.createAdjustmentTransaction(request);
     }
 
     @GetMapping("/count-by-wallet/{walletId}")
     public long countByWallet(@PathVariable String walletId) {
-        return transactionService.countTransactionsByWallet(walletId);
+        return queryService.countTransactionsByWallet(walletId);
     }
 }

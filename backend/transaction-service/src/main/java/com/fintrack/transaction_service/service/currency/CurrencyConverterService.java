@@ -1,4 +1,4 @@
-package com.fintrack.transaction_service.service;
+package com.fintrack.transaction_service.service.currency;
 
 import com.fintrack.transaction_service.entity.ExchangeRate;
 import com.fintrack.transaction_service.repository.ExchangeRateRepository;

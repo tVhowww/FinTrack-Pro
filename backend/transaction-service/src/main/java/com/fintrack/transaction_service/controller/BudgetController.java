@@ -4,7 +4,7 @@ import com.fintrack.transaction_service.dto.request.BudgetCreationRequest;
 import com.fintrack.transaction_service.dto.request.BudgetUpdateRequest;
 import com.fintrack.transaction_service.dto.response.ApiResponse;
 import com.fintrack.transaction_service.dto.response.BudgetResponse;
-import com.fintrack.transaction_service.service.BudgetService;
+import com.fintrack.transaction_service.service.budget.BudgetService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
