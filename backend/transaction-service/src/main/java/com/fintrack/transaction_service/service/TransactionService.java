@@ -57,6 +57,7 @@ public class TransactionService {
     private final CurrencyConverterService currencyConverterService;
     private final StringRedisTemplate redisTemplate;
     private final BudgetAlertEngine budgetAlertEngine;
+    private final TransactionNotificationWorker notificationWorker;
 
 
     public long countTransactionsByWallet(String walletId) {
@@ -276,7 +277,7 @@ public class TransactionService {
         }
 
         // 3. Gửi thông báo ASYNC (Truyền thêm Email và Tên)
-        sendTransactionNotification(transaction, category, recipientEmail, username, currency);
+        notificationWorker.sendTransactionNotification(transaction, category, recipientEmail, username, currency);
     }
 
     /**
@@ -727,75 +728,11 @@ public class TransactionService {
         }
 
         // 4. Gửi Notification qua Kafka (ASYNC)
-        sendTransactionNotification(transaction, category, recipientEmail, username, currency);
+        notificationWorker.sendTransactionNotification(transaction, category, recipientEmail, username, currency);
 
         budgetAlertEngine.checkAndAlert(transaction, recipientEmail, username);
 
         return transactionMapper.toTransactionResponse(transaction);
-    }
-
-    /**
-     * Gửi notification về giao dịch qua Kafka (ASYNC)
-     * Nếu lỗi sẽ không ảnh hưởng đến giao dịch chính
-     */
-    @Async
-    public void sendTransactionNotification(Transaction transaction, Category category, String recipientEmail, String username, String currency) {
-        try {
-            if (recipientEmail == null || recipientEmail.isEmpty()) {
-                log.warn("User không có email, bỏ qua gửi thông báo cho transaction: {}", transaction.getId());
-                return;
-            }
-
-            // Dùng US Locale làm chuẩn để format số (ví dụ: 1,000,000.50)
-            // Nếu muốn format linh hoạt theo loại tiền thì dùng java.util.Currency
-            NumberFormat formatter = NumberFormat.getInstance(Locale.US);
-            String formattedNumber = formatter.format(transaction.getAmount().abs());
-
-            // Đảm bảo fallback nếu currency bị null
-            String finalCurrency = (currency != null && !currency.isEmpty()) ? currency : "VND";
-
-            String amountString;
-            String actionString;
-
-            if (transaction.getType() == TransactionType.EXPENSE) {
-                amountString = "-" + formattedNumber + " " + finalCurrency;
-                actionString = "thanh toán cho";
-            } else {
-                amountString = "+" + formattedNumber + " " + finalCurrency;
-                actionString = "nhận tiền từ";
-            }
-
-            String categoryName = (category != null) ? category.getName() : "Không phân loại";
-
-            String emailBody = String.format(
-                    "Xin chào %s,\n\n" +
-                            "Giao dịch mới: %s\n" +
-                            "Nội dung: %s %s\n" +
-                            "Ghi chú: %s\n" +
-                            "Thời gian: %s\n\n" +
-                            "Đây là email tự động, vui lòng không trả lời.",
-                    username,
-                    amountString,
-                    actionString,
-                    categoryName,
-                    transaction.getNote() != null ? transaction.getNote() : "Không có",
-                    transaction.getDate().toString()
-            );
-
-            NotificationEvent event = NotificationEvent.builder()
-                    .channel("EMAIL")
-                    .recipient(recipientEmail)
-                    .subject("Biến động số dư: " + amountString)
-                    .body(emailBody)
-                    .build();
-
-            kafkaTemplate.send("notification-delivery", event);
-            log.info("Đã gửi notification event cho transaction: {}", transaction.getId());
-
-        } catch (Exception e) {
-            log.error("Lỗi khi gửi Kafka Notification cho transaction {}: {}",
-                    transaction.getId(), e.getMessage(), e);
-        }
     }
 
     // Lấy đồng tiền cơ sở của User (nếu không có mặc định là VND)
