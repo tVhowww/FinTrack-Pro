@@ -33,6 +33,14 @@
 		<spring-ai.version>2.0.0-M2</spring-ai.version>
 	</properties>
 	<dependencies>
+		<dependency>
+			<groupId>org.flywaydb</groupId>
+			<artifactId>flyway-core</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.flywaydb</groupId>
+			<artifactId>flyway-database-postgresql</artifactId>
+		</dependency>
 		<!-- Source: https://mvnrepository.com/artifact/org.springframework.ai/spring-ai-starter-model-google-genai -->
 		<dependency>
 			<groupId>org.springframework.ai</groupId>
