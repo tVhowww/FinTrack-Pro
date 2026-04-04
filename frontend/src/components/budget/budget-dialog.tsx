@@ -68,6 +68,8 @@ export function BudgetDialog({
   );
 
   const isEditing = !!budgetToEdit;
+  const currentYear = new Date().getFullYear();
+  const yearOptions = Array.from({ length: 10 }, (_, i) => currentYear - 2 + i);
 
   const form = useForm<z.infer<typeof BudgetSchema>>({
     resolver: zodResolver(BudgetSchema),
@@ -244,40 +246,64 @@ export function BudgetDialog({
             </div>
 
             <div className="grid grid-cols-2 gap-4 w-full min-w-0">
+              {/* Dropdown THÁNG */}
               <FormField
                 control={form.control}
                 name="month"
                 render={({ field }) => (
                   <FormItem className="flex flex-col min-w-0">
                     <FormLabel>Tháng</FormLabel>
-                    <FormControl>
-                      <Input
-                        className="h-12 text-center text-lg"
-                        type="number"
-                        min={1}
-                        max={12}
-                        {...field}
-                        disabled={isEditing}
-                      />
-                    </FormControl>
+                    <Select
+                      onValueChange={(val) => field.onChange(Number(val))}
+                      value={field.value.toString()}
+                      disabled={isEditing}
+                    >
+                      <FormControl>
+                        <SelectTrigger className="h-12 text-base">
+                          <SelectValue placeholder="Chọn tháng" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent className="max-h-[200px]">
+                        {Array.from({ length: 12 }, (_, i) => i + 1).map(
+                          (m) => (
+                            <SelectItem key={m} value={m.toString()}>
+                              Tháng {m}
+                            </SelectItem>
+                          ),
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
                   </FormItem>
                 )}
               />
+
+              {/* Dropdown NĂM */}
               <FormField
                 control={form.control}
                 name="year"
                 render={({ field }) => (
                   <FormItem className="flex flex-col min-w-0">
                     <FormLabel>Năm</FormLabel>
-                    <FormControl>
-                      <Input
-                        className="h-12 text-center text-lg"
-                        type="number"
-                        min={2020}
-                        {...field}
-                        disabled={isEditing}
-                      />
-                    </FormControl>
+                    <Select
+                      onValueChange={(val) => field.onChange(Number(val))}
+                      value={field.value.toString()}
+                      disabled={isEditing}
+                    >
+                      <FormControl>
+                        <SelectTrigger className="h-12 text-base">
+                          <SelectValue placeholder="Chọn năm" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent className="max-h-[200px]">
+                        {yearOptions.map((y) => (
+                          <SelectItem key={y} value={y.toString()}>
+                            Năm {y}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
                   </FormItem>
                 )}
               />
