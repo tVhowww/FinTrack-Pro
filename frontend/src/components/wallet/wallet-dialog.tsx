@@ -27,7 +27,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useWallets } from "@/hooks/use-wallets";
-import { CURRENCIES } from "@/lib/constants";
+import { CURRENCIES, getCurrencyFormatConfig } from "@/lib/constants";
 import {
   Wallet,
   WalletFormValues,
@@ -38,6 +38,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
+import { NumericFormat } from "react-number-format";
 import { toast } from "sonner";
 
 interface WalletDialogProps {
@@ -171,6 +172,7 @@ export function WalletDialog({
 
   const isLoading = isCreating || isUpdating || isAdjusting;
   const currentType = form.watch("type");
+  const currentCurrency = form.watch("currency");
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -253,11 +255,16 @@ export function WalletDialog({
                     <FormItem>
                       <FormLabel>Số tiền mục tiêu</FormLabel>
                       <FormControl>
-                        <Input
-                          type="number"
-                          placeholder="50000000"
+                        <NumericFormat
+                          customInput={Input}
+                          {...getCurrencyFormatConfig(currentCurrency)}
+                          allowNegative={false}
+                          value={field.value === 0 ? "" : field.value}
+                          onValueChange={(values) =>
+                            field.onChange(values.floatValue || 0)
+                          }
+                          placeholder="50,000,000"
                           className="h-12 text-lg font-bold pr-4"
-                          {...field}
                         />
                       </FormControl>
                       <FormMessage />
@@ -303,11 +310,15 @@ export function WalletDialog({
                         : `Số dư ${isEditMode ? "thực tế" : "ban đầu"}`}
                     </FormLabel>
                     <FormControl>
-                      <Input
-                        type="number"
-                        step="any"
+                      <NumericFormat
+                        customInput={Input}
+                        {...getCurrencyFormatConfig(currentCurrency)}
+                        allowNegative={false}
+                        value={field.value === 0 ? "" : field.value}
+                        onValueChange={(values) =>
+                          field.onChange(values.floatValue || 0)
+                        }
                         className="h-12 text-lg font-bold pr-4"
-                        {...field}
                       />
                     </FormControl>
                     {isEditMode && (

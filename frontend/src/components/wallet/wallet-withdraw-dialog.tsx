@@ -28,13 +28,14 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTransactions } from "@/hooks/use-transactions";
 import { useWallets } from "@/hooks/use-wallets";
-import { getCurrencySymbol } from "@/lib/constants";
+import { getCurrencyFormatConfig, getCurrencySymbol } from "@/lib/constants";
 import { TransactionType } from "@/types/transaction.dto";
 import { Wallet, WalletType } from "@/types/wallet.dto";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Hammer, ArrowRightLeft, ShoppingCart } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
+import { NumericFormat } from "react-number-format";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -204,12 +205,19 @@ export function WalletWithdrawDialog({
                     <FormLabel className="text-base">Số tiền rút</FormLabel>
                     <FormControl>
                       <div className="relative w-full min-w-0">
-                        <Input
-                          type="number"
-                          step="any"
-                          placeholder="VD: 500000"
+                        <NumericFormat
+                          customInput={Input}
+                          {...getCurrencyFormatConfig(
+                            wallet?.currency || "VND",
+                          )}
+                          allowNegative={false}
+                          value={field.value === 0 ? "" : field.value}
+                          onValueChange={(values) => {
+                            field.onChange(values.floatValue || 0);
+                          }}
+                          placeholder="VD: 500,000"
                           className="h-12 text-lg font-bold pr-14 w-full min-w-0"
-                          {...field}
+                          autoFocus
                         />
                         <div className="absolute right-4 top-1/2 -translate-y-1/2 font-medium text-muted-foreground pointer-events-none">
                           {getCurrencySymbol(wallet.currency || "VND")}
@@ -248,7 +256,9 @@ export function WalletWithdrawDialog({
                     name="destinationWalletId"
                     render={({ field }) => (
                       <FormItem className="flex flex-col w-full min-w-0">
-                        <FormLabel className="text-base">Nhận tiền vào ví</FormLabel>
+                        <FormLabel className="text-base">
+                          Nhận tiền vào ví
+                        </FormLabel>
                         <Select
                           onValueChange={field.onChange}
                           value={field.value}
@@ -260,7 +270,11 @@ export function WalletWithdrawDialog({
                           </FormControl>
                           <SelectContent className="max-w-[85vw] sm:max-w-[400px]">
                             {compatibleWallets.map((w) => (
-                              <SelectItem key={w.id} value={w.id} className="py-3 max-w-full overflow-hidden">
+                              <SelectItem
+                                key={w.id}
+                                value={w.id}
+                                className="py-3 max-w-full overflow-hidden"
+                              >
                                 <div className="w-full text-left truncate pr-2">
                                   <span className="font-medium">{w.name}</span>
                                   <span className="text-muted-foreground ml-1">
@@ -289,7 +303,9 @@ export function WalletWithdrawDialog({
                   name="note"
                   render={({ field }) => (
                     <FormItem className="flex flex-col w-full min-w-0">
-                      <FormLabel className="text-base">Ghi chú chi tiêu</FormLabel>
+                      <FormLabel className="text-base">
+                        Ghi chú chi tiêu
+                      </FormLabel>
                       <FormControl>
                         <Input
                           placeholder="VD: Mua điện thoại..."

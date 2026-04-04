@@ -32,6 +32,8 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Loader2 } from "lucide-react";
+import { NumericFormat } from "react-number-format";
+import { getCurrencyFormatConfig } from "@/lib/constants";
 
 const BudgetSchema = z.object({
   name: z.string().min(1, "Vui lòng nhập tên"),
@@ -151,11 +153,16 @@ export function BudgetDialog({
                 <FormItem className="flex flex-col w-full min-w-0">
                   <FormLabel>Hạn mức</FormLabel>
                   <FormControl>
-                    <Input
+                    <NumericFormat
+                      customInput={Input}
+                      {...getCurrencyFormatConfig("VND")}
+                      allowNegative={false}
+                      value={field.value === 0 ? "" : field.value}
+                      onValueChange={(values) =>
+                        field.onChange(values.floatValue || 0)
+                      }
                       className="h-12 text-lg font-bold"
-                      type="number"
-                      placeholder="5000000"
-                      {...field}
+                      placeholder="5,000,000"
                     />
                   </FormControl>
                   <FormMessage />

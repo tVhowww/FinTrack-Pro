@@ -15,3 +15,21 @@ export const CURRENCIES = [
 export const getCurrencySymbol = (code: string) => {
   return CURRENCIES.find((c) => c.code === code)?.symbol || code;
 };
+
+export const getCurrencyFormatConfig = (currencyCode: string = "VND") => {
+  switch (currencyCode.toUpperCase()) {
+    case "VND": // Việt Nam Đồng (Không có số lẻ)
+      return { thousandSeparator: ".", decimalSeparator: ",", decimalScale: 0 };
+    case "JPY": // Yên Nhật (Không có số lẻ)
+    case "KRW": // Won Hàn Quốc (Không có số lẻ)
+      return { thousandSeparator: ",", decimalSeparator: ".", decimalScale: 0 };
+    case "EUR": // Euro (Định dạng Châu Âu: 1.000.000,00)
+      return { thousandSeparator: ".", decimalSeparator: ",", decimalScale: 2 };
+    case "USD": // Đô la Mỹ (1,000,000.00)
+    case "GBP": // Bảng Anh
+    case "AUD": // Đô la Úc
+    default:
+      // Mặc định chuẩn quốc tế chung
+      return { thousandSeparator: ",", decimalSeparator: ".", decimalScale: 2 };
+  }
+};

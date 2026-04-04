@@ -39,9 +39,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { getCurrencySymbol } from "@/lib/constants";
+import { getCurrencyFormatConfig, getCurrencySymbol } from "@/lib/constants";
 import { Camera, Loader2, Sparkles, X, Mic } from "lucide-react";
 import { toast } from "sonner";
+import { NumericFormat } from "react-number-format";
 
 // Schema Validate
 const TransactionSchema = z.object({
@@ -121,7 +122,10 @@ export function TransactionDialog({
 
   const selectedWalletId = form.watch("walletId");
   const selectedWallet = wallets.find((w) => w.id === selectedWalletId);
-  const currencySymbol = getCurrencySymbol(selectedWallet?.currency || "VND");
+  const currentCurrency = selectedWallet?.currency || "VND";
+  const currencySymbol = getCurrencySymbol(currentCurrency);
+  const { thousandSeparator, decimalSeparator, decimalScale } =
+    getCurrencyFormatConfig(currentCurrency);
 
   useEffect(() => {
     if (open) {
@@ -473,12 +477,18 @@ export function TransactionDialog({
                         <FormLabel>Số tiền</FormLabel>
                         <FormControl>
                           <div className="relative w-full min-w-0">
-                            <Input
-                              type="number"
-                              step="any"
-                              placeholder="VD: 50000"
+                            <NumericFormat
+                              customInput={Input}
+                              thousandSeparator={thousandSeparator}
+                              decimalSeparator={decimalSeparator}
+                              decimalScale={decimalScale}
+                              allowNegative={false}
+                              value={field.value === 0 ? "" : field.value}
+                              onValueChange={(values) => {
+                                field.onChange(values.floatValue || 0);
+                              }}
+                              placeholder="VD: 50,000"
                               className="h-12 text-lg font-bold pr-14 w-full min-w-0"
-                              {...field}
                             />
                             <div className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-medium text-muted-foreground pointer-events-none">
                               {currencySymbol}
