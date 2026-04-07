@@ -69,7 +69,7 @@ export default function WalletsPage() {
   const basicWallets = wallets.filter((w) => w.type !== WalletType.SAVING);
   const savingWallets = wallets.filter((w) => w.type === WalletType.SAVING);
 
-  // 👇 CSS VŨ KHÍ: Dùng để làm vuốt ngang trên Mobile, ẩn thanh cuộn, và thành Grid trên PC
+  // CSS VŨ KHÍ: Dùng để làm vuốt ngang trên Mobile, ẩn thanh cuộn, và thành Grid trên PC
   const swipeableContainerClass =
     "flex overflow-x-auto pb-6 pt-2 gap-4 snap-x snap-mandatory md:grid md:grid-cols-2 lg:grid-cols-3 md:overflow-visible md:pb-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]";
 
@@ -146,7 +146,7 @@ export default function WalletsPage() {
                 </h3>
               </div>
 
-              {/* 👇 Áp dụng Swipeable Carousel cho Mobile */}
+              {/* Áp dụng Swipeable Carousel cho Mobile */}
               <div className={swipeableContainerClass}>
                 {basicWallets.map((wallet) => (
                   <div key={wallet.id} className={swipeableItemClass}>

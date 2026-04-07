@@ -2,6 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useHideAmount } from "@/hooks/use-hide-amount";
 import { formatCurrency } from "@/lib/utils";
 import { BalanceTrend } from "@/types/statistics.dto";
 import {
@@ -26,6 +27,8 @@ export function BalanceChart({
   isLoading,
   baseCurrency,
 }: BalanceChartProps) {
+  const { maskAmount } = useHideAmount();
+
   if (isLoading) {
     return <Skeleton className="h-full w-full rounded-xl" />;
   }
@@ -81,7 +84,7 @@ export function BalanceChart({
               />
               <Tooltip
                 formatter={(value: number) =>
-                  formatCurrency(value, baseCurrency)
+                  maskAmount(formatCurrency(value, baseCurrency))
                 }
                 cursor={{ fill: "rgba(0,0,0,0.05)" }}
                 contentStyle={{

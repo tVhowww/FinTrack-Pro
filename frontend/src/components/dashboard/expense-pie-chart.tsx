@@ -2,6 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useHideAmount } from "@/hooks/use-hide-amount";
 import { formatCurrency } from "@/lib/utils";
 import { ExpenseStructure } from "@/types/statistics.dto";
 import {
@@ -34,6 +35,7 @@ export function ExpensePieChart({
   isLoading,
   baseCurrency,
 }: ExpensePieChartProps) {
+  const { maskAmount } = useHideAmount();
   if (isLoading) {
     return <Skeleton className="h-full w-full rounded-xl" />;
   }
@@ -82,7 +84,7 @@ export function ExpensePieChart({
               </Pie>
               <Tooltip
                 formatter={(value: number) =>
-                  formatCurrency(value, baseCurrency)
+                  maskAmount(formatCurrency(value, baseCurrency))
                 }
                 contentStyle={{
                   borderRadius: "8px",

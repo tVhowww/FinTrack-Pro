@@ -15,10 +15,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Progress } from "@/components/ui/progress";
+import { useHideAmount } from "@/hooks/use-hide-amount";
 import { Wallet, WalletType } from "@/types/wallet.dto";
 import {
   CheckCircle2,
   Edit,
+  Eye,
+  EyeOff,
   Hammer,
   MoreVertical,
   Target,
@@ -60,6 +63,11 @@ export function WalletCard({
   onAddFund,
   onWithdraw,
 }: WalletCardProps) {
+  const { isHidden, revealedItems, toggleRevealItem, maskAmount } =
+    useHideAmount();
+  const isRevealed = revealedItems.includes(wallet.id);
+  const showEyeOpen = !isHidden || isRevealed;
+
   const isSaving = wallet.type === WalletType.SAVING;
   const isCompleted = isSaving && (wallet.percentage || 0) >= 100;
 
@@ -161,19 +169,35 @@ export function WalletCard({
                 Đã tích lũy
               </div>
             )}
-            <div
-              className={`text-2xl font-bold truncate ${
-                isCompleted ? "text-emerald-600" : ""
-              }`}
-              title={new Intl.NumberFormat("vi-VN", {
-                style: "currency",
-                currency: wallet.currency || "VND",
-              }).format(wallet.balance)}
-            >
-              {new Intl.NumberFormat("vi-VN", {
-                style: "currency",
-                currency: wallet.currency || "VND",
-              }).format(wallet.balance)}
+            <div className="flex items-center gap-2">
+              {isHidden && (
+                <button
+                  onClick={() => toggleRevealItem(wallet.id)}
+                  className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                >
+                  {isRevealed ? (
+                    <Eye className="h-4 w-4" />
+                  ) : (
+                    <EyeOff className="h-4 w-4" />
+                  )}
+                </button>
+              )}
+
+              <div
+                className={`text-2xl font-bold truncate ${isCompleted ? "text-emerald-600" : ""}`}
+                title={new Intl.NumberFormat("vi-VN", {
+                  style: "currency",
+                  currency: wallet.currency || "VND",
+                }).format(wallet.balance)}
+              >
+                {maskAmount(
+                  new Intl.NumberFormat("vi-VN", {
+                    style: "currency",
+                    currency: wallet.currency || "VND",
+                  }).format(wallet.balance),
+                  wallet.id, // Truyền ID vào để Hook biết đường mà xử lý
+                )}
+              </div>
             </div>
           </div>
 

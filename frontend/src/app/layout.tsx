@@ -4,6 +4,7 @@ import "./globals.css";
 import QueryProvider from "@/providers/query-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/providers/theme-provider";
+import { HideAmountProvider } from "@/hooks/use-hide-amount";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -37,8 +38,10 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <QueryProvider>
-            {children}
-            <Toaster position="top-right" richColors />
+            <HideAmountProvider>
+              {children}
+              <Toaster position="top-right" richColors />
+            </HideAmountProvider>
           </QueryProvider>
         </ThemeProvider>
       </body>

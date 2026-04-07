@@ -2,7 +2,7 @@
 
 import { UserNav } from "@/components/ui/user-nav";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
-import { Menu, Command } from "lucide-react";
+import { Menu, Command, EyeOff, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -13,13 +13,21 @@ import {
 } from "@/components/ui/sheet";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 import { sidebarItems } from "./sidebar";
 import { useState } from "react";
+import { useHideAmount } from "@/hooks/use-hide-amount";
+import { useStatistics } from "@/hooks/use-statistics";
+import { useUser } from "@/hooks/use-user";
 
 export function Header() {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
+  const { isHidden, toggleHide, maskAmount } = useHideAmount();
+
+  const { user } = useUser();
+  const { totalBalance } = useStatistics();
+  const baseCurrency = user?.baseCurrency || "VND";
 
   return (
     <header className="flex h-16 items-center justify-between border-b bg-background px-4 md:px-6">
@@ -69,6 +77,24 @@ export function Header() {
       </div>
 
       <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 bg-secondary/60 px-2 py-1.5 sm:px-3 sm:py-1.5 rounded-full border shadow-sm transition-all">
+          <span className="hidden sm:inline-block text-sm font-bold text-primary">
+            {maskAmount(formatCurrency(totalBalance || 0, baseCurrency))}
+          </span>
+
+          <button
+            onClick={toggleHide}
+            className="h-6 w-6 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-background rounded-full transition-colors"
+            title={isHidden ? "Hiển thị số tiền" : "Ẩn số tiền"}
+          >
+            {isHidden ? (
+              <EyeOff className="h-4 w-4" />
+            ) : (
+              <Eye className="h-4 w-4" />
+            )}
+          </button>
+        </div>
+
         <ThemeToggle />
         <UserNav />
       </div>
