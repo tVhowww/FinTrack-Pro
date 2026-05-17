@@ -25,10 +25,15 @@ import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
 
 import java.math.BigDecimal;
 
 import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 public class TransactionCommandServiceTest {
@@ -52,6 +57,18 @@ public class TransactionCommandServiceTest {
     private TransactionResponse response;
     private Transaction transaction;
 
+    private void mockSecurityContext() {
+        SecurityContext securityContext = Mockito.mock(SecurityContext.class);
+        Authentication authentication = Mockito.mock(Authentication.class);
+        Jwt jwt = Mockito.mock(Jwt.class);
+
+        SecurityContextHolder.setContext(securityContext);
+        when(securityContext.getAuthentication()).thenReturn(authentication);
+        when(authentication.isAuthenticated()).thenReturn(true);
+        when(authentication.getPrincipal()).thenReturn(jwt);
+        when(jwt.getClaimAsString("userId")).thenReturn("user-123");
+    }
+
     @BeforeEach
     void setUp() {
         request = TransactionCreationRequest.builder()
@@ -59,6 +76,8 @@ public class TransactionCommandServiceTest {
                 .amount(BigDecimal.valueOf(100000))
                 .type(TransactionType.EXPENSE)
                 .build();
+
+        SecurityContextHolder.clearContext();
 
         transaction = Transaction.builder()
                 .id("trans-789")
@@ -74,6 +93,7 @@ public class TransactionCommandServiceTest {
     @Test
     @DisplayName("Create Transaction: Should convert amount to negative if type is EXPENSE")
     void createTransaction_Expense_Success() {
+        mockSecurityContext();
         // Mock Redis (Tránh lỗi Double Click)
         Mockito.when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         Mockito.when(valueOperations.setIfAbsent(any(), any(), anyLong(), any())).thenReturn(true);
@@ -101,6 +121,7 @@ public class TransactionCommandServiceTest {
     @Test
     @DisplayName("Create Transaction: Should keep positive amount if type is INCOME")
     void createTransaction_Income_Success() {
+        mockSecurityContext();
         request.setType(TransactionType.INCOME);
 
         // Phải mock lại Redis và QueryService cho Test Case này

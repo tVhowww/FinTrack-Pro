@@ -13,4 +13,5 @@ import java.math.BigDecimal;
 @Builder
 public class WalletBalanceUpdateRequest {
     private BigDecimal amount;
+    private String idempotencyKey;
 }

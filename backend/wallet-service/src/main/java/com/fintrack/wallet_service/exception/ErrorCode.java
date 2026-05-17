@@ -19,6 +19,7 @@ public enum ErrorCode {
     INSUFFICIENT_BALANCE(2005, "Insufficient balance", HttpStatus.BAD_REQUEST),
     TRANSACTION_SERVICE_ERROR(2006, "Failed to create transaction history", HttpStatus.INTERNAL_SERVER_ERROR),
     WALLET_HAS_TRANSACTIONS(2007, "Không thể đổi đơn vị tiền tệ vì ví đã có giao dịch phát sinh", HttpStatus.BAD_REQUEST),
+    CONCURRENT_BALANCE_UPDATE(2008, "Wallet balance is being updated, please retry", HttpStatus.CONFLICT),
     REQUEST_PROCESSING(2030, "Request is being processed, please try again later", HttpStatus.TOO_MANY_REQUESTS)
     ;
 

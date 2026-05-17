@@ -1,5 +1,6 @@
 package com.fintrack.wallet_service.service;
 
+import com.fintrack.wallet_service.dto.request.WalletBalanceUpdateRequest;
 import com.fintrack.wallet_service.dto.request.WalletCreationRequest;
 import com.fintrack.wallet_service.dto.request.WalletUpdateRequest;
 import com.fintrack.wallet_service.dto.response.WalletResponse;
@@ -8,6 +9,7 @@ import com.fintrack.wallet_service.exception.AppException;
 import com.fintrack.wallet_service.exception.ErrorCode;
 import com.fintrack.wallet_service.mapper.WalletMapper;
 import com.fintrack.wallet_service.repository.WalletRepository;
+import com.fintrack.wallet_service.repository.httpclient.TransactionClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -15,6 +17,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -37,6 +41,15 @@ public class WalletServiceTest {
 
     @Mock
     private WalletMapper walletMapper; // giả lập cái Mapper
+
+    @Mock
+    private TransactionClient transactionClient;
+
+    @Mock
+    private StringRedisTemplate redisTemplate;
+
+    @Mock
+    private ValueOperations<String, String> valueOperations;
 
     @InjectMocks
     private WalletService walletService; // Inject mấy cái Mock ở trên vào Service thật
@@ -84,6 +97,7 @@ public class WalletServiceTest {
 
         SecurityContextHolder.setContext(securityContext);
         when(securityContext.getAuthentication()).thenReturn(authentication);
+        when(authentication.isAuthenticated()).thenReturn(true);
         when(authentication.getPrincipal()).thenReturn(jwt);
         when(jwt.getClaimAsString("userId")).thenReturn(userId);
     }
@@ -96,6 +110,8 @@ public class WalletServiceTest {
         mockSecurityContext();
 
         // 2. Giả lập hành vi của Mapper và Repository
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.setIfAbsent(anyString(), anyString(), anyLong(), any())).thenReturn(true);
         when(walletMapper.toWallet(any(WalletCreationRequest.class))).thenReturn(wallet);
         when(walletRepository.save(any(Wallet.class))).thenReturn(wallet);
         when(walletMapper.toWalletResponse(any(Wallet.class))).thenReturn(walletResponse);
@@ -114,6 +130,8 @@ public class WalletServiceTest {
     void createWallet_ExistedName_Fail() {
         // GIVEN:
         mockSecurityContext();
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.setIfAbsent(anyString(), anyString(), anyLong(), any())).thenReturn(true);
         when(walletRepository.existsByNameIgnoreCaseAndUserIdAndIsActive("Ví test", userId, true)).thenReturn(true);
 
         // WHEN + THEN:
@@ -197,6 +215,48 @@ public class WalletServiceTest {
         verify(walletRepository).save(argThat(argument ->
                 argument.getId().equals("wallet-123") && !argument.isActive()
         ));
+    }
+
+    @Test
+    void updateBalance_UsesPessimisticLockAndIdempotency_Success() {
+        WalletBalanceUpdateRequest request = WalletBalanceUpdateRequest.builder()
+                .amount(BigDecimal.valueOf(50000))
+                .idempotencyKey("op-123")
+                .build();
+
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.setIfAbsent(anyString(), anyString(), anyLong(), any())).thenReturn(true);
+        when(walletRepository.findByIdForUpdate("wallet-123")).thenReturn(Optional.of(wallet));
+        when(walletRepository.save(any(Wallet.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(walletMapper.toWalletResponse(any(Wallet.class))).thenReturn(
+                WalletResponse.builder().id("wallet-123").balance(BigDecimal.valueOf(1050000)).build()
+        );
+
+        WalletResponse response = walletService.updateBalance("wallet-123", request);
+
+        assertEquals(BigDecimal.valueOf(1050000), response.getBalance());
+        verify(walletRepository).findByIdForUpdate("wallet-123");
+        verify(walletRepository).save(argThat(saved -> saved.getBalance().compareTo(BigDecimal.valueOf(1050000)) == 0));
+    }
+
+    @Test
+    void updateBalance_DuplicateIdempotencyKey_DoesNotApplyTwice() {
+        WalletBalanceUpdateRequest request = WalletBalanceUpdateRequest.builder()
+                .amount(BigDecimal.valueOf(50000))
+                .idempotencyKey("op-123")
+                .build();
+
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.setIfAbsent(anyString(), anyString(), anyLong(), any())).thenReturn(false);
+        when(valueOperations.get(anyString())).thenReturn("COMPLETED");
+        when(walletRepository.findById("wallet-123")).thenReturn(Optional.of(wallet));
+        when(walletMapper.toWalletResponse(wallet)).thenReturn(walletResponse);
+
+        WalletResponse response = walletService.updateBalance("wallet-123", request);
+
+        assertEquals(walletResponse, response);
+        verify(walletRepository, never()).findByIdForUpdate(anyString());
+        verify(walletRepository, never()).save(any(Wallet.class));
     }
 }
 

@@ -23,6 +23,8 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -44,6 +46,27 @@ public class TransactionCommandService {
 
     // Inject QueryService để xài lại hàm Validate
     private final TransactionQueryService queryService;
+
+    private WalletBalanceUpdateRequest balanceUpdate(BigDecimal amount, String idempotencyKey) {
+        return WalletBalanceUpdateRequest.builder()
+                .amount(amount)
+                .idempotencyKey(idempotencyKey)
+                .build();
+    }
+
+    private void runAfterCommit(Runnable action) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            action.run();
+            return;
+        }
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                action.run();
+            }
+        });
+    }
 
     @Transactional
     public TransactionResponse create(TransactionCreationRequest request) {
@@ -71,7 +94,7 @@ public class TransactionCommandService {
         transaction = transactionRepository.save(transaction);
 
         BigDecimal updateAmount = request.getType() == TransactionType.EXPENSE ? request.getAmount().negate() : request.getAmount();
-        walletClient.updateBalance(request.getWalletId(), WalletBalanceUpdateRequest.builder().amount(updateAmount).build());
+        walletClient.updateBalance(request.getWalletId(), balanceUpdate(updateAmount, "transaction:create:" + transaction.getId()));
 
         String recipientEmail = null, username = "Người dùng", currency = "VND";
         try {
@@ -91,11 +114,12 @@ public class TransactionCommandService {
 
     @Transactional
     public TransactionResponse update(String id, TransactionUpdateRequest request) {
+        String operationId = java.util.UUID.randomUUID().toString();
         Transaction transaction = transactionRepository.findById(id).orElseThrow(() -> new AppException(ErrorCode.TRANSACTION_NOT_FOUND));
         WalletResponse wallet = queryService.validateAndGetWallet(transaction.getWalletId());
 
         BigDecimal revertAmount = transaction.getType() == TransactionType.INCOME ? transaction.getAmount().negate() : transaction.getAmount();
-        walletClient.updateBalance(transaction.getWalletId(), WalletBalanceUpdateRequest.builder().amount(revertAmount).build());
+        walletClient.updateBalance(transaction.getWalletId(), balanceUpdate(revertAmount, "transaction:update:" + id + ":" + operationId + ":revert"));
 
         if (wallet != null && "SAVING".equals(wallet.getType())) {
             String sysCatName = (transaction.getType() == TransactionType.INCOME) ? "Nạp tiền tích lũy" : "Rút tiền tích lũy";
@@ -111,7 +135,7 @@ public class TransactionCommandService {
 
         transaction = transactionRepository.save(transaction);
         BigDecimal newUpdateAmount = transaction.getType() == TransactionType.EXPENSE ? transaction.getAmount().negate() : transaction.getAmount();
-        walletClient.updateBalance(transaction.getWalletId(), WalletBalanceUpdateRequest.builder().amount(newUpdateAmount).build());
+        walletClient.updateBalance(transaction.getWalletId(), balanceUpdate(newUpdateAmount, "transaction:update:" + id + ":" + operationId + ":apply"));
 
         String recipientEmail = null, username = "Người dùng";
         try {
@@ -132,7 +156,7 @@ public class TransactionCommandService {
         queryService.validateAndGetWallet(transaction.getWalletId());
 
         BigDecimal revertAmount = transaction.getType() == TransactionType.INCOME ? transaction.getAmount().negate() : transaction.getAmount();
-        walletClient.updateBalance(transaction.getWalletId(), WalletBalanceUpdateRequest.builder().amount(revertAmount).build());
+        walletClient.updateBalance(transaction.getWalletId(), balanceUpdate(revertAmount, "transaction:delete:" + id));
 
         transaction.setDeleted(true);
         transactionRepository.save(transaction);
@@ -165,11 +189,11 @@ public class TransactionCommandService {
                 .category(transferInCategory).sagaId(sagaId).transferStatus(TransferStatus.PENDING).build();
         transactionRepository.save(incomeTx);
 
-        walletClient.updateBalance(request.getFromWalletId(), WalletBalanceUpdateRequest.builder().amount(request.getAmount().negate()).build());
+        walletClient.updateBalance(request.getFromWalletId(), balanceUpdate(request.getAmount().negate(), "transfer:" + sagaId + ":debit"));
 
         TransferDebitEvent event = TransferDebitEvent.builder().sagaId(sagaId).fromWalletId(request.getFromWalletId())
                 .toWalletId(request.getToWalletId()).amount(request.getAmount()).note(request.getNote()).date(transactionDate).build();
-        kafkaTemplate.send("transfer.debit-completed", event);
+        runAfterCommit(() -> kafkaTemplate.send("transfer.debit-completed", event));
 
         return transactionMapper.toTransactionResponse(expenseTx);
     }

@@ -1,8 +1,12 @@
 package com.fintrack.wallet_service.repository;
 
 import com.fintrack.wallet_service.entity.Wallet;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.Collection;
@@ -19,6 +23,14 @@ public interface WalletRepository extends JpaRepository<Wallet, String>, JpaSpec
 
     // Tìm ví theo ID và UserID (Quan trọng để check quyền sở hữu)
     Optional<Wallet> findByIdAndUserId(String id, String userId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select w from Wallet w where w.id = :id")
+    Optional<Wallet> findByIdForUpdate(@Param("id") String id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select w from Wallet w where w.id = :id and w.userId = :userId")
+    Optional<Wallet> findByIdAndUserIdForUpdate(@Param("id") String id, @Param("userId") String userId);
 
     boolean existsByNameIgnoreCaseAndUserIdAndIdNotAndIsActive(String name, String userId, String id, boolean isActive);
 

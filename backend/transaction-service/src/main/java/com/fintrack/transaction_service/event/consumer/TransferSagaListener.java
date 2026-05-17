@@ -11,11 +11,13 @@ import com.fintrack.transaction_service.repository.TransactionRepository;
 import com.fintrack.transaction_service.repository.httpclient.WalletClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 @Component
 @RequiredArgsConstructor
@@ -25,10 +27,16 @@ public class TransferSagaListener {
     private final TransactionRepository transactionRepository;
     private final CategoryRepository categoryRepository;
     private final WalletClient walletClient;
+    private final StringRedisTemplate redisTemplate;
 
     // KỊCH BẢN 1: MỌI THỨ ỔN THỎA
     @KafkaListener(topics = "transfer.credit-completed", groupId = "transaction-saga-group")
     public void handleCreditCompleted(TransferResultEvent event) {
+        if (isDuplicate("saga:terminal:" + event.getSagaId())) {
+            log.warn("Duplicate transfer credit-completed ignored for saga {}", event.getSagaId());
+            return;
+        }
+
         List<Transaction> transactions = transactionRepository.findBySagaId(event.getSagaId());
 
         // Chuyển trạng thái 2 giao dịch (Thu & Chi) thành COMPLETED
@@ -39,6 +47,11 @@ public class TransferSagaListener {
     // KỊCH BẢN 2: THẤT BẠI (ĐỀN BÙ VÀ TẠO GIAO DỊCH HOÀN TIỀN)
     @KafkaListener(topics = "transfer.credit-failed", groupId = "transaction-saga-group")
     public void handleCreditFailed(TransferResultEvent event) {
+        if (isDuplicate("saga:terminal:" + event.getSagaId())) {
+            log.warn("Duplicate transfer credit-failed ignored for saga {}", event.getSagaId());
+            return;
+        }
+
         List<Transaction> transactions = transactionRepository.findBySagaId(event.getSagaId());
 
         // 1. Tìm lại cái giao dịch trừ tiền lúc đầu của người gửi
@@ -57,6 +70,7 @@ public class TransferSagaListener {
             // A. GỌI API ĐỂ HOÀN TRẢ LẠI TIỀN VÀO VÍ NGUỒN
             WalletBalanceUpdateRequest refundRequest = WalletBalanceUpdateRequest.builder()
                     .amount(expenseTx.getAmount())
+                    .idempotencyKey("transfer:" + event.getSagaId() + ":refund")
                     .build();
             walletClient.updateBalance(expenseTx.getWalletId(), refundRequest);
 
@@ -91,5 +105,10 @@ public class TransferSagaListener {
         }
 
         transactionRepository.saveAll(transactions);
+    }
+
+    private boolean isDuplicate(String key) {
+        Boolean firstSeen = redisTemplate.opsForValue().setIfAbsent(key, "PROCESSING", 24, TimeUnit.HOURS);
+        return Boolean.FALSE.equals(firstSeen);
     }
 }

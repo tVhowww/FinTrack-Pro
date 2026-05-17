@@ -18,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -52,8 +53,13 @@ public class WalletService {
         // 1. Lấy ví hiện tại
         String userId = SecurityUtils.getCurrentUserId();
 
-        Wallet wallet = walletRepository.findByIdAndUserId(walletId, userId)
-                .orElseThrow(() -> new AppException(ErrorCode.WALLET_NOT_FOUND));
+        Wallet wallet;
+        try {
+            wallet = walletRepository.findByIdAndUserIdForUpdate(walletId, userId)
+                    .orElseThrow(() -> new AppException(ErrorCode.WALLET_NOT_FOUND));
+        } catch (PessimisticLockingFailureException e) {
+            throw new AppException(ErrorCode.CONCURRENT_BALANCE_UPDATE);
+        }
 
         BigDecimal currentBalance = wallet.getBalance();
         BigDecimal newBalance = request.getNewBalance();
@@ -107,21 +113,51 @@ public class WalletService {
 
     @Transactional // đảm bảo tính nhất quán
     public WalletResponse updateBalance(String walletId,  WalletBalanceUpdateRequest request) {
+        String idempotencyRedisKey = null;
+        if (request.getIdempotencyKey() != null && !request.getIdempotencyKey().isBlank()) {
+            idempotencyRedisKey = "wallet:balance:update:" + walletId + ":" + request.getIdempotencyKey();
+            Boolean firstSeen = redisTemplate.opsForValue().setIfAbsent(idempotencyRedisKey, "PROCESSING", 24, TimeUnit.HOURS);
+            if (Boolean.FALSE.equals(firstSeen)) {
+                String status = redisTemplate.opsForValue().get(idempotencyRedisKey);
+                if (!"COMPLETED".equals(status)) {
+                    throw new AppException(ErrorCode.REQUEST_PROCESSING);
+                }
+                Wallet currentWallet = walletRepository.findById(walletId)
+                        .orElseThrow(() -> new AppException(ErrorCode.WALLET_NOT_FOUND));
+                return walletMapper.toWalletResponse(currentWallet);
+            }
+        }
+
         // 1. Tìm ví
-        Wallet wallet = walletRepository.findById(walletId)
-                .orElseThrow(() -> new AppException(ErrorCode.WALLET_NOT_FOUND));
+        Wallet wallet;
+        try {
+            wallet = walletRepository.findByIdForUpdate(walletId)
+                    .orElseThrow(() -> new AppException(ErrorCode.WALLET_NOT_FOUND));
+        } catch (PessimisticLockingFailureException e) {
+            throw new AppException(ErrorCode.CONCURRENT_BALANCE_UPDATE);
+        }
 
         // 2. Tính toán số dư
         BigDecimal newBalance = wallet.getBalance().add(request.getAmount());
 
         // 3. Kiểm tra nếu số dư âm
         if (newBalance.compareTo(BigDecimal.ZERO) < 0) {
+            if (idempotencyRedisKey != null) redisTemplate.delete(idempotencyRedisKey);
             throw new AppException(ErrorCode.INSUFFICIENT_BALANCE);
         }
 
         // 4. Cập nhật số dư và lưu
         wallet.setBalance(newBalance);
-        return walletMapper.toWalletResponse(walletRepository.save(wallet));
+        try {
+            Wallet savedWallet = walletRepository.save(wallet);
+            if (idempotencyRedisKey != null) {
+                redisTemplate.opsForValue().set(idempotencyRedisKey, "COMPLETED", 24, TimeUnit.HOURS);
+            }
+            return walletMapper.toWalletResponse(savedWallet);
+        } catch (ObjectOptimisticLockingFailureException | PessimisticLockingFailureException e) {
+            if (idempotencyRedisKey != null) redisTemplate.delete(idempotencyRedisKey);
+            throw new AppException(ErrorCode.CONCURRENT_BALANCE_UPDATE);
+        }
 
     }
 
