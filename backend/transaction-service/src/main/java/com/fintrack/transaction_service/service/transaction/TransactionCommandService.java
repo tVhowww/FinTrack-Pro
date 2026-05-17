@@ -72,9 +72,13 @@ public class TransactionCommandService {
     public TransactionResponse create(TransactionCreationRequest request) {
         String currentUserId = SecurityUtils.getCurrentUserId();
         String lockKey = "lock:create_transaction:" + currentUserId;
-        Boolean acquired = redisTemplate.opsForValue().setIfAbsent(lockKey, "LOCKED", 3, TimeUnit.SECONDS);
+        Boolean acquired = redisTemplate.opsForValue().setIfAbsent(lockKey, "LOCKED", 30, TimeUnit.SECONDS);
         if (Boolean.FALSE.equals(acquired)) throw new AppException(ErrorCode.REQUEST_PROCESSING);
-        return createInternal(request);
+        try {
+            return createInternal(request);
+        } finally {
+            redisTemplate.delete(lockKey);
+        }
     }
 
     private TransactionResponse createInternal(TransactionCreationRequest request) {
@@ -167,9 +171,10 @@ public class TransactionCommandService {
     public TransactionResponse transfer(TransferRequest request) {
         String currentUserId = SecurityUtils.getCurrentUserId();
         String lockKey = "lock:transfer_transaction:" + currentUserId;
-        Boolean acquired = redisTemplate.opsForValue().setIfAbsent(lockKey, "LOCKED", 3, TimeUnit.SECONDS);
+        Boolean acquired = redisTemplate.opsForValue().setIfAbsent(lockKey, "LOCKED", 30, TimeUnit.SECONDS);
         if (Boolean.FALSE.equals(acquired)) throw new AppException(ErrorCode.REQUEST_PROCESSING);
 
+        try {
         WalletResponse fromWallet = queryService.validateAndGetWallet(request.getFromWalletId());
         WalletResponse toWallet = queryService.validateAndGetWallet(request.getToWalletId());
 
@@ -196,6 +201,9 @@ public class TransactionCommandService {
         runAfterCommit(() -> kafkaTemplate.send("transfer.debit-completed", event));
 
         return transactionMapper.toTransactionResponse(expenseTx);
+        } finally {
+            redisTemplate.delete(lockKey);
+        }
     }
 
     @Transactional

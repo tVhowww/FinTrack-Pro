@@ -2,6 +2,7 @@ package com.fintrack.transaction_service.repository;
 
 import com.fintrack.transaction_service.entity.Transaction;
 import com.fintrack.transaction_service.enums.TransactionType;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Modifying;
@@ -66,17 +67,41 @@ public interface TransactionRepository extends JpaRepository<Transaction, String
             @Param("endDate") Instant endDate
     );
 
+    @Query("SELECT t.walletId, t.type, COALESCE(SUM(t.amount), 0) FROM Transaction t " +
+            "WHERE t.walletId IN :walletIds " +
+            "AND t.date BETWEEN :startDate AND :endDate " +
+            "AND t.sagaId IS NULL " +
+            "GROUP BY t.walletId, t.type")
+    List<Object[]> sumAmountGroupedByWalletAndType(
+            @Param("walletIds") List<String> walletIds,
+            @Param("startDate") Instant startDate,
+            @Param("endDate") Instant endDate
+    );
+
+    @Query("SELECT t.category, t.walletId, COALESCE(SUM(t.amount), 0) FROM Transaction t " +
+            "WHERE t.walletId IN :walletIds " +
+            "AND t.type = 'EXPENSE' " +
+            "AND t.date BETWEEN :startDate AND :endDate " +
+            "AND t.sagaId IS NULL " +
+            "GROUP BY t.category, t.walletId")
+    List<Object[]> sumExpenseGroupedByCategoryAndWallet(
+            @Param("walletIds") List<String> walletIds,
+            @Param("startDate") Instant startDate,
+            @Param("endDate") Instant endDate
+    );
+
     // 3. Top chi tiêu
     @Query("SELECT t FROM Transaction t " +
             "WHERE t.walletId IN :walletIds " +
             "AND t.type = 'EXPENSE' " +
             "AND t.date BETWEEN :startDate AND :endDate " +
-            "ORDER BY ABS(t.amount) DESC " +
-            "LIMIT 5")
-    List<Transaction> findHighestExpensesByWalletIds(
+            "AND t.sagaId IS NULL " +
+            "ORDER BY t.amount DESC")
+    List<Transaction> findHighestExpenseCandidatesByWalletIds(
             @Param("walletIds") List<String> walletIds,
             @Param("startDate") Instant startDate,
-            @Param("endDate") Instant endDate
+            @Param("endDate") Instant endDate,
+            Pageable pageable
     );
 
     @Query("SELECT COALESCE(SUM(t.amount), 0) FROM Transaction t " +

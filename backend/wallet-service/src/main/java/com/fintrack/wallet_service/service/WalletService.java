@@ -170,22 +170,26 @@ public class WalletService {
         }
 
         String lockKey = "lock:create_wallet:" + userId;
-        Boolean acquired = redisTemplate.opsForValue().setIfAbsent(lockKey, "LOCKED", 3, TimeUnit.SECONDS);
+        Boolean acquired = redisTemplate.opsForValue().setIfAbsent(lockKey, "LOCKED", 30, TimeUnit.SECONDS);
         if (Boolean.FALSE.equals(acquired)) {
             log.warn("Double-Click chặn đứng! User {} đang tạo Wallet.", userId);
             throw new AppException(ErrorCode.REQUEST_PROCESSING);
         }
 
-        // 2. Check trùng tên ví (Optional)
-        if (walletRepository.existsByNameIgnoreCaseAndUserIdAndIsActive(request.getName(), userId, true)) {
-            throw new AppException(ErrorCode.WALLET_EXISTED);
+        try {
+            // 2. Check trùng tên ví (Optional)
+            if (walletRepository.existsByNameIgnoreCaseAndUserIdAndIsActive(request.getName(), userId, true)) {
+                throw new AppException(ErrorCode.WALLET_EXISTED);
+            }
+
+            // 3. Map & Save
+            Wallet wallet = walletMapper.toWallet(request);
+            wallet.setUserId(userId);
+
+            return walletMapper.toWalletResponse(walletRepository.save(wallet));
+        } finally {
+            redisTemplate.delete(lockKey);
         }
-
-        // 3. Map & Save
-        Wallet wallet = walletMapper.toWallet(request);
-        wallet.setUserId(userId);
-
-        return walletMapper.toWalletResponse(walletRepository.save(wallet));
     }
 
     public List<WalletResponse> getMyWallets(String keyword, String currency) {

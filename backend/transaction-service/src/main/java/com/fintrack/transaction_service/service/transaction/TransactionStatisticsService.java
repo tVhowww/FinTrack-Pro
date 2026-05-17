@@ -8,11 +8,10 @@ import com.fintrack.transaction_service.mapper.TransactionMapper;
 import com.fintrack.transaction_service.repository.TransactionRepository;
 import com.fintrack.transaction_service.repository.httpclient.IdentityClient;
 import com.fintrack.transaction_service.repository.httpclient.WalletClient;
-import com.fintrack.transaction_service.repository.specification.TransactionSpecification;
 import com.fintrack.transaction_service.service.currency.CurrencyConverterService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -63,12 +62,8 @@ public class TransactionStatisticsService {
         Instant start = yearMonth.atDay(1).atStartOfDay(ZoneId.systemDefault()).toInstant();
         Instant end = yearMonth.atEndOfMonth().atTime(23, 59, 59).atZone(ZoneId.systemDefault()).toInstant();
 
-        Specification<Transaction> spec = Specification.where(TransactionSpecification.hasWalletIdIn(walletIds))
-                .and(TransactionSpecification.hasType(TransactionType.EXPENSE))
-                .and(TransactionSpecification.createdBetween(start, end))
-                .and(TransactionSpecification.isNotTransfer());
-
-        return transactionRepository.findAll(spec).stream()
+        return transactionRepository.findHighestExpenseCandidatesByWalletIds(walletIds, start, end, PageRequest.of(0, 50))
+                .stream()
                 .sorted((t1, t2) -> {
                     String c1 = walletCurrencyMap.getOrDefault(t1.getWalletId(), "VND");
                     String c2 = walletCurrencyMap.getOrDefault(t2.getWalletId(), "VND");
@@ -94,19 +89,17 @@ public class TransactionStatisticsService {
             Instant start = targetMonth.atDay(1).atStartOfDay(ZoneId.systemDefault()).toInstant();
             Instant end = targetMonth.atEndOfMonth().atTime(23, 59, 59).atZone(ZoneId.systemDefault()).toInstant();
 
-            Specification<Transaction> spec = Specification.where(TransactionSpecification.hasWalletIdIn(walletIds))
-                    .and(TransactionSpecification.createdBetween(start, end))
-                    .and(TransactionSpecification.isNotTransfer());
-            List<Transaction> transactions = transactionRepository.findAll(spec);
-
             BigDecimal mIncome = BigDecimal.ZERO;
             BigDecimal mExpense = BigDecimal.ZERO;
 
-            for (Transaction tx : transactions) {
-                String txCurrency = walletCurrencyMap.getOrDefault(tx.getWalletId(), "VND");
-                BigDecimal converted = currencyConverterService.convertCurrency(tx.getAmount().abs(), txCurrency, baseCurrency);
-                if (tx.getType() == TransactionType.INCOME) mIncome = mIncome.add(converted);
-                else if (tx.getType() == TransactionType.EXPENSE) mExpense = mExpense.add(converted);
+            for (Object[] row : transactionRepository.sumAmountGroupedByWalletAndType(walletIds, start, end)) {
+                String rowWalletId = (String) row[0];
+                TransactionType type = (TransactionType) row[1];
+                BigDecimal amount = (BigDecimal) row[2];
+                String txCurrency = walletCurrencyMap.getOrDefault(rowWalletId, "VND");
+                BigDecimal converted = currencyConverterService.convertCurrency(amount.abs(), txCurrency, baseCurrency);
+                if (type == TransactionType.INCOME) mIncome = mIncome.add(converted);
+                else if (type == TransactionType.EXPENSE) mExpense = mExpense.add(converted);
             }
 
             trends.add(BalanceTrendResponse.builder().month(targetMonth.getMonthValue()).year(targetMonth.getYear())
@@ -125,20 +118,17 @@ public class TransactionStatisticsService {
         Instant start = yearMonth.atDay(1).atStartOfDay(ZoneId.systemDefault()).toInstant();
         Instant end = yearMonth.atEndOfMonth().atTime(23, 59, 59).atZone(ZoneId.systemDefault()).toInstant();
 
-        Specification<Transaction> spec = Specification.where(TransactionSpecification.hasWalletIdIn(walletIds))
-                .and(TransactionSpecification.hasType(TransactionType.EXPENSE))
-                .and(TransactionSpecification.createdBetween(start, end))
-                .and(TransactionSpecification.isNotTransfer());
-
-        List<Transaction> transactions = transactionRepository.findAll(spec);
         java.util.Map<Category, BigDecimal> categorySums = new java.util.HashMap<>();
         BigDecimal totalExpense = BigDecimal.ZERO;
 
-        for (Transaction tx : transactions) {
-            String txCurrency = walletCurrencyMap.getOrDefault(tx.getWalletId(), "VND");
-            BigDecimal converted = currencyConverterService.convertCurrency(tx.getAmount().abs(), txCurrency, baseCurrency);
+        for (Object[] row : transactionRepository.sumExpenseGroupedByCategoryAndWallet(walletIds, start, end)) {
+            Category category = (Category) row[0];
+            String rowWalletId = (String) row[1];
+            BigDecimal amount = (BigDecimal) row[2];
+            String txCurrency = walletCurrencyMap.getOrDefault(rowWalletId, "VND");
+            BigDecimal converted = currencyConverterService.convertCurrency(amount.abs(), txCurrency, baseCurrency);
             totalExpense = totalExpense.add(converted);
-            categorySums.put(tx.getCategory(), categorySums.getOrDefault(tx.getCategory(), BigDecimal.ZERO).add(converted));
+            categorySums.put(category, categorySums.getOrDefault(category, BigDecimal.ZERO).add(converted));
         }
 
         List<ExpenseStructureResponse> result = new ArrayList<>();
@@ -165,17 +155,15 @@ public class TransactionStatisticsService {
         Instant start = yearMonth.atDay(1).atStartOfDay(ZoneId.systemDefault()).toInstant();
         Instant end = yearMonth.atEndOfMonth().atTime(23, 59, 59).atZone(ZoneId.systemDefault()).toInstant();
 
-        Specification<Transaction> spec = Specification.where(TransactionSpecification.hasWalletIdIn(walletIds))
-                .and(TransactionSpecification.createdBetween(start, end))
-                .and(TransactionSpecification.isNotTransfer());
-        List<Transaction> transactions = transactionRepository.findAll(spec);
-
         BigDecimal totalIncome = BigDecimal.ZERO, totalExpense = BigDecimal.ZERO;
-        for (Transaction tx : transactions) {
-            String txCurrency = walletCurrencyMap.getOrDefault(tx.getWalletId(), "VND");
-            BigDecimal convertedAmount = currencyConverterService.convertCurrency(tx.getAmount().abs(), txCurrency, baseCurrency);
-            if (tx.getType() == TransactionType.INCOME) totalIncome = totalIncome.add(convertedAmount);
-            else if (tx.getType() == TransactionType.EXPENSE) totalExpense = totalExpense.add(convertedAmount);
+        for (Object[] row : transactionRepository.sumAmountGroupedByWalletAndType(walletIds, start, end)) {
+            String rowWalletId = (String) row[0];
+            TransactionType type = (TransactionType) row[1];
+            BigDecimal amount = (BigDecimal) row[2];
+            String txCurrency = walletCurrencyMap.getOrDefault(rowWalletId, "VND");
+            BigDecimal convertedAmount = currencyConverterService.convertCurrency(amount.abs(), txCurrency, baseCurrency);
+            if (type == TransactionType.INCOME) totalIncome = totalIncome.add(convertedAmount);
+            else if (type == TransactionType.EXPENSE) totalExpense = totalExpense.add(convertedAmount);
         }
 
         return MonthlyStatisticsResponse.builder().month(month).year(year).totalIncome(totalIncome).totalExpense(totalExpense).netSavings(totalIncome.subtract(totalExpense)).build();
