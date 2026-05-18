@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useState, useMemo, useCallback } from "react";
 
 interface HideAmountContextType {
   isHidden: boolean; // Master Eye (Che tất cả)
@@ -25,7 +25,7 @@ export function HideAmountProvider({ children }: { children: React.ReactNode }) 
   }, []);
 
   // Bật/tắt Master Eye
-  const toggleHide = () => {
+  const toggleHide = useCallback(() => {
     setIsHidden((prev) => {
       const next = !prev;
       localStorage.setItem("hide-amount", String(next));
@@ -33,29 +33,35 @@ export function HideAmountProvider({ children }: { children: React.ReactNode }) 
       if (next === false) setRevealedItems([]); 
       return next;
     });
-  };
+  }, []);
 
   // Bật/tắt con mắt nhỏ của từng Ví/Giao dịch
-  const toggleRevealItem = (id: string) => {
+  const toggleRevealItem = useCallback((id: string) => {
     setRevealedItems((prev) =>
       prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
     );
-  };
+  }, []);
 
   // Logic che tiền siêu việt:
   // Nếu Master = ẨN -> Check xem ID này có được cấp phép xem trộm không?
   // - Nếu có: Hiện.
   // - Nếu không: Che.
-  const maskAmount = (formattedAmount: string, id?: string) => {
+  const maskAmount = useCallback((formattedAmount: string, id?: string) => {
     if (!isHidden) return formattedAmount; // Master mở -> Hiện tất
     if (id && revealedItems.includes(id)) return formattedAmount; // Được cấp phép -> Hiện
     return "******"; // Còn lại -> Che
-  };
+  }, [isHidden, revealedItems]);
+
+  const value = useMemo(() => ({
+    isHidden,
+    toggleHide,
+    revealedItems,
+    toggleRevealItem,
+    maskAmount
+  }), [isHidden, toggleHide, revealedItems, toggleRevealItem, maskAmount]);
 
   return (
-    <HideAmountContext.Provider
-      value={{ isHidden, toggleHide, revealedItems, toggleRevealItem, maskAmount }}
-    >
+    <HideAmountContext.Provider value={value}>
       {children}
     </HideAmountContext.Provider>
   );

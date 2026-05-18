@@ -108,6 +108,15 @@ export function TransactionDialog({
     }
   }, [open]);
 
+  // Giải phóng URL bộ nhớ để tránh rò rỉ
+  useEffect(() => {
+    return () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
+
   const form = useForm<TransactionFormValues>({
     resolver: zodResolver(TransactionSchema),
     defaultValues: {
@@ -314,9 +323,8 @@ export function TransactionDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className={`transition-all duration-300 max-h-[90vh] overflow-y-auto ${
-          previewUrl ? "sm:max-w-[800px]" : "sm:max-w-[500px]"
-        }`}
+        className={`transition-all duration-300 max-h-[90vh] overflow-y-auto ${previewUrl ? "sm:max-w-[800px]" : "sm:max-w-[500px]"
+          }`}
       >
         <DialogHeader className="pr-6">
           <DialogTitle>
@@ -354,10 +362,9 @@ export function TransactionDialog({
                   onClick={handleListen}
                   disabled={isScanning}
                   className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full transition-colors
-                    ${
-                      isListening
-                        ? "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 animate-pulse"
-                        : "text-gray-400 hover:text-purple-600 hover:bg-purple-50 dark:hover:text-purple-300 dark:hover:bg-purple-900/30"
+                    ${isListening
+                      ? "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 animate-pulse"
+                      : "text-gray-400 hover:text-purple-600 hover:bg-purple-50 dark:hover:text-purple-300 dark:hover:bg-purple-900/30"
                     }`}
                 >
                   <Mic className="h-4 w-4" />

@@ -9,7 +9,7 @@ import {
 } from "@/types/transaction.dto";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 
 const defaultParams: TransactionQueryParams = {
   page: 1,
@@ -21,6 +21,14 @@ export function useTransactions(
 ) {
   const queryClient = useQueryClient();
   const [isCheckingRelated, setIsCheckingRelated] = useState(false);
+  const isMounted = useRef(true);
+
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
 
   // =================================================================
   // 1. QUERY: Lấy danh sách giao dịch
@@ -190,7 +198,7 @@ export function useTransactions(
       let attempts = 0;
       const MAX_ATTEMPTS = 10;
 
-      while (finalStatus === "PENDING" && attempts < MAX_ATTEMPTS) {
+      while (finalStatus === "PENDING" && attempts < MAX_ATTEMPTS && isMounted.current) {
         await new Promise((resolve) => setTimeout(resolve, 1000));
         try {
           // Hàm này return response.data.result (chính là TransactionResponse)

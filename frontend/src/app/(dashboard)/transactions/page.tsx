@@ -25,7 +25,7 @@ import {
   TransactionUpdateRequest,
 } from "@/types/transaction.dto";
 import { Download, Loader2, Plus } from "lucide-react";
-import { useState } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { getColumns } from "./columns";
 import { useSearchParams } from "next/navigation";
 import { useWallets } from "@/hooks/use-wallets";
@@ -36,14 +36,14 @@ export default function TransactionsPage() {
   const currentPage = Number(searchParams.get("page")) || 1;
   const pageSize = 10;
 
-  const queryParams: TransactionQueryParams = {
+  const queryParams: TransactionQueryParams = useMemo(() => ({
     page: currentPage,
     size: pageSize,
     keyword: searchParams.get("keyword") || undefined,
     type: (searchParams.get("type") as TransactionType) || undefined,
     walletId: searchParams.get("walletId") || undefined,
     categoryId: searchParams.get("categoryId") || undefined,
-  };
+  }), [currentPage, pageSize, searchParams]);
 
   const {
     data,
@@ -73,23 +73,23 @@ export default function TransactionsPage() {
     setIsDialogOpen(true);
   };
 
-  const handleEdit = (transaction: TransactionResponse) => {
+  const handleEdit = useCallback((transaction: TransactionResponse) => {
     setTransactionToEdit(transaction);
     setIsDialogOpen(true);
-  };
+  }, []);
 
-  const handleDelete = async () => {
+  const handleDelete = useCallback(async () => {
     if (deleteId) {
       await deleteTransaction(deleteId);
       setDeleteId(null);
     }
-  };
+  }, [deleteId, deleteTransaction]);
 
-  const handleCreateSubmit = async (data: TransactionCreationRequest) => {
+  const handleCreateSubmit = useCallback(async (data: TransactionCreationRequest) => {
     return await createTransaction(data);
-  };
+  }, [createTransaction]);
 
-  const handleUpdateSubmit = async ({
+  const handleUpdateSubmit = useCallback(async ({
     id,
     data,
   }: {
@@ -97,11 +97,15 @@ export default function TransactionsPage() {
     data: TransactionUpdateRequest;
   }) => {
     return await updateTransaction({ id, data });
-  };
+  }, [updateTransaction]);
 
   const { wallets } = useWallets();
 
-  const columns = getColumns(handleEdit, (t) => setDeleteId(t.id), wallets);
+  const handleSetDeleteId = useCallback((id: string) => {
+    setDeleteId(id);
+  }, []);
+
+  const columns = useMemo(() => getColumns(handleEdit, handleSetDeleteId, wallets), [handleEdit, handleSetDeleteId, wallets]);
 
   const handlePageChange = (newPage: number) => {
     const params = new URLSearchParams(searchParams);
