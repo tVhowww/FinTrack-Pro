@@ -11,3 +11,7 @@ eureka:
     fetch-registry: false
   server:
     wait-time-in-ms-when-sync-empty: 5 # Giup khoi dong nhanh hon khi dev
+logging:
+  charset:
+    console: UTF-8
+    file: UTF-8

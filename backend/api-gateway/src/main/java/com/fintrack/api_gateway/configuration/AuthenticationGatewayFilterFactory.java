@@ -15,6 +15,8 @@ import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
+import org.springframework.util.AntPathMatcher;
+import org.springframework.http.HttpMethod;
 
 import java.util.List;
 
@@ -24,6 +26,7 @@ public class AuthenticationGatewayFilterFactory extends AbstractGatewayFilterFac
 
     private final IdentityService identityService;
     private final ObjectMapper objectMapper; // Dùng để convert object sang JSON
+    private final AntPathMatcher pathMatcher = new AntPathMatcher();
 
     public AuthenticationGatewayFilterFactory(IdentityService identityService, ObjectMapper objectMapper) {
         super(Config.class);
@@ -36,7 +39,8 @@ public class AuthenticationGatewayFilterFactory extends AbstractGatewayFilterFac
         return (exchange, chain) -> {
             // KIỂM TRA PUBLIC ENDPOINTS (QUAN TRỌNG)
             String path = exchange.getRequest().getURI().getPath();
-            if (isPublicEndpoint(path)) {
+            HttpMethod method = exchange.getRequest().getMethod();
+            if (isPublicEndpoint(path, method)) {
                 return chain.filter(exchange);
             }
 
@@ -89,22 +93,25 @@ public class AuthenticationGatewayFilterFactory extends AbstractGatewayFilterFac
         };
     }
 
-    private boolean isPublicEndpoint(String path) {
+    private boolean isPublicEndpoint(String path, HttpMethod method) {
         // Danh sách các API không cần token
-        List<String> publicPaths = List.of(
-                "/identity/auth/token",           // Login
-                "/identity/auth/google",          // Google OAuth login
-                "/identity/auth/introspect",      // Check token (internal)
-                "/identity/auth/logout",          // Logout (reads cookie itself)
-                "/identity/auth/refresh",         // Silent token refresh (reads cookie itself)
-                "/identity/auth/forgot-password", // Password recovery
-                "/identity/auth/reset-password",  // Password reset
-                "/identity/users"                 // Register
-        );
+        // Match chính xác các route
+        if (pathMatcher.match("/identity/auth/token", path) ||
+            pathMatcher.match("/identity/auth/google", path) ||
+            pathMatcher.match("/identity/auth/introspect", path) ||
+            pathMatcher.match("/identity/auth/logout", path) ||
+            pathMatcher.match("/identity/auth/refresh", path) ||
+            pathMatcher.match("/identity/auth/forgot-password", path) ||
+            pathMatcher.match("/identity/auth/reset-password", path)) {
+            return true;
+        }
+        
+        // Match riêng cho Register (chỉ POST /identity/users)
+        if (pathMatcher.match("/identity/users", path) && HttpMethod.POST.equals(method)) {
+            return true;
+        }
 
-        // Kiểm tra xem path hiện tại có chứa đoạn nào trong list trên không
-        // Dùng contains vì path thực tế có thể có query params
-        return publicPaths.stream().anyMatch(path::contains);
+        return false;
     }
 
     // Trả về JSON body để Postman hiện lỗi

@@ -74,3 +74,7 @@ spring:
     properties:
       hibernate:
         format_sql: true
+logging:
+  charset:
+    console: UTF-8
+    file: UTF-8

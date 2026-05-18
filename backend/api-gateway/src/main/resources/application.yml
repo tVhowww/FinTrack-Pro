@@ -29,6 +29,7 @@ spring:
               predicates:
                 - Path=/identity/auth/**
               filters:
+                - RemoveRequestHeader=X-Internal-Secret
                 # Dùng biến config thay vì hardcode
                 - AddRequestHeader=X-Internal-Secret, ${app.internal-secret}
 
@@ -40,6 +41,7 @@ spring:
               predicates:
                 - Path=/identity/**
               filters:
+                - RemoveRequestHeader=X-Internal-Secret
                 - Authentication
                 - AddRequestHeader=X-Internal-Secret, ${app.internal-secret}
 
@@ -51,6 +53,7 @@ spring:
               predicates:
                 - Path=/wallet/wallets/**, /wallet/users/**
               filters:
+                - RemoveRequestHeader=X-Internal-Secret
                 - Authentication
                 - AddRequestHeader=X-Internal-Secret, ${app.internal-secret}
 
@@ -62,6 +65,7 @@ spring:
               predicates:
                 - Path=/transaction/**
               filters:
+                - RemoveRequestHeader=X-Internal-Secret
                 - Authentication
                 - AddRequestHeader=X-Internal-Secret, ${app.internal-secret}
 
@@ -73,6 +77,7 @@ spring:
               predicates:
                 - Path=/notification/**
               filters:
+                - RemoveRequestHeader=X-Internal-Secret
                 - Authentication
                 - AddRequestHeader=X-Internal-Secret, ${app.internal-secret}
 
@@ -88,3 +93,8 @@ app:
   internal-secret: ${INTERNAL_SECRET}
   # Comma-separated list of allowed CORS origins. Override with ALLOWED_ORIGINS env var.
   allowed-origins: ${ALLOWED_ORIGINS:http://localhost:3000}
+
+logging:
+  charset:
+    console: UTF-8
+    file: UTF-8

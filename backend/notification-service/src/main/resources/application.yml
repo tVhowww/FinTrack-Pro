@@ -37,3 +37,7 @@ eureka:
   client:
     service-url:
       defaultZone: ${EUREKA_URI:http://localhost:8761/eureka/}
+logging:
+  charset:
+    console: UTF-8
+    file: UTF-8
