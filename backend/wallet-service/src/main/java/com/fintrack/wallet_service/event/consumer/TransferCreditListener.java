@@ -11,7 +11,9 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
-import java.util.concurrent.TimeUnit;
+import com.fintrack.wallet_service.entity.InboxEvent;
+import com.fintrack.wallet_service.repository.InboxEventRepository;
+import org.springframework.transaction.annotation.Transactional;
 
 @Component
 @RequiredArgsConstructor
@@ -20,16 +22,18 @@ public class TransferCreditListener {
 
     private final WalletService walletService;
     private final KafkaTemplate<String, Object> kafkaTemplate;
-    private final StringRedisTemplate redisTemplate;
+    private final InboxEventRepository inboxEventRepository;
 
     @KafkaListener(topics = "transfer.debit-completed", groupId = "wallet-saga-group")
+    @Transactional
     public void handleDebitCompleted(TransferDebitEvent event) {
         String processedKey = "saga:processed:wallet-credit:" + event.getSagaId();
-        Boolean firstSeen = redisTemplate.opsForValue().setIfAbsent(processedKey, "PROCESSING", 24, TimeUnit.HOURS);
-        if (Boolean.FALSE.equals(firstSeen)) {
+        if (inboxEventRepository.existsById(processedKey)) {
             log.warn("Duplicate transfer debit event ignored for saga {}", event.getSagaId());
             return;
         }
+        
+        inboxEventRepository.save(InboxEvent.builder().id(processedKey).build());
 
         TransferResultEvent resultEvent = TransferResultEvent.builder()
                 .sagaId(event.getSagaId())

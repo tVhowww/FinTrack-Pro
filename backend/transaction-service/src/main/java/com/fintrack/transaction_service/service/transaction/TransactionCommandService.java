@@ -20,11 +20,8 @@ import com.fintrack.transaction_service.utils.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -39,7 +36,7 @@ public class TransactionCommandService {
     private final TransactionMapper transactionMapper;
     private final WalletClient walletClient;
     private final IdentityClient identityClient;
-    private final KafkaTemplate<String, Object> kafkaTemplate;
+    private final OutboxService outboxService;
     private final StringRedisTemplate redisTemplate;
     private final BudgetAlertEngine budgetAlertEngine;
     private final TransactionNotificationWorker notificationWorker;
@@ -52,20 +49,6 @@ public class TransactionCommandService {
                 .amount(amount)
                 .idempotencyKey(idempotencyKey)
                 .build();
-    }
-
-    private void runAfterCommit(Runnable action) {
-        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            action.run();
-            return;
-        }
-
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                action.run();
-            }
-        });
     }
 
     @Transactional
@@ -82,7 +65,10 @@ public class TransactionCommandService {
     }
 
     private TransactionResponse createInternal(TransactionCreationRequest request) {
-        WalletResponse wallet = queryService.validateAndGetWallet(request.getWalletId());
+        // [EVENTUAL CONSISTENCY] Dùng tryGetWallet() thay vì validateAndGetWallet().
+        // Nếu Wallet-Service offline, wallet = null và transaction vẫn được lưu.
+        // Outbox relay sẽ cập nhật số dư sau khi Wallet-Service khôi phục.
+        WalletResponse wallet = queryService.tryGetWallet(request.getWalletId());
         Category category = null;
 
         if (wallet != null && "SAVING".equals(wallet.getType())) {
@@ -95,10 +81,12 @@ public class TransactionCommandService {
 
         Transaction transaction = transactionMapper.toTransaction(request);
         transaction.setCategory(category);
+        // [ATOMICITY] Transaction và OutboxEvent được lưu trong cùng 1 DB transaction.
         transaction = transactionRepository.save(transaction);
 
         BigDecimal updateAmount = request.getType() == TransactionType.EXPENSE ? request.getAmount().negate() : request.getAmount();
-        walletClient.updateBalance(request.getWalletId(), balanceUpdate(updateAmount, "transaction:create:" + transaction.getId()));
+        outboxService.saveEvent("walletClient", "WALLET_UPDATE",
+                new OutboxWalletUpdatePayload(request.getWalletId(), balanceUpdate(updateAmount, "transaction:create:" + transaction.getId())));
 
         String recipientEmail = null, username = "Người dùng", currency = "VND";
         try {
@@ -120,10 +108,12 @@ public class TransactionCommandService {
     public TransactionResponse update(String id, TransactionUpdateRequest request) {
         String operationId = java.util.UUID.randomUUID().toString();
         Transaction transaction = transactionRepository.findById(id).orElseThrow(() -> new AppException(ErrorCode.TRANSACTION_NOT_FOUND));
-        WalletResponse wallet = queryService.validateAndGetWallet(transaction.getWalletId());
+        // [EVENTUAL CONSISTENCY] Dùng tryGetWallet() – balance revert/apply vẫn được enqueue qua Outbox.
+        WalletResponse wallet = queryService.tryGetWallet(transaction.getWalletId());
 
         BigDecimal revertAmount = transaction.getType() == TransactionType.INCOME ? transaction.getAmount().negate() : transaction.getAmount();
-        walletClient.updateBalance(transaction.getWalletId(), balanceUpdate(revertAmount, "transaction:update:" + id + ":" + operationId + ":revert"));
+        outboxService.saveEvent("walletClient", "WALLET_UPDATE", 
+                new OutboxWalletUpdatePayload(transaction.getWalletId(), balanceUpdate(revertAmount, "transaction:update:" + id + ":" + operationId + ":revert")));
 
         if (wallet != null && "SAVING".equals(wallet.getType())) {
             String sysCatName = (transaction.getType() == TransactionType.INCOME) ? "Nạp tiền tích lũy" : "Rút tiền tích lũy";
@@ -139,7 +129,8 @@ public class TransactionCommandService {
 
         transaction = transactionRepository.save(transaction);
         BigDecimal newUpdateAmount = transaction.getType() == TransactionType.EXPENSE ? transaction.getAmount().negate() : transaction.getAmount();
-        walletClient.updateBalance(transaction.getWalletId(), balanceUpdate(newUpdateAmount, "transaction:update:" + id + ":" + operationId + ":apply"));
+        outboxService.saveEvent("walletClient", "WALLET_UPDATE", 
+                new OutboxWalletUpdatePayload(transaction.getWalletId(), balanceUpdate(newUpdateAmount, "transaction:update:" + id + ":" + operationId + ":apply")));
 
         String recipientEmail = null, username = "Người dùng";
         try {
@@ -157,14 +148,17 @@ public class TransactionCommandService {
     @Transactional
     public void delete(String id) {
         Transaction transaction = transactionRepository.findById(id).orElseThrow(() -> new AppException(ErrorCode.TRANSACTION_NOT_FOUND));
-        queryService.validateAndGetWallet(transaction.getWalletId());
+        // [EVENTUAL CONSISTENCY] Không block nếu Wallet-Service offline.
+        // OutboxEvent vẫn được enqueue để hoàn tiền; Wallet-Service sẽ xử lý khi khôi phục.
+        queryService.tryGetWallet(transaction.getWalletId());
 
         BigDecimal revertAmount = transaction.getType() == TransactionType.INCOME ? transaction.getAmount().negate() : transaction.getAmount();
-        walletClient.updateBalance(transaction.getWalletId(), balanceUpdate(revertAmount, "transaction:delete:" + id));
+        outboxService.saveEvent("walletClient", "WALLET_UPDATE",
+                new OutboxWalletUpdatePayload(transaction.getWalletId(), balanceUpdate(revertAmount, "transaction:delete:" + id)));
 
         transaction.setDeleted(true);
         transactionRepository.save(transaction);
-        log.info("Đã xóa giao dịch {} và hoàn tiền lại ví {}", id, transaction.getWalletId());
+        log.info("Đã xóa giao dịch {} và enqueue hoàn tiền ví {} qua Outbox", id, transaction.getWalletId());
     }
 
     @Transactional
@@ -175,32 +169,35 @@ public class TransactionCommandService {
         if (Boolean.FALSE.equals(acquired)) throw new AppException(ErrorCode.REQUEST_PROCESSING);
 
         try {
-        WalletResponse fromWallet = queryService.validateAndGetWallet(request.getFromWalletId());
-        WalletResponse toWallet = queryService.validateAndGetWallet(request.getToWalletId());
+            // [EVENTUAL CONSISTENCY] Dùng tryGetWallet() cho transfer flow.
+            WalletResponse fromWallet = queryService.tryGetWallet(request.getFromWalletId());
+            WalletResponse toWallet = queryService.tryGetWallet(request.getToWalletId());
 
-        Instant transactionDate = request.getDate() != null ? request.getDate() : Instant.now();
-        Category transferOutCategory = getOrCreateSystemCategory("Chuyển tiền đi", TransactionType.EXPENSE);
-        Category transferInCategory = getOrCreateSystemCategory("Nhận tiền đến", TransactionType.INCOME);
-        String sagaId = java.util.UUID.randomUUID().toString();
+            Instant transactionDate = request.getDate() != null ? request.getDate() : Instant.now();
+            Category transferOutCategory = getOrCreateSystemCategory("Chuyển tiền đi", TransactionType.EXPENSE);
+            Category transferInCategory = getOrCreateSystemCategory("Nhận tiền đến", TransactionType.INCOME);
+            String sagaId = java.util.UUID.randomUUID().toString();
 
-        Transaction expenseTx = Transaction.builder().amount(request.getAmount()).type(TransactionType.EXPENSE)
-                .walletId(request.getFromWalletId()).date(transactionDate)
-                .note(request.getNote() != null && !request.getNote().isEmpty() ? request.getNote() : "Chuyển tiền sang ví " + toWallet.getName())
-                .category(transferOutCategory).sagaId(sagaId).transferStatus(TransferStatus.PENDING).build();
-        transactionRepository.save(expenseTx);
+            Transaction expenseTx = Transaction.builder().amount(request.getAmount()).type(TransactionType.EXPENSE)
+                    .walletId(request.getFromWalletId()).date(transactionDate)
+                    .note(request.getNote() != null && !request.getNote().isEmpty() ? request.getNote() : "Chuyển tiền sang ví " + toWallet.getName())
+                    .category(transferOutCategory).sagaId(sagaId).transferStatus(TransferStatus.PENDING).build();
+            transactionRepository.save(expenseTx);
 
-        Transaction incomeTx = Transaction.builder().amount(request.getAmount()).type(TransactionType.INCOME)
-                .walletId(request.getToWalletId()).date(transactionDate).note("Nhận tiền từ quỹ " + fromWallet.getName())
-                .category(transferInCategory).sagaId(sagaId).transferStatus(TransferStatus.PENDING).build();
-        transactionRepository.save(incomeTx);
+            Transaction incomeTx = Transaction.builder().amount(request.getAmount()).type(TransactionType.INCOME)
+                    .walletId(request.getToWalletId()).date(transactionDate).note("Nhận tiền từ quỹ " + fromWallet.getName())
+                    .category(transferInCategory).sagaId(sagaId).transferStatus(TransferStatus.PENDING).build();
+            transactionRepository.save(incomeTx);
 
-        walletClient.updateBalance(request.getFromWalletId(), balanceUpdate(request.getAmount().negate(), "transfer:" + sagaId + ":debit"));
+            outboxService.saveEvent("walletClient", "WALLET_UPDATE", 
+                    new OutboxWalletUpdatePayload(request.getFromWalletId(), balanceUpdate(request.getAmount().negate(), "transfer:" + sagaId + ":debit")));
 
-        TransferDebitEvent event = TransferDebitEvent.builder().sagaId(sagaId).fromWalletId(request.getFromWalletId())
-                .toWalletId(request.getToWalletId()).amount(request.getAmount()).note(request.getNote()).date(transactionDate).build();
-        runAfterCommit(() -> kafkaTemplate.send("transfer.debit-completed", event));
+            TransferDebitEvent event = TransferDebitEvent.builder().sagaId(sagaId).fromWalletId(request.getFromWalletId())
+                    .toWalletId(request.getToWalletId()).amount(request.getAmount()).note(request.getNote()).date(transactionDate).build();
+            
+            outboxService.saveEvent("transfer.debit-completed", "KAFKA_PUBLISH", event);
 
-        return transactionMapper.toTransactionResponse(expenseTx);
+            return transactionMapper.toTransactionResponse(expenseTx);
         } finally {
             redisTemplate.delete(lockKey);
         }

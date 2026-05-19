@@ -4,6 +4,7 @@ import org.flywaydb.core.Flyway;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 
 import javax.sql.DataSource;
 
@@ -20,6 +21,7 @@ public class FlywayConfig {
     private boolean flywayEnabled;
 
     @Bean(initMethod = "migrate")
+    @Primary
     public Flyway flyway() {
         if (!flywayEnabled) {
             return Flyway.configure().dataSource(dataSource).load();
@@ -29,8 +31,6 @@ public class FlywayConfig {
                 .dataSource(dataSource)
                 .locations("classpath:db/migration")
                 .load();
-
-        flyway.migrate();
 
         return flyway;
     }

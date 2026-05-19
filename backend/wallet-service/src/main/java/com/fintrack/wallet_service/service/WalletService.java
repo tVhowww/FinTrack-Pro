@@ -6,11 +6,13 @@ import com.fintrack.wallet_service.dto.request.WalletCreationRequest;
 import com.fintrack.wallet_service.dto.request.WalletUpdateRequest;
 import com.fintrack.wallet_service.dto.response.WalletResponse;
 import com.fintrack.wallet_service.entity.Wallet;
+import com.fintrack.wallet_service.entity.InboxEvent;
 import com.fintrack.wallet_service.enums.TransactionType;
 import com.fintrack.wallet_service.exception.AppException;
 import com.fintrack.wallet_service.exception.ErrorCode;
 import com.fintrack.wallet_service.mapper.WalletMapper;
 import com.fintrack.wallet_service.repository.WalletRepository;
+import com.fintrack.wallet_service.repository.InboxEventRepository;
 import com.fintrack.wallet_service.repository.httpclient.TransactionClient;
 import com.fintrack.wallet_service.utils.SecurityUtils;
 import jakarta.persistence.criteria.Predicate;
@@ -25,6 +27,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.retry.annotation.Retryable;
+import org.springframework.retry.annotation.Backoff;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -39,6 +43,7 @@ public class WalletService {
     private final WalletMapper walletMapper;
     private final TransactionClient transactionClient;
     private final StringRedisTemplate redisTemplate;
+    private final InboxEventRepository inboxEventRepository;
 
     /**
      * Điều chỉnh số dư ví thủ công
@@ -111,17 +116,17 @@ public class WalletService {
         return walletMapper.toWalletResponse(wallet);
     }
 
+    @Retryable(
+            retryFor = {ObjectOptimisticLockingFailureException.class, PessimisticLockingFailureException.class},
+            maxAttempts = 3,
+            backoff = @Backoff(delay = 100, maxDelay = 500)
+    )
     @Transactional // đảm bảo tính nhất quán
     public WalletResponse updateBalance(String walletId,  WalletBalanceUpdateRequest request) {
-        String idempotencyRedisKey = null;
-        if (request.getIdempotencyKey() != null && !request.getIdempotencyKey().isBlank()) {
-            idempotencyRedisKey = "wallet:balance:update:" + walletId + ":" + request.getIdempotencyKey();
-            Boolean firstSeen = redisTemplate.opsForValue().setIfAbsent(idempotencyRedisKey, "PROCESSING", 24, TimeUnit.HOURS);
-            if (Boolean.FALSE.equals(firstSeen)) {
-                String status = redisTemplate.opsForValue().get(idempotencyRedisKey);
-                if (!"COMPLETED".equals(status)) {
-                    throw new AppException(ErrorCode.REQUEST_PROCESSING);
-                }
+        String idempotencyKey = request.getIdempotencyKey();
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            if (inboxEventRepository.existsById(idempotencyKey)) {
+                log.info("Idempotent hit for key: {}", idempotencyKey);
                 Wallet currentWallet = walletRepository.findById(walletId)
                         .orElseThrow(() -> new AppException(ErrorCode.WALLET_NOT_FOUND));
                 return walletMapper.toWalletResponse(currentWallet);
@@ -142,7 +147,6 @@ public class WalletService {
 
         // 3. Kiểm tra nếu số dư âm
         if (newBalance.compareTo(BigDecimal.ZERO) < 0) {
-            if (idempotencyRedisKey != null) redisTemplate.delete(idempotencyRedisKey);
             throw new AppException(ErrorCode.INSUFFICIENT_BALANCE);
         }
 
@@ -150,15 +154,13 @@ public class WalletService {
         wallet.setBalance(newBalance);
         try {
             Wallet savedWallet = walletRepository.save(wallet);
-            if (idempotencyRedisKey != null) {
-                redisTemplate.opsForValue().set(idempotencyRedisKey, "COMPLETED", 24, TimeUnit.HOURS);
+            if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+                inboxEventRepository.save(InboxEvent.builder().id(idempotencyKey).build());
             }
             return walletMapper.toWalletResponse(savedWallet);
         } catch (ObjectOptimisticLockingFailureException | PessimisticLockingFailureException e) {
-            if (idempotencyRedisKey != null) redisTemplate.delete(idempotencyRedisKey);
             throw new AppException(ErrorCode.CONCURRENT_BALANCE_UPDATE);
         }
-
     }
 
     public WalletResponse create(WalletCreationRequest request) {

@@ -1,0 +1,4 @@
+CREATE TABLE inbox_events (
+    id VARCHAR(255) PRIMARY KEY,
+    processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

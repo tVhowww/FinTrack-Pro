@@ -89,6 +89,10 @@ public class TransactionQueryService {
 
     // --- CÁC HÀM VALIDATE DÙNG CHUNG (PUBLIC) ---
 
+    /**
+     * STRICT validation: throws exception if wallet-service is unreachable or wallet not found.
+     * Dùng cho read-path (GET) nơi cần đảm bảo dữ liệu nhất quán ngay lập tức.
+     */
     public WalletResponse validateAndGetWallet(String walletId) {
         if (walletId == null || walletId.trim().isEmpty() || "undefined".equals(walletId)) return null;
         try {
@@ -96,9 +100,37 @@ public class TransactionQueryService {
             if (response == null || response.getResult() == null) throw new AppException(ErrorCode.WALLET_NOT_FOUND);
             if (!SecurityUtils.getCurrentUserId().equals(response.getResult().getUserId())) throw new AppException(ErrorCode.UNAUTHORIZED);
             return response.getResult();
+        } catch (AppException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Lỗi xác thực ví: {}", e.getMessage());
             throw new AppException(ErrorCode.WALLET_NOT_FOUND);
+        }
+    }
+
+    /**
+     * LENIENT fetch: trả về null nếu wallet-service tạm thời không khả dụng.
+     * Dùng cho write-path (CREATE/UPDATE/DELETE) để hỗ trợ Eventual Consistency.
+     * Transaction vẫn được lưu; balance update sẽ được xử lý qua Outbox.
+     */
+    public WalletResponse tryGetWallet(String walletId) {
+        if (walletId == null || walletId.trim().isEmpty() || "undefined".equals(walletId)) return null;
+        try {
+            var response = walletClient.getWallet(walletId);
+            if (response == null || response.getResult() == null) {
+                log.warn("Wallet {} không tìm thấy – tiếp tục theo Eventual Consistency", walletId);
+                return null;
+            }
+            String currentUserId = SecurityUtils.getCurrentUserId();
+            if (!currentUserId.equals(response.getResult().getUserId())) {
+                log.warn("Wallet {} không thuộc user {} – tiếp tục theo Eventual Consistency", walletId, currentUserId);
+                return null;
+            }
+            return response.getResult();
+        } catch (Exception e) {
+            log.warn("Wallet-service tạm thời không khả dụng khi lấy ví {} ({}). " +
+                    "Giao dịch vẫn được lưu; cập nhật số dư sẽ xử lý qua Outbox.", walletId, e.getMessage());
+            return null;
         }
     }
 
