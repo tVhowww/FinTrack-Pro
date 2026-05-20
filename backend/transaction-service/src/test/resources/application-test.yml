@@ -1,0 +1,42 @@
+spring:
+  application:
+    name: transaction-service-test
+  datasource:
+    url: jdbc:h2:mem:transaction_test_db;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;NON_KEYWORDS=MONTH,YEAR
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+        format_sql: true
+
+  flyway:
+    enabled: false
+
+  # Ngăn Kafka Listener tự động startup khi chạy test để tránh cố gắng kết nối tới Broker thật
+  kafka:
+    listener:
+      auto-startup: false
+
+  # Ngăn Redis tự kết nối thật
+  data:
+    redis:
+      repositories:
+        enabled: false
+
+eureka:
+  client:
+    enabled: false
+
+jwt:
+  signerKey: "testsignerkey123456789012345678901234567890123456789012345678901234567890"
+
+app:
+  internal-secret: "test-internal-secret"
+  exchange-rate:
+    url: "mock-url"

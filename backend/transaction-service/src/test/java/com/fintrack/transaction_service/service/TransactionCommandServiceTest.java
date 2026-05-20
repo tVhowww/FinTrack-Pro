@@ -1,5 +1,6 @@
 package com.fintrack.transaction_service.service;
 
+import com.fintrack.transaction_service.dto.request.OutboxWalletUpdatePayload;
 import com.fintrack.transaction_service.dto.request.TransactionCreationRequest;
 import com.fintrack.transaction_service.dto.request.WalletBalanceUpdateRequest;
 import com.fintrack.transaction_service.dto.response.TransactionResponse;
@@ -8,6 +9,7 @@ import com.fintrack.transaction_service.enums.TransactionType;
 import com.fintrack.transaction_service.mapper.TransactionMapper;
 import com.fintrack.transaction_service.repository.TransactionRepository;
 import com.fintrack.transaction_service.repository.httpclient.WalletClient;
+import com.fintrack.transaction_service.service.transaction.OutboxService;
 import com.fintrack.transaction_service.service.transaction.TransactionCommandService;
 import com.fintrack.transaction_service.service.transaction.TransactionQueryService;
 import com.fintrack.transaction_service.repository.httpclient.IdentityClient;
@@ -49,6 +51,7 @@ public class TransactionCommandServiceTest {
     @Mock private IdentityClient identityClient;
     @Mock private BudgetAlertEngine budgetAlertEngine;
     @Mock private TransactionNotificationWorker notificationWorker;
+    @Mock private OutboxService outboxService;
 
     @InjectMocks
     private TransactionCommandService commandService; // Trỏ vào Service mới
@@ -91,16 +94,12 @@ public class TransactionCommandServiceTest {
     }
 
     @Test
-    @DisplayName("Create Transaction: Should convert amount to negative if type is EXPENSE")
+    @DisplayName("Create Transaction: Should save event to Outbox instead of calling WalletClient directly")
     void createTransaction_Expense_Success() {
         mockSecurityContext();
-        // Mock Redis (Tránh lỗi Double Click)
         Mockito.when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         Mockito.when(valueOperations.setIfAbsent(any(), any(), anyLong(), any())).thenReturn(true);
-
-        // Mock QueryService (Bỏ qua đoạn Check Ví của user)
-        Mockito.when(queryService.validateAndGetWallet(any())).thenReturn(null);
-
+//        Mockito.when(queryService.validateAndGetWallet(any())).thenReturn(null);
         Mockito.when(transactionMapper.toTransaction(any())).thenReturn(transaction);
         Mockito.when(transactionRepository.save(any())).thenReturn(transaction);
         Mockito.when(transactionMapper.toTransactionResponse(any())).thenReturn(response);
@@ -108,37 +107,35 @@ public class TransactionCommandServiceTest {
         // Gọi hàm của thằng CommandService
         var result = commandService.create(request);
 
-        ArgumentCaptor<WalletBalanceUpdateRequest> captor = ArgumentCaptor.forClass(WalletBalanceUpdateRequest.class);
-        Mockito.verify(walletClient).updateBalance(Mockito.eq("wallet-456"), captor.capture());
+        ArgumentCaptor<OutboxWalletUpdatePayload> captor = ArgumentCaptor.forClass(OutboxWalletUpdatePayload.class);
+        Mockito.verify(outboxService).saveEvent(Mockito.eq("walletClient"), Mockito.eq("WALLET_UPDATE"), captor.capture());
 
-        BigDecimal sentAmount = captor.getValue().getAmount();
-        Assertions.assertEquals(BigDecimal.valueOf(-100000), sentAmount);
+        BigDecimal sentAmount = captor.getValue().getRequest().getAmount(); // getUpdate() tuỳ vào cấu trúc Payload của sếp
+        Assertions.assertEquals(0, BigDecimal.valueOf(-100000).compareTo(sentAmount));
         Mockito.verify(transactionRepository).save(any());
         Assertions.assertNotNull(result);
         Assertions.assertEquals("trans-789", result.getId());
     }
 
     @Test
-    @DisplayName("Create Transaction: Should keep positive amount if type is INCOME")
+    @DisplayName("Create Transaction: Should keep positive amount in Outbox if type is INCOME")
     void createTransaction_Income_Success() {
         mockSecurityContext();
         request.setType(TransactionType.INCOME);
 
-        // Phải mock lại Redis và QueryService cho Test Case này
         Mockito.when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         Mockito.when(valueOperations.setIfAbsent(any(), any(), anyLong(), any())).thenReturn(true);
-        Mockito.when(queryService.validateAndGetWallet(any())).thenReturn(null);
-
+//        Mockito.when(queryService.validateAndGetWallet(any())).thenReturn(null);
         Mockito.when(transactionMapper.toTransaction(any())).thenReturn(transaction);
         Mockito.when(transactionRepository.save(any())).thenReturn(transaction);
         Mockito.when(transactionMapper.toTransactionResponse(any())).thenReturn(response);
 
         commandService.create(request);
 
-        ArgumentCaptor<WalletBalanceUpdateRequest> captor = ArgumentCaptor.forClass(WalletBalanceUpdateRequest.class);
-        Mockito.verify(walletClient).updateBalance(Mockito.eq("wallet-456"), captor.capture());
+        ArgumentCaptor<OutboxWalletUpdatePayload> captor = ArgumentCaptor.forClass(OutboxWalletUpdatePayload.class);
+        Mockito.verify(outboxService).saveEvent(Mockito.eq("walletClient"), Mockito.eq("WALLET_UPDATE"), captor.capture());
 
-        BigDecimal sentAmount = captor.getValue().getAmount();
-        Assertions.assertEquals(BigDecimal.valueOf(100000), sentAmount);
+        BigDecimal sentAmount = captor.getValue().getRequest().getAmount();
+        Assertions.assertEquals(0, BigDecimal.valueOf(100000).compareTo(sentAmount));
     }
 }
