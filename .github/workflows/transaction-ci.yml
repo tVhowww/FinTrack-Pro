@@ -49,3 +49,20 @@ jobs:
         context: ./backend/transaction-service
         push: true
         tags: ${{ secrets.DOCKER_USERNAME }}/fintrack-transaction-service:latest
+
+  deploy-to-render:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    
+    steps:
+      # Step 1: Log in to Render
+      - name: Log in to Render
+        run: |
+          echo "Bắt đầu xác thực với Render API..."
+          
+      # Step 2: Deploy image from Docker Hub to Render
+      - name: Deploy to Render
+        run: |
+          curl -X POST https://api.render.com/v1/services/srv-d86ujh37uimc73an4fc0/deploys \
+            -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
+            -H "Accept: application/json"
