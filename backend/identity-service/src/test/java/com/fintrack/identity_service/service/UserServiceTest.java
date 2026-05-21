@@ -90,7 +90,7 @@ public class UserServiceTest {
                 .build();
         when(roleRepository.findAllById(any())).thenReturn(Collections.singletonList(roleUser));
 
-        when(userRepository.save(any(User.class))).thenReturn(user);
+        when(userRepository.saveAndFlush(any(User.class))).thenReturn(user);
         when(userMapper.toUserResponse(any(User.class))).thenReturn(response);
 
         // WHEN
