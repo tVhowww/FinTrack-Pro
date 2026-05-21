@@ -9,6 +9,7 @@ import com.fintrack.wallet_service.exception.AppException;
 import com.fintrack.wallet_service.exception.ErrorCode;
 import com.fintrack.wallet_service.mapper.WalletMapper;
 import com.fintrack.wallet_service.repository.WalletRepository;
+import com.fintrack.wallet_service.repository.InboxEventRepository;
 import com.fintrack.wallet_service.repository.httpclient.TransactionClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,6 +34,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.*;
 
+
 @ExtendWith(MockitoExtension.class) // sử dụng mockito
 public class WalletServiceTest {
 
@@ -41,6 +43,9 @@ public class WalletServiceTest {
 
     @Mock
     private WalletMapper walletMapper; // giả lập cái Mapper
+
+    @Mock
+    private InboxEventRepository inboxEventRepository;
 
     @Mock
     private TransactionClient transactionClient;
@@ -224,9 +229,9 @@ public class WalletServiceTest {
                 .idempotencyKey("op-123")
                 .build();
 
-        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
-        when(valueOperations.setIfAbsent(anyString(), anyString(), anyLong(), any())).thenReturn(true);
+
         when(walletRepository.findByIdForUpdate("wallet-123")).thenReturn(Optional.of(wallet));
+        when(inboxEventRepository.existsById(anyString())).thenReturn(false);
         when(walletRepository.save(any(Wallet.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(walletMapper.toWalletResponse(any(Wallet.class))).thenReturn(
                 WalletResponse.builder().id("wallet-123").balance(BigDecimal.valueOf(1050000)).build()
@@ -246,9 +251,8 @@ public class WalletServiceTest {
                 .idempotencyKey("op-123")
                 .build();
 
-        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
-        when(valueOperations.setIfAbsent(anyString(), anyString(), anyLong(), any())).thenReturn(false);
-        when(valueOperations.get(anyString())).thenReturn("COMPLETED");
+
+        when(inboxEventRepository.existsById(anyString())).thenReturn(true);
         when(walletRepository.findById("wallet-123")).thenReturn(Optional.of(wallet));
         when(walletMapper.toWalletResponse(wallet)).thenReturn(walletResponse);
 

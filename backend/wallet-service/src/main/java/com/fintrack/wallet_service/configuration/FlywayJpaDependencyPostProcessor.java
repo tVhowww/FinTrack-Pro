@@ -11,7 +11,7 @@ public class FlywayJpaDependencyPostProcessor implements BeanFactoryPostProcesso
 
     @Override
     public void postProcessBeanFactory(ConfigurableListableBeanFactory beanFactory) throws BeansException {
-        if (beanFactory.containsBeanDefinition("entityManagerFactory")) {
+        if (beanFactory.containsBeanDefinition("entityManagerFactory") && beanFactory.containsBeanDefinition("flyway")) {
             String[] dependsOn = beanFactory.getBeanDefinition("entityManagerFactory").getDependsOn();
             if (dependsOn == null) {
                 beanFactory.getBeanDefinition("entityManagerFactory").setDependsOn("flyway");
