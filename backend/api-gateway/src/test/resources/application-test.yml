@@ -1,0 +1,7 @@
+app:
+  internal-secret: mock-internal-secret-for-testing
+  allowed-origins: http://localhost:3000
+
+eureka:
+  client:
+    enabled: false
