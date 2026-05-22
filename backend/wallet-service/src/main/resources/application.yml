@@ -60,6 +60,10 @@ jwt:
 app:
   internal-secret: ${INTERNAL_SECRET}
 
+  services:
+    transaction:
+      url: ${APP_SERVICES_TRANSACTION_URL:http://localhost:8082}
+
 ---
 # ============================================================
 # DEV Profile — verbose SQL logging for local development
