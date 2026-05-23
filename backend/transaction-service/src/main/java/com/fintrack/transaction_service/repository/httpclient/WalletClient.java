@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 
 import java.util.List;
 
-@FeignClient(name = "wallet-service", path = "/wallet", configuration = FeignClientConfig.class)
+@FeignClient(name = "wallet-service", url = "${WALLET_SERVICE_URL:}", path = "/wallet", configuration = FeignClientConfig.class)
 public interface WalletClient {
     // Khai báo hàm giống hệt Controller bên Wallet Service
     // URL đầy đủ sẽ là: http://wallet-service/wallet/internal/wallets/{id}/balance
