@@ -26,7 +26,14 @@ spring:
     enabled: true
 
   kafka:
-    bootstrap-servers: localhost:29092
+    # Mặc định gọi local, nếu có biến môi trường sẽ gọi Aiven
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:29092}
+    properties:
+      # Local thì dùng PLAINTEXT (không mật khẩu), lên mây thì truyền biến SASL_SSL vào
+      security.protocol: ${KAFKA_SECURITY_PROTOCOL:PLAINTEXT}
+      sasl.mechanism: SCRAM-SHA-256
+      # Tự động nhét Username/Password từ biến môi trường vào đây
+      sasl.jaas.config: org.apache.kafka.common.security.scram.ScramLoginModule required username="${KAFKA_USERNAME:}" password="${KAFKA_PASSWORD:}";
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
