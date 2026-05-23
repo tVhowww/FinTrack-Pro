@@ -10,6 +10,11 @@ spring:
   # Cau hinh KAFKA
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:29092}
+    properties:
+      # Local thì dùng PLAINTEXT, lên mây thì truyền biến SASL_SSL vào
+      security.protocol: ${KAFKA_SECURITY_PROTOCOL:PLAINTEXT}
+      sasl.mechanism: SCRAM-SHA-256
+      sasl.jaas.config: org.apache.kafka.common.security.scram.ScramLoginModule required username="${KAFKA_USERNAME:}" password="${KAFKA_PASSWORD:}";
     consumer:
       group-id: notification-group-v3
       auto-offset-reset: latest
@@ -37,6 +42,9 @@ eureka:
   client:
     service-url:
       defaultZone: ${EUREKA_URI:http://localhost:8761/eureka/}
+    register-with-eureka: ${EUREKA_CLIENT_REGISTER_WITH_EUREKA:true}
+    fetch-registry: ${EUREKA_CLIENT_FETCH_REGISTRY:true}
+    
 logging:
   charset:
     console: UTF-8
