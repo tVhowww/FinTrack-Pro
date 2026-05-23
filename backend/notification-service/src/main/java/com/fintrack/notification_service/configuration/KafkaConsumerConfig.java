@@ -22,11 +22,26 @@ public class KafkaConsumerConfig {
     @Value("${spring.kafka.bootstrap-servers:localhost:29092}")
     private String bootstrapServers;
 
+    @Value("${KAFKA_SECURITY_PROTOCOL:PLAINTEXT}")
+    private String securityProtocol;
+
+    @Value("${KAFKA_USERNAME:}")
+    private String kafkaUsername;
+
+    @Value("${KAFKA_PASSWORD:}")
+    private String kafkaPassword;
+
     @Bean
     public ConsumerFactory<String, String> consumerFactory() {
         Map<String, Object> config = new HashMap<>();
 
         config.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        if ("SASL_SSL".equals(securityProtocol)) {
+            config.put("security.protocol", "SASL_SSL");
+            config.put("sasl.mechanism", "SCRAM-SHA-256"); // Aiven dùng SCRAM-SHA-256
+            String jaasTemplate = "org.apache.kafka.common.security.scram.ScramLoginModule required username=\"%s\" password=\"%s\";";
+            config.put("sasl.jaas.config", String.format(jaasTemplate, kafkaUsername, kafkaPassword));
+        }
         config.put(ConsumerConfig.GROUP_ID_CONFIG, "notification-group-v3");
         config.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         config.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);

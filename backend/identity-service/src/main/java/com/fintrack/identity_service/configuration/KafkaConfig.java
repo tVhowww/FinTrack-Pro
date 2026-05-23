@@ -18,17 +18,31 @@ public class KafkaConfig {
     @Value("${spring.kafka.bootstrap-servers}")
     private String bootstrapServers;
 
+    @Value("${KAFKA_SECURITY_PROTOCOL:PLAINTEXT}")
+    private String securityProtocol;
+
+    @Value("${KAFKA_USERNAME:}")
+    private String kafkaUsername;
+
+    @Value("${KAFKA_PASSWORD:}")
+    private String kafkaPassword;
+
     @Bean
     public ProducerFactory<String, Object> producerFactory() {
         Map<String, Object> configProps = new HashMap<>();
 
         // 1. Cấu hình Server
         configProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        if ("SASL_SSL".equals(securityProtocol)) {
+            configProps.put("security.protocol", "SASL_SSL");
+            configProps.put("sasl.mechanism", "SCRAM-SHA-256");
+            String jaasTemplate = "org.apache.kafka.common.security.scram.ScramLoginModule required username=\"%s\" password=\"%s\";";
+            configProps.put("sasl.jaas.config", String.format(jaasTemplate, kafkaUsername, kafkaPassword));
+        }
 
         // 2. Cấu hình Serializer (Key là String, Value là JSON)
         configProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         configProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class);
-
         return new DefaultKafkaProducerFactory<>(configProps);
     }
 
