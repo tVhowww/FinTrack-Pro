@@ -26,7 +26,8 @@ spring:
 
   # Cau hinh EMAIL (Gmail SMTP)
   mail:
-    host: smtp.gmail.com
+    # host: smtp.gmail.com
+    host: in.mailjet.com
     port: 587
     # Lấy từ biến môi trường, không để lộ email/pass trong code
     username: ${MAIL_USERNAME}
