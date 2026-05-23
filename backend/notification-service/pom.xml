@@ -51,10 +51,11 @@
 			<artifactId>spring-boot-starter-mail</artifactId>
 		</dependency> -->
 		<!-- Source: https://mvnrepository.com/artifact/com.mailjet/mailjet-client -->
+		<!-- Source: https://mvnrepository.com/artifact/software.amazon.awssdk/ses -->
 		<dependency>
-			<groupId>com.mailjet</groupId>
-			<artifactId>mailjet-client</artifactId>
-			<version>5.2.5</version>
+			<groupId>software.amazon.awssdk</groupId>
+			<artifactId>ses</artifactId>
+			<version>2.44.10</version>
 			<scope>compile</scope>
 		</dependency>
 		<dependency>
