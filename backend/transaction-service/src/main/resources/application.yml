@@ -4,6 +4,10 @@ server:
     context-path: /transaction # Base path
 
 spring:
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
   application:
     name: transaction-service
   datasource:

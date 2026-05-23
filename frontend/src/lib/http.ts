@@ -1,7 +1,8 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 
 const http = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_BASE_URL,
+  // baseURL: process.env.NEXT_PUBLIC_API_BASE_URL,
+  baseURL: "/api",
   headers: {
     "Content-Type": "application/json",
   },
@@ -60,7 +61,7 @@ http.interceptors.response.use(
       // POST with empty body — the backend reads the token from the HttpOnly cookie
       // and sets a new rotated cookie in the response.
       await axios.post(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL}/identity/auth/refresh`,
+        `/api/identity/auth/refresh`,
         {},
         { withCredentials: true }
       );
