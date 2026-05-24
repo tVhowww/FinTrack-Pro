@@ -13,7 +13,10 @@ import org.springframework.kafka.core.*;
 import org.springframework.kafka.support.converter.RecordMessageConverter;
 import org.springframework.kafka.support.converter.StringJsonMessageConverter;
 import org.springframework.kafka.support.serializer.JsonSerializer;
-
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.util.FileCopyUtils;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -43,6 +46,16 @@ public class KafkaProducerConfig {
             configProps.put("sasl.mechanism", "SCRAM-SHA-256"); // Aiven dùng SCRAM-SHA-256
             String jaasTemplate = "org.apache.kafka.common.security.scram.ScramLoginModule required username=\"%s\" password=\"%s\";";
             configProps.put("sasl.jaas.config", String.format(jaasTemplate, kafkaUsername, kafkaPassword));
+
+            try {
+                ClassPathResource resource = new ClassPathResource("ca.pem"); 
+                String caCertContent = FileCopyUtils.copyToString(new InputStreamReader(resource.getInputStream(), StandardCharsets.UTF_8));
+                
+                configProps.put("ssl.truststore.type", "PEM");
+                configProps.put("ssl.truststore.certificates", caCertContent);
+            } catch (Exception e) {
+                throw new RuntimeException("Không thể đọc chứng chỉ Aiven CA", e);
+            }
         }
         configProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         configProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class);
@@ -65,6 +78,16 @@ public class KafkaProducerConfig {
             config.put("sasl.mechanism", "SCRAM-SHA-256"); // Aiven dùng SCRAM-SHA-256
             String jaasTemplate = "org.apache.kafka.common.security.scram.ScramLoginModule required username=\"%s\" password=\"%s\";";
             config.put("sasl.jaas.config", String.format(jaasTemplate, kafkaUsername, kafkaPassword));
+
+            try {
+                ClassPathResource resource = new ClassPathResource("ca.pem"); 
+                String caCertContent = FileCopyUtils.copyToString(new InputStreamReader(resource.getInputStream(), StandardCharsets.UTF_8));
+                
+                config.put("ssl.truststore.type", "PEM");
+                config.put("ssl.truststore.certificates", caCertContent);
+            } catch (Exception e) {
+                throw new RuntimeException("Không thể đọc chứng chỉ Aiven CA", e);
+            }
         }
         config.put(ConsumerConfig.GROUP_ID_CONFIG, "transaction-service-group-v3"); // Đổi group để dọn rác
         config.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);

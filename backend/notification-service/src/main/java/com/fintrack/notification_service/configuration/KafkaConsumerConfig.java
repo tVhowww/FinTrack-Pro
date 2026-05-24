@@ -5,13 +5,17 @@ import org.apache.kafka.common.serialization.StringDeserializer;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.kafka.annotation.EnableKafka;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.support.converter.RecordMessageConverter;
 import org.springframework.kafka.support.converter.StringJsonMessageConverter;
+import org.springframework.util.FileCopyUtils;
 
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -41,6 +45,17 @@ public class KafkaConsumerConfig {
             config.put("sasl.mechanism", "SCRAM-SHA-256"); // Aiven dùng SCRAM-SHA-256
             String jaasTemplate = "org.apache.kafka.common.security.scram.ScramLoginModule required username=\"%s\" password=\"%s\";";
             config.put("sasl.jaas.config", String.format(jaasTemplate, kafkaUsername, kafkaPassword));
+
+            try {
+                ClassPathResource resource = new ClassPathResource("ca.pem");
+                String caCertContent = FileCopyUtils.copyToString(new InputStreamReader(resource.getInputStream(), StandardCharsets.UTF_8));
+                
+
+                config.put("ssl.truststore.type", "PEM");
+                config.put("ssl.truststore.certificates", caCertContent);
+            } catch (Exception e) {
+                throw new RuntimeException("Không thể đọc chứng chỉ Aiven CA", e);
+            }
         }
         config.put(ConsumerConfig.GROUP_ID_CONFIG, "notification-group-v3");
         config.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);

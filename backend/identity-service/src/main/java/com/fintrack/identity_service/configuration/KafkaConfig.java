@@ -9,7 +9,10 @@ import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.core.ProducerFactory;
 import org.springframework.kafka.support.serializer.JsonSerializer;
-
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.util.FileCopyUtils;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -38,6 +41,16 @@ public class KafkaConfig {
             configProps.put("sasl.mechanism", "SCRAM-SHA-256");
             String jaasTemplate = "org.apache.kafka.common.security.scram.ScramLoginModule required username=\"%s\" password=\"%s\";";
             configProps.put("sasl.jaas.config", String.format(jaasTemplate, kafkaUsername, kafkaPassword));
+
+            try {
+                ClassPathResource resource = new ClassPathResource("ca.pem"); 
+                String caCertContent = FileCopyUtils.copyToString(new InputStreamReader(resource.getInputStream(), StandardCharsets.UTF_8));
+                
+                configProps.put("ssl.truststore.type", "PEM");
+                configProps.put("ssl.truststore.certificates", caCertContent);
+            } catch (Exception e) {
+                throw new RuntimeException("Không thể đọc chứng chỉ Aiven CA", e);
+            }
         }
 
         // 2. Cấu hình Serializer (Key là String, Value là JSON)
