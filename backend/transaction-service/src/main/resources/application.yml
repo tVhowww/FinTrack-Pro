@@ -66,8 +66,8 @@ eureka:
   client:
     service-url:
       defaultZone: ${EUREKA_URI:http://localhost:8761/eureka/}
-    fetch-registry: true
-    register-with-eureka: true
+    register-with-eureka: ${EUREKA_CLIENT_REGISTER_WITH_EUREKA:true}
+    fetch-registry: ${EUREKA_CLIENT_FETCH_REGISTRY:true}
 
 # Cau hinh Feign Client (de goi Wallet Service)
 feign:
