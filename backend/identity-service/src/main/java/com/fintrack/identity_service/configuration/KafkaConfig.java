@@ -38,6 +38,9 @@ public class KafkaConfig {
             configProps.put("sasl.mechanism", "SCRAM-SHA-256");
             String jaasTemplate = "org.apache.kafka.common.security.scram.ScramLoginModule required username=\"%s\" password=\"%s\";";
             configProps.put("sasl.jaas.config", String.format(jaasTemplate, kafkaUsername, kafkaPassword));
+
+            configProps.put("ssl.truststore.location", "classpath:certs/ca.pem");
+            configProps.put("ssl.truststore.type", "PEM");
         }
 
         // 2. Cấu hình Serializer (Key là String, Value là JSON)

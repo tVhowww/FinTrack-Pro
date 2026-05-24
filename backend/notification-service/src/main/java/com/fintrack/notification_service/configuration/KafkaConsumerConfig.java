@@ -41,6 +41,9 @@ public class KafkaConsumerConfig {
             config.put("sasl.mechanism", "SCRAM-SHA-256"); // Aiven dùng SCRAM-SHA-256
             String jaasTemplate = "org.apache.kafka.common.security.scram.ScramLoginModule required username=\"%s\" password=\"%s\";";
             config.put("sasl.jaas.config", String.format(jaasTemplate, kafkaUsername, kafkaPassword));
+
+            config.put("ssl.truststore.location", "classpath:certs/ca.pem");
+            config.put("ssl.truststore.type", "PEM");
         }
         config.put(ConsumerConfig.GROUP_ID_CONFIG, "notification-group-v3");
         config.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);

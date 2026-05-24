@@ -42,6 +42,9 @@ public class KafkaConfig {
             configProps.put("sasl.mechanism", "SCRAM-SHA-256");
             String jaasTemplate = "org.apache.kafka.common.security.scram.ScramLoginModule required username=\"%s\" password=\"%s\";";
             configProps.put("sasl.jaas.config", String.format(jaasTemplate, kafkaUsername, kafkaPassword));
+
+            configProps.put("ssl.truststore.location", "classpath:certs/ca.pem");
+            configProps.put("ssl.truststore.type", "PEM");
         }
         configProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         configProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class);
@@ -64,6 +67,9 @@ public class KafkaConfig {
             config.put("sasl.mechanism", "SCRAM-SHA-256");
             String jaasTemplate = "org.apache.kafka.common.security.scram.ScramLoginModule required username=\"%s\" password=\"%s\";";
             config.put("sasl.jaas.config", String.format(jaasTemplate, kafkaUsername, kafkaPassword));
+
+            config.put("ssl.truststore.location", "classpath:certs/ca.pem");
+            config.put("ssl.truststore.type", "PEM");
         }
         config.put(ConsumerConfig.GROUP_ID_CONFIG, "wallet-service-group-v3"); // Đổi group để dọn rác
         config.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
