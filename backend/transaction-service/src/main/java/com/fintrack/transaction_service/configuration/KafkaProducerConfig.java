@@ -47,6 +47,7 @@ public class KafkaProducerConfig {
             String jaasTemplate = "org.apache.kafka.common.security.scram.ScramLoginModule required username=\"%s\" password=\"%s\";";
             configProps.put("sasl.jaas.config", String.format(jaasTemplate, kafkaUsername, kafkaPassword));
 
+<<<<<<< HEAD
             try {
                 ClassPathResource resource = new ClassPathResource("ca.pem"); 
                 String caCertContent = FileCopyUtils.copyToString(new InputStreamReader(resource.getInputStream(), StandardCharsets.UTF_8));
@@ -56,6 +57,10 @@ public class KafkaProducerConfig {
             } catch (Exception e) {
                 throw new RuntimeException("Không thể đọc chứng chỉ Aiven CA", e);
             }
+=======
+            configProps.put("ssl.truststore.location", "classpath:certs/ca.pem");
+            configProps.put("ssl.truststore.type", "PEM");
+>>>>>>> 303ad11ad7aa586fba1eb97335eaf6ec30c19d02
         }
         configProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         configProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class);
