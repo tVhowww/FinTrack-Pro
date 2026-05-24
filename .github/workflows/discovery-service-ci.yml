@@ -50,20 +50,19 @@ jobs:
         push: true
         tags: ${{ secrets.DOCKER_USERNAME }}/fintrack-discovery-service:latest
 
-  # deploy-to-render:
-  #   needs: build-and-test
-  #   runs-on: ubuntu-latest
+  deploy-to-render:
+    needs: build-and-test
+    runs-on: ubuntu-latest
     
-  #   steps:
-  #     # Step 1: Log in to Render
-  #     - name: Log in to Render
-  #       run: |
-  #         echo "Bắt đầu xác thực với Render API..."
+    steps:
+      # Step 1: Log in to Render
+      - name: Log in to Render
+        run: |
+          echo "Bắt đầu xác thực với Render API..."
           
-  #     # Step 2: Deploy image from Docker Hub to Render
-  #     - name: Deploy to Render
-  #       run: |
-  #         # TODO: Thay thế REPLACE_WITH_YOUR_RENDER_SERVICE_ID bằng Service ID thực tế của Discovery Service trên Render
-  #         curl -X POST https://api.render.com/v1/services/REPLACE_WITH_YOUR_RENDER_SERVICE_ID/deploys \
-  #           -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
-  #           -H "Accept: application/json"
+      # Step 2: Deploy image from Docker Hub to Render
+      - name: Deploy to Render
+        run: |
+          curl -X POST https://api.render.com/v1/services/srv-d89j52jbc2fs73f9id90/deploys \
+            -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
+            -H "Accept: application/json"
