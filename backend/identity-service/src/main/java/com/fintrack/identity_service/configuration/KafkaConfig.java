@@ -30,6 +30,9 @@ public class KafkaConfig {
     @Value("${KAFKA_PASSWORD:}")
     private String kafkaPassword;
 
+    @Value("${KAFKA_SSL_CERT:}") 
+    private String kafkaSslCert;
+
     @Bean
     public ProducerFactory<String, Object> producerFactory() {
         Map<String, Object> configProps = new HashMap<>();
@@ -42,14 +45,9 @@ public class KafkaConfig {
             String jaasTemplate = "org.apache.kafka.common.security.scram.ScramLoginModule required username=\"%s\" password=\"%s\";";
             configProps.put("sasl.jaas.config", String.format(jaasTemplate, kafkaUsername, kafkaPassword));
 
-            try {
-                ClassPathResource resource = new ClassPathResource("ca.pem"); 
-                String caCertContent = FileCopyUtils.copyToString(new InputStreamReader(resource.getInputStream(), StandardCharsets.UTF_8));
-                
+            if (kafkaSslCert != null && !kafkaSslCert.isEmpty()) {
                 configProps.put("ssl.truststore.type", "PEM");
-                configProps.put("ssl.truststore.certificates", caCertContent);
-            } catch (Exception e) {
-                throw new RuntimeException("Không thể đọc chứng chỉ Aiven CA", e);
+                configProps.put("ssl.truststore.certificates", kafkaSslCert); 
             }
         }
 

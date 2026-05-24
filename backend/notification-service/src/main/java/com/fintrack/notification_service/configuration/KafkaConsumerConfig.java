@@ -34,6 +34,9 @@ public class KafkaConsumerConfig {
 
     @Value("${KAFKA_PASSWORD:}")
     private String kafkaPassword;
+    
+    @Value("${KAFKA_SSL_CERT:}") 
+    private String kafkaSslCert;
 
     @Bean
     public ConsumerFactory<String, String> consumerFactory() {
@@ -46,15 +49,9 @@ public class KafkaConsumerConfig {
             String jaasTemplate = "org.apache.kafka.common.security.scram.ScramLoginModule required username=\"%s\" password=\"%s\";";
             config.put("sasl.jaas.config", String.format(jaasTemplate, kafkaUsername, kafkaPassword));
 
-            try {
-                ClassPathResource resource = new ClassPathResource("ca.pem");
-                String caCertContent = FileCopyUtils.copyToString(new InputStreamReader(resource.getInputStream(), StandardCharsets.UTF_8));
-                
-
+           if (kafkaSslCert != null && !kafkaSslCert.isEmpty()) {
                 config.put("ssl.truststore.type", "PEM");
-                config.put("ssl.truststore.certificates", caCertContent);
-            } catch (Exception e) {
-                throw new RuntimeException("Không thể đọc chứng chỉ Aiven CA", e);
+                config.put("ssl.truststore.certificates", kafkaSslCert); 
             }
         }
         config.put(ConsumerConfig.GROUP_ID_CONFIG, "notification-group-v3");
