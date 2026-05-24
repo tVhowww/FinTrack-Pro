@@ -7,7 +7,7 @@ spring:
 
 eureka:
   client:
-    register-with-eureka: false # Vi minh la Server, khong can dang ky voi ai
+    register-with-eureka: false # Vi minh la Server, khong can dang ky voi ai 
     fetch-registry: false
   server:
     wait-time-in-ms-when-sync-empty: 5 # Giup khoi dong nhanh hon khi dev
