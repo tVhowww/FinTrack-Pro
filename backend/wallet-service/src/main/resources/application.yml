@@ -77,7 +77,7 @@ app:
 ---
 # ============================================================
 # DEV Profile — verbose SQL logging for local development
-# Activate with: SPRING_PROFILES_ACTIVE=dev
+# Activate with: SPRING_PROFILES_ACTIVE=dev 
 # ============================================================
 spring:
   config:
