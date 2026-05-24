@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 
 // name: tên service trên Eureka
 // configuration: để tự động gắn Token vào header
-@FeignClient(name = "identity-service", path = "/identity", configuration = AuthenticationRequestInterceptor.class, fallback = IdentityClientFallback.class)
+@FeignClient(name = "identity-service", configuration = AuthenticationRequestInterceptor.class /*, fallback = IdentityClientFallback.class*/)
 public interface IdentityClient {
 
     // Gọi API lấy thông tin chính chủ (My Info) bên Identity
