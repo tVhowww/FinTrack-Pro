@@ -9,16 +9,10 @@ public class IdentityClientFallback implements IdentityClient {
 
     @Override
     public ApiResponse<UserResponse> getMyInfo() {
-        // Đây là dữ liệu giả sẽ trả về khi Identity Service bị sập
-        UserResponse fallbackUser = UserResponse.builder()
-                .id("unknown")
-                .username("User (Hệ thống bận)")
-                .email("admin@fintrack.com") // Gửi tạm về admin hoặc email mặc định
-                .fullName("Unknown")
-                .build();
-
         return ApiResponse.<UserResponse>builder()
-                .result(fallbackUser)
+                .code(503)
+                .message("Identity Service Unavailable")
+                .result(null) 
                 .build();
     }
 }
