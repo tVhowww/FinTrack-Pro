@@ -7,12 +7,14 @@ import com.fintrack.wallet_service.dto.request.WalletUpdateRequest;
 import com.fintrack.wallet_service.dto.response.WalletResponse;
 import com.fintrack.wallet_service.entity.Wallet;
 import com.fintrack.wallet_service.entity.InboxEvent;
+import com.fintrack.wallet_service.entity.WalletAuditLog;
 import com.fintrack.wallet_service.enums.TransactionType;
 import com.fintrack.wallet_service.exception.AppException;
 import com.fintrack.wallet_service.exception.ErrorCode;
 import com.fintrack.wallet_service.mapper.WalletMapper;
 import com.fintrack.wallet_service.repository.WalletRepository;
 import com.fintrack.wallet_service.repository.InboxEventRepository;
+import com.fintrack.wallet_service.repository.WalletAuditLogRepository;
 import com.fintrack.wallet_service.repository.httpclient.TransactionClient;
 import com.fintrack.wallet_service.utils.SecurityUtils;
 import jakarta.persistence.criteria.Predicate;
@@ -44,6 +46,7 @@ public class WalletService {
     private final TransactionClient transactionClient;
     private final StringRedisTemplate redisTemplate;
     private final InboxEventRepository inboxEventRepository;
+    private final WalletAuditLogRepository walletAuditLogRepository;
 
     /**
      * Điều chỉnh số dư ví thủ công
@@ -91,6 +94,14 @@ public class WalletService {
         wallet.setBalance(newBalance);
         try {
             walletRepository.save(wallet);
+            walletAuditLogRepository.save(WalletAuditLog.builder()
+                    .walletId(walletId)
+                    .previousBalance(currentBalance)
+                    .newBalance(newBalance)
+                    .amount(diff)
+                    .transactionType(type.name())
+                    .referenceId("MANUAL_ADJUST")
+                    .build());
         } catch (ObjectOptimisticLockingFailureException e) {
             throw new RuntimeException("Hệ thống đang xử lý một giao dịch khác trên ví này. Vui lòng thử lại sau!");
         }
@@ -143,7 +154,8 @@ public class WalletService {
         }
 
         // 2. Tính toán số dư
-        BigDecimal newBalance = wallet.getBalance().add(request.getAmount());
+        BigDecimal currentBalance = wallet.getBalance();
+        BigDecimal newBalance = currentBalance.add(request.getAmount());
 
         // 3. Kiểm tra nếu số dư âm
         if (newBalance.compareTo(BigDecimal.ZERO) < 0) {
@@ -154,6 +166,15 @@ public class WalletService {
         wallet.setBalance(newBalance);
         try {
             Wallet savedWallet = walletRepository.save(wallet);
+            walletAuditLogRepository.save(WalletAuditLog.builder()
+                    .walletId(walletId)
+                    .previousBalance(currentBalance)
+                    .newBalance(newBalance)
+                    .amount(request.getAmount())
+                    .transactionType(request.getAmount().compareTo(BigDecimal.ZERO) > 0 ? TransactionType.INCOME.name() : TransactionType.EXPENSE.name())
+                    .referenceId(idempotencyKey != null ? idempotencyKey : "UPDATE_BALANCE")
+                    .build());
+            
             if (idempotencyKey != null && !idempotencyKey.isBlank()) {
                 inboxEventRepository.save(InboxEvent.builder().id(idempotencyKey).build());
             }

@@ -226,6 +226,11 @@ public class AuthenticationService {
     // login
     @Transactional
     public AuthenticationResponse authenticate(AuthenticationRequest request) {
+        String lockKey = "account_locked:" + request.getUsername();
+        if (Boolean.TRUE.equals(redisTemplate.hasKey(lockKey))) {
+            throw new AppException(ErrorCode.ACCOUNT_LOCKED);
+        }
+
         // 1. Tìm user theo username
         var user = userRepository.findByUsernameAndDeletedFalse(request.getUsername())
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
@@ -234,8 +239,21 @@ public class AuthenticationService {
         boolean authenticated = passwordEncoder.matches(request.getPassword(), user.getPassword());
 
         if (!authenticated) {
+            String attemptKey = "login_attempts:" + request.getUsername();
+            Long attempts = redisTemplate.opsForValue().increment(attemptKey);
+            if (attempts != null && attempts == 1) {
+                redisTemplate.expire(attemptKey, 15, TimeUnit.MINUTES);
+            }
+            if (attempts != null && attempts >= 5) {
+                redisTemplate.opsForValue().set(lockKey, "LOCKED", 15, TimeUnit.MINUTES);
+                redisTemplate.delete(attemptKey); // reset attempts sau khi bị khóa
+                throw new AppException(ErrorCode.ACCOUNT_LOCKED);
+            }
             throw new AppException(ErrorCode.UNAUTHENTICATED);
         }
+
+        // Đăng nhập thành công -> Xóa bộ đếm sai
+        redisTemplate.delete("login_attempts:" + request.getUsername());
 
         // [LOGIC MỚI] Kiểm tra xem user có đang đăng nhập ở chỗ khác không?
         if (user.getCurrentJwtId() != null) {

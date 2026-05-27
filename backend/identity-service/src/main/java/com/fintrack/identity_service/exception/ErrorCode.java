@@ -25,6 +25,7 @@ public enum ErrorCode {
 
     // 403
     UNAUTHORIZED(1007, "You do not have permission", HttpStatus.FORBIDDEN),
+    ACCOUNT_LOCKED(1014, "Account is locked due to multiple failed login attempts. Please try again later.", HttpStatus.FORBIDDEN),
 
     // 404
     USER_NOT_EXISTED(1008, "User not existed", HttpStatus.NOT_FOUND),
