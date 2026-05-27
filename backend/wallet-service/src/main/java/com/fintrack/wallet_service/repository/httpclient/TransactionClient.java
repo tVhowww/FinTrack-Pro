@@ -15,4 +15,7 @@ public interface TransactionClient {
 
     @GetMapping("/internal/transactions/count-by-wallet/{walletId}")
     long countByWallet(@PathVariable("walletId") String walletId);
+
+    @PostMapping("/internal/transactions/balances")
+    java.util.Map<String, java.math.BigDecimal> getNetBalancesForWallets(@RequestBody java.util.List<String> walletIds);
 }

@@ -2,6 +2,7 @@ package com.fintrack.wallet_service.repository;
 
 import com.fintrack.wallet_service.entity.Wallet;
 import jakarta.persistence.LockModeType;
+import org.springframework.data.domain.Page;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Lock;
@@ -33,6 +34,8 @@ public interface WalletRepository extends JpaRepository<Wallet, String>, JpaSpec
     Optional<Wallet> findByIdAndUserIdForUpdate(@Param("id") String id, @Param("userId") String userId);
 
     boolean existsByNameIgnoreCaseAndUserIdAndIdNotAndIsActive(String name, String userId, String id, boolean isActive);
+
+    Page<Wallet> findByIsActiveTrue(org.springframework.data.domain.Pageable pageable);
 
     void deleteByUserId(String userId);
 

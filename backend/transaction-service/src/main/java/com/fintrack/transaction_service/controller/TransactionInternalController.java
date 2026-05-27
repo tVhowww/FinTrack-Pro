@@ -6,6 +6,9 @@ import com.fintrack.transaction_service.service.transaction.TransactionQueryServ
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
+import java.util.Map;
+
 @RestController
 @RequestMapping("/internal/transactions") // Endpoint nội bộ
 @RequiredArgsConstructor
@@ -22,5 +25,10 @@ public class TransactionInternalController {
     @GetMapping("/count-by-wallet/{walletId}")
     public long countByWallet(@PathVariable String walletId) {
         return queryService.countTransactionsByWallet(walletId);
+    }
+
+    @PostMapping("/balances")
+    public Map<String, BigDecimal> getNetBalancesForWallets(@RequestBody java.util.List<String> walletIds) {
+        return queryService.getNetBalancesForWallets(walletIds);
     }
 }

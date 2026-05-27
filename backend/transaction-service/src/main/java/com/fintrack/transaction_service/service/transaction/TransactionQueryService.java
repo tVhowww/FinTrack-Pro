@@ -23,10 +23,12 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -39,6 +41,18 @@ public class TransactionQueryService {
 
     public long countTransactionsByWallet(String walletId) {
         return transactionRepository.countByWalletId(walletId);
+    }
+
+    public Map<String, BigDecimal> getNetBalancesForWallets(List<String> walletIds) {
+        if (walletIds == null || walletIds.isEmpty()) return Collections.emptyMap();
+        List<Object[]> results = transactionRepository.getNetBalancesForWallets(walletIds);
+        java.util.Map<String, java.math.BigDecimal> map = new java.util.HashMap<>();
+        for (Object[] row : results) {
+            String wId = (String) row[0];
+            java.math.BigDecimal bal = (java.math.BigDecimal) row[1];
+            map.put(wId, bal);
+        }
+        return map;
     }
 
     public TransactionResponse getTransaction(String id) {

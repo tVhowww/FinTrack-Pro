@@ -124,4 +124,11 @@ public interface TransactionRepository extends JpaRepository<Transaction, String
     List<Transaction> findBySagaId(String sagaId);
 
     Optional<Transaction> findBySagaIdAndType(String sagaId, TransactionType type);
+
+    @Query("SELECT t.walletId, " +
+           "COALESCE(SUM(CASE WHEN t.type = 'INCOME' THEN t.amount ELSE -t.amount END), 0) " +
+           "FROM Transaction t " +
+           "WHERE t.walletId IN :walletIds AND t.deleted = false " +
+           "GROUP BY t.walletId")
+    List<Object[]> getNetBalancesForWallets(@Param("walletIds") List<String> walletIds);
 }
