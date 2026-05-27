@@ -13,6 +13,7 @@ import org.springframework.stereotype.Repository;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface TransactionRepository extends JpaRepository<Transaction, String>, JpaSpecificationExecutor<Transaction> {
@@ -121,4 +122,6 @@ public interface TransactionRepository extends JpaRepository<Transaction, String
     void deleteByWalletIdIn(List<String> walletIds);
 
     List<Transaction> findBySagaId(String sagaId);
+
+    Optional<Transaction> findBySagaIdAndType(String sagaId, TransactionType type);
 }

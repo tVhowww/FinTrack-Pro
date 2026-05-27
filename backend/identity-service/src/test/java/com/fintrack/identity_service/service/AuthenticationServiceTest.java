@@ -28,6 +28,10 @@ public class AuthenticationServiceTest {
     private UserRepository userRepository;
     @Mock
     private PasswordEncoder passwordEncoder;
+    @Mock
+    private org.springframework.data.redis.core.StringRedisTemplate redisTemplate;
+    @Mock
+    private org.springframework.data.redis.core.ValueOperations<String, String> valueOperations;
 
     @InjectMocks
     private AuthenticationService authenticationService;
@@ -57,6 +61,7 @@ public class AuthenticationServiceTest {
     @Test
     void authenticate_Success() {
         // GIVEN
+        when(redisTemplate.hasKey(anyString())).thenReturn(false);
         when(userRepository.findByUsernameAndDeletedFalse(anyString())).thenReturn(Optional.of(user));
         // Giả lập pass nhập vào khớp với pass trong DB
         when(passwordEncoder.matches(anyString(), anyString())).thenReturn(true);
@@ -75,6 +80,7 @@ public class AuthenticationServiceTest {
     @Test
     void authenticate_UserNotFound_Fail() {
         // GIVEN
+        when(redisTemplate.hasKey(anyString())).thenReturn(false);
         when(userRepository.findByUsernameAndDeletedFalse(anyString())).thenReturn(Optional.empty());
 
         // WHEN & THEN
@@ -87,9 +93,11 @@ public class AuthenticationServiceTest {
     @Test
     void authenticate_WrongPassword_Fail() {
         // GIVEN
+        when(redisTemplate.hasKey(anyString())).thenReturn(false);
         when(userRepository.findByUsernameAndDeletedFalse(anyString())).thenReturn(Optional.of(user));
         // Giả lập pass nhập vào KHÔNG khớp
         when(passwordEncoder.matches(anyString(), anyString())).thenReturn(false);
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
 
         // WHEN & THEN
         AppException exception = assertThrows(AppException.class,

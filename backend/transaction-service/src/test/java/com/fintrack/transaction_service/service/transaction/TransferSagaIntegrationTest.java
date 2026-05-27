@@ -62,6 +62,9 @@ public class TransferSagaIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
+
     // --- Mock External Infrastructure Beans ---
     @MockitoBean
     private WalletClient walletClient;
@@ -83,8 +86,8 @@ public class TransferSagaIntegrationTest {
     @BeforeEach
     void setUp() {
         valueOperations = Mockito.mock(ValueOperations.class);
-        transactionRepository.deleteAll();
-        categoryRepository.deleteAll();
+        jdbcTemplate.execute("DELETE FROM transactions");
+        jdbcTemplate.execute("DELETE FROM categories");
 
         // Ví nguồn
         sourceWallet = WalletResponse.builder()
@@ -185,12 +188,12 @@ public class TransferSagaIntegrationTest {
 
         // 3. Kiểm tra kết quả
         Transaction completedTx = transactionRepository.findById(response.getId()).get();
-        Assertions.assertEquals("COMPLETED", completedTx.getTransferStatus());
+        Assertions.assertEquals(com.fintrack.transaction_service.enums.TransferStatus.COMPLETED, completedTx.getTransferStatus());
 
         // Kiểm tra target transaction cũng được cập nhật
         Optional<Transaction> targetTxOpt = transactionRepository.findBySagaIdAndType(tx.getSagaId(), TransactionType.INCOME);
         Assertions.assertTrue(targetTxOpt.isPresent());
-        Assertions.assertEquals("COMPLETED", targetTxOpt.get().getTransferStatus());
+        Assertions.assertEquals(com.fintrack.transaction_service.enums.TransferStatus.COMPLETED, targetTxOpt.get().getTransferStatus());
     }
 
     @Test
@@ -217,7 +220,7 @@ public class TransferSagaIntegrationTest {
 
         // Kiểm tra kết quả
         Transaction compensatedTx = transactionRepository.findById(response.getId()).get();
-        Assertions.assertEquals("COMPENSATED", compensatedTx.getTransferStatus());
+        Assertions.assertEquals(com.fintrack.transaction_service.enums.TransferStatus.COMPENSATED, compensatedTx.getTransferStatus());
 
         // Đảm bảo OutboxService được gọi để ghi nhận refund, do ta mock toàn bộ TransactionCommandService
         // nên đoạn check log hoặc mock behavior sẽ phụ thuộc vào OutboxService
@@ -229,7 +232,7 @@ public class TransferSagaIntegrationTest {
         // Đặt số dư ví nguồn về nhỏ hơn amount
         Mockito.when(walletClient.getWallet(eq("wallet-source")))
                 .thenReturn(ApiResponse.<WalletResponse>builder().code(1000).result(
-                        WalletResponse.builder().id("wallet-source").balance(BigDecimal.valueOf(10000)).build()
+                        WalletResponse.builder().id("wallet-source").userId("user-123").balance(BigDecimal.valueOf(10000)).build()
                 ).build());
 
         TransferRequest request = TransferRequest.builder()

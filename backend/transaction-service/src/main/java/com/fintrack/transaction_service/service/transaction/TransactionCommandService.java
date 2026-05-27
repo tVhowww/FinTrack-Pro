@@ -173,19 +173,26 @@ public class TransactionCommandService {
             WalletResponse fromWallet = queryService.tryGetWallet(request.getFromWalletId());
             WalletResponse toWallet = queryService.tryGetWallet(request.getToWalletId());
 
+            if (fromWallet != null && fromWallet.getBalance() != null && fromWallet.getBalance().compareTo(request.getAmount()) < 0) {
+                throw new AppException(ErrorCode.INSUFFICIENT_BALANCE);
+            }
+
             Instant transactionDate = request.getDate() != null ? request.getDate() : Instant.now();
             Category transferOutCategory = getOrCreateSystemCategory("Chuyển tiền đi", TransactionType.EXPENSE);
             Category transferInCategory = getOrCreateSystemCategory("Nhận tiền đến", TransactionType.INCOME);
             String sagaId = java.util.UUID.randomUUID().toString();
 
+            String toWalletName = toWallet != null ? toWallet.getName() : "ví đích";
+            String fromWalletName = fromWallet != null ? fromWallet.getName() : "ví nguồn";
+
             Transaction expenseTx = Transaction.builder().amount(request.getAmount()).type(TransactionType.EXPENSE)
                     .walletId(request.getFromWalletId()).date(transactionDate)
-                    .note(request.getNote() != null && !request.getNote().isEmpty() ? request.getNote() : "Chuyển tiền sang ví " + toWallet.getName())
+                    .note(request.getNote() != null && !request.getNote().isEmpty() ? request.getNote() : "Chuyển tiền sang ví " + toWalletName)
                     .category(transferOutCategory).sagaId(sagaId).transferStatus(TransferStatus.PENDING).build();
             transactionRepository.save(expenseTx);
 
             Transaction incomeTx = Transaction.builder().amount(request.getAmount()).type(TransactionType.INCOME)
-                    .walletId(request.getToWalletId()).date(transactionDate).note("Nhận tiền từ quỹ " + fromWallet.getName())
+                    .walletId(request.getToWalletId()).date(transactionDate).note("Nhận tiền từ quỹ " + fromWalletName)
                     .category(transferInCategory).sagaId(sagaId).transferStatus(TransferStatus.PENDING).build();
             transactionRepository.save(incomeTx);
 

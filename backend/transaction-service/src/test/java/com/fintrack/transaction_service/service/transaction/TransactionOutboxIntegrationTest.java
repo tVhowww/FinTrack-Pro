@@ -76,6 +76,9 @@ public class TransactionOutboxIntegrationTest {
     @MockitoBean
     private StringRedisTemplate redisTemplate;
 
+    @Autowired
+    private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
+
     private ValueOperations<String, String> valueOperations;
 
     private Category testCategory;
@@ -86,8 +89,8 @@ public class TransactionOutboxIntegrationTest {
         valueOperations = Mockito.mock(ValueOperations.class);
         // Clear all data
         outboxEventRepository.deleteAll();
-        transactionRepository.deleteAll();
-        categoryRepository.deleteAll();
+        jdbcTemplate.execute("DELETE FROM transactions");
+        jdbcTemplate.execute("DELETE FROM categories");
 
         // Cài đặt danh mục test
         testCategory = Category.builder()
