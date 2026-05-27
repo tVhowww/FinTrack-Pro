@@ -10,6 +10,7 @@ import com.fintrack.wallet_service.exception.ErrorCode;
 import com.fintrack.wallet_service.mapper.WalletMapper;
 import com.fintrack.wallet_service.repository.WalletRepository;
 import com.fintrack.wallet_service.repository.InboxEventRepository;
+import com.fintrack.wallet_service.repository.WalletAuditLogRepository;
 import com.fintrack.wallet_service.repository.httpclient.TransactionClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -46,6 +47,9 @@ public class WalletServiceTest {
 
     @Mock
     private InboxEventRepository inboxEventRepository;
+
+    @Mock
+    private WalletAuditLogRepository walletAuditLogRepository;
 
     @Mock
     private TransactionClient transactionClient;

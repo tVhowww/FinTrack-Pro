@@ -88,7 +88,7 @@ public class DataSeeder implements CommandLineRunner {
         }
 
         // 4. Tạo tài khoản Admin mặc định
-        if (userRepository.findByUsername("admin").isEmpty()) {
+        if (userRepository.findByUsernameAndDeletedFalse("admin").isEmpty()) {
             Role adminRole = roleRepository.findById("ADMIN").orElseThrow();
             User admin = User.builder()
                     .username("admin")

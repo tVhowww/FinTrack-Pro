@@ -1,7 +1,7 @@
 package com.fintrack.transaction_service.service.transaction;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fintrack.transaction_service.dto.event.TransferSagaEvent;
+import com.fintrack.transaction_service.dto.event.TransferResultEvent;
 import com.fintrack.transaction_service.dto.request.TransferRequest;
 import com.fintrack.transaction_service.dto.response.ApiResponse;
 import com.fintrack.transaction_service.dto.response.TransactionResponse;
@@ -176,15 +176,12 @@ public class TransferSagaIntegrationTest {
         Assertions.assertNotNull(tx.getSagaId());
 
         // 2. Giả lập Wallet Service xử lý xong ở đích và gửi lại sự kiện CREDIT_COMPLETED
-        TransferSagaEvent successEvent = TransferSagaEvent.builder()
+        TransferResultEvent successEvent = TransferResultEvent.builder()
                 .sagaId(tx.getSagaId())
-                .sourceWalletId("wallet-source")
-                .targetWalletId("wallet-target")
-                .amount(BigDecimal.valueOf(200000))
-                .status("CREDIT_COMPLETED")
+                .success(true)
                 .build();
 
-        transferSagaListener.handleTransferSagaEvent(successEvent);
+        transferSagaListener.handleCreditCompleted(successEvent);
 
         // 3. Kiểm tra kết quả
         Transaction completedTx = transactionRepository.findById(response.getId()).get();
@@ -210,16 +207,13 @@ public class TransferSagaIntegrationTest {
         Transaction tx = transactionRepository.findById(response.getId()).get();
 
         // Giả lập Wallet Service báo lỗi ở ví đích
-        TransferSagaEvent failedEvent = TransferSagaEvent.builder()
+        TransferResultEvent failedEvent = TransferResultEvent.builder()
                 .sagaId(tx.getSagaId())
-                .sourceWalletId("wallet-source")
-                .targetWalletId("wallet-target")
-                .amount(BigDecimal.valueOf(200000))
-                .status("CREDIT_FAILED")
-                .errorMessage("Wallet target has been closed")
+                .success(false)
+                .reason("Wallet target has been closed")
                 .build();
 
-        transferSagaListener.handleTransferSagaEvent(failedEvent);
+        transferSagaListener.handleCreditFailed(failedEvent);
 
         // Kiểm tra kết quả
         Transaction compensatedTx = transactionRepository.findById(response.getId()).get();
