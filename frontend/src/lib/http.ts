@@ -40,6 +40,13 @@ http.interceptors.response.use(
       return Promise.reject(error);
     }
 
+    // Do not attempt to refresh on login/refresh endpoints
+    if (originalRequest.url?.includes('/auth/token') || 
+        originalRequest.url?.includes('/auth/refresh') || 
+        originalRequest.url?.includes('/auth/google')) {
+      return Promise.reject(error);
+    }
+
     // Avoid infinite retry loops
     if (originalRequest._retry) {
       return Promise.reject(error);
