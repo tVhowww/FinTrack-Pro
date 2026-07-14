@@ -19,6 +19,8 @@ interface ConfirmDialogProps {
   description?: React.ReactNode;
   onConfirm: () => void;
   isLoading?: boolean; // Để hiện trạng thái đang xóa
+  confirmText?: string;
+  variant?: "destructive" | "default";
 }
 
 export function ConfirmDialog({
@@ -28,6 +30,8 @@ export function ConfirmDialog({
   description = "Hành động này không thể hoàn tác. Dữ liệu sẽ bị xóa vĩnh viễn khỏi hệ thống.",
   onConfirm,
   isLoading,
+  confirmText = "Xóa ngay",
+  variant = "destructive",
 }: ConfirmDialogProps) {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -47,9 +51,13 @@ export function ConfirmDialog({
               onConfirm();
             }}
             disabled={isLoading}
-            className="bg-red-600 hover:bg-red-700 text-white focus:ring-red-600"
+            className={
+              `bg-${variant === "destructive" ? "red-600" : "blue-600"} 
+            hover:bg-${variant === "destructive" ? "red-700" : "blue-700"} 
+            text-white focus:ring-${variant === "destructive" ? "red-600" : "blue-600"}`
+            }
           >
-            {isLoading ? "Đang xóa..." : "Xóa ngay"}
+            {isLoading ? "Đang xử lý..." : confirmText}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
