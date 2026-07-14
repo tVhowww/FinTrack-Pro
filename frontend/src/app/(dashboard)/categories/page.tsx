@@ -30,7 +30,7 @@ export default function CategoriesPage() {
     isDeleting,
   } = useCategories();
 
-  const { checkRelatedTransactions, isChecking: isCheckingDependency } =
+  const { checkRelatedTransactions, isCheckingRelated: isCheckingDependency } =
     useTransactions();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -194,7 +194,7 @@ export default function CategoriesPage() {
         isLoading={isDeleting}
         confirmText="Xóa tất cả"
         variant="destructive"
-        // ... (phần description giữ nguyên)
+      // ... (phần description giữ nguyên)
       />
     </div>
   );
