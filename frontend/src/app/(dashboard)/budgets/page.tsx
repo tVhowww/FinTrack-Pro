@@ -9,11 +9,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useBudgets } from "@/hooks/use-budgets";
 import { useWallets } from "@/hooks/use-wallets";
 import { Plus, Search } from "lucide-react";
-import { useState, useMemo } from "react";
+import { useState, useMemo, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useUser } from "@/hooks/use-user";
 
-export default function BudgetsPage() {
+function BudgetsPageContent() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [editingBudget, setEditingBudget] = useState<any | null>(null);
@@ -200,5 +200,27 @@ export default function BudgetsPage() {
         isLoading={isDeleting}
       />
     </div>
+  );
+}
+
+export default function BudgetsPage() {
+  return (
+    <Suspense fallback={
+      <div className="space-y-6">
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight">Quản lý Ngân sách</h2>
+            <p className="text-sm text-muted-foreground">Đang tải...</p>
+          </div>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 animate-pulse">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-[180px] bg-muted/40 rounded-xl" />
+          ))}
+        </div>
+      </div>
+    }>
+      <BudgetsPageContent />
+    </Suspense>
   );
 }

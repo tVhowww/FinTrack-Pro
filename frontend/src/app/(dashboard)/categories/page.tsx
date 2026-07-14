@@ -12,10 +12,10 @@ import { useTransactions } from "@/hooks/use-transactions";
 import { formatCurrency } from "@/lib/utils";
 import { Category, TransactionType } from "@/types/category.dto";
 import { Plus, Search } from "lucide-react";
-import { useState, useMemo } from "react";
+import { useState, useMemo, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 
-export default function CategoriesPage() {
+function CategoriesPageContent() {
   const searchParams = useSearchParams();
 
   // Lấy params từ URL
@@ -197,6 +197,26 @@ export default function CategoriesPage() {
       // ... (phần description giữ nguyên)
       />
     </div>
+  );
+}
+
+export default function CategoriesPage() {
+  return (
+    <Suspense fallback={
+      <div className="h-full flex flex-col space-y-6">
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between px-1">
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight">Danh mục</h2>
+            <p className="text-sm text-muted-foreground">Đang tải...</p>
+          </div>
+        </div>
+        <div className="flex-1 min-h-0 overflow-hidden text-center py-10 text-muted-foreground">
+          Đang tải dữ liệu...
+        </div>
+      </div>
+    }>
+      <CategoriesPageContent />
+    </Suspense>
   );
 }
 

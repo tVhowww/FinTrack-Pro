@@ -25,12 +25,12 @@ import {
   TransactionUpdateRequest,
 } from "@/types/transaction.dto";
 import { Download, Loader2, Plus } from "lucide-react";
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, Suspense } from "react";
 import { getColumns } from "./columns";
 import { useSearchParams } from "next/navigation";
 import { useWallets } from "@/hooks/use-wallets";
 
-export default function TransactionsPage() {
+function TransactionsPageContent() {
   const searchParams = useSearchParams();
 
   const currentPage = Number(searchParams.get("page")) || 1;
@@ -250,5 +250,25 @@ export default function TransactionsPage() {
         variant="destructive"
       />
     </div>
+  );
+}
+
+export default function TransactionsPage() {
+  return (
+    <Suspense fallback={
+      <div className="h-full flex flex-col space-y-4">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight">Giao dịch</h2>
+            <p className="text-sm text-muted-foreground">Đang tải...</p>
+          </div>
+        </div>
+        <div className="text-center py-10 text-muted-foreground">
+          Đang tải dữ liệu...
+        </div>
+      </div>
+    }>
+      <TransactionsPageContent />
+    </Suspense>
   );
 }

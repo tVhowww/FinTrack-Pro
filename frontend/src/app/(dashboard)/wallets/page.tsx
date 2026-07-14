@@ -8,14 +8,14 @@ import { WalletFilter } from "@/components/wallet/wallet-filter";
 import { useWallets } from "@/hooks/use-wallets";
 import { Wallet, WalletType } from "@/types/wallet.dto";
 import { ArrowRightLeft, Plus, Search, Target, WalletIcon } from "lucide-react";
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { useSearchParams } from "next/navigation";
 import { WalletAddFundDialog } from "@/components/wallet/wallet-add-fund-dialog";
 import { WalletWithdrawDialog } from "@/components/wallet/wallet-withdraw-dialog";
 import { WalletTransferDialog } from "@/components/wallet/wallet-transfer-dialog";
 
-export default function WalletsPage() {
+function WalletsPageContent() {
   const searchParams = useSearchParams();
   const keyword = searchParams.get("keyword") || undefined;
   const currency = searchParams.get("currency") || undefined;
@@ -250,5 +250,27 @@ export default function WalletsPage() {
         onOpenChange={setIsTransferOpen}
       />
     </div>
+  );
+}
+
+export default function WalletsPage() {
+  return (
+    <Suspense fallback={
+      <div className="space-y-6">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight">Ví & Quỹ</h2>
+            <p className="text-sm text-muted-foreground">Đang tải...</p>
+          </div>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 animate-pulse">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-[150px] bg-muted/40 rounded-xl" />
+          ))}
+        </div>
+      </div>
+    }>
+      <WalletsPageContent />
+    </Suspense>
   );
 }
