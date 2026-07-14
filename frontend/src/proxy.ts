@@ -5,7 +5,7 @@ import type { NextRequest } from "next/server";
 // Lưu ý: Login và Register là public, nhưng nếu đã login rồi thì không cho vào nữa
 const authPaths = ["/login", "/register", "/forgot-password"];
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Read the HttpOnly cookie set by the backend (CookieUtils.COOKIE_NAME = "access_token")
