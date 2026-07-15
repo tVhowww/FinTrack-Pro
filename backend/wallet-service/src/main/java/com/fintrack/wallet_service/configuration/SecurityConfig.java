@@ -25,7 +25,8 @@ public class SecurityConfig {
             "/v3/api-docs/**",
             "/swagger-ui/**",
             "/swagger-ui.html",
-            "/internal/**"
+            "/internal/**",
+            "/ping"
     };
 
     @Value("${jwt.signerKey}")

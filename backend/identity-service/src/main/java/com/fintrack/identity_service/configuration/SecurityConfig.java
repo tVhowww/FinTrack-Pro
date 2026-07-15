@@ -41,7 +41,8 @@ public class SecurityConfig {
             "/auth/token", "/auth/introspect", "/auth/logout",
             "/auth/refresh", "/auth/reset-password", "/auth/forgot-password", "/auth/google", "/v3/api-docs/**",
             "/swagger-ui/**",
-            "/swagger-ui.html"
+            "/swagger-ui.html",
+            "/ping"
     };
 
     @Bean

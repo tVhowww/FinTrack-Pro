@@ -94,6 +94,11 @@ public class AuthenticationGatewayFilterFactory extends AbstractGatewayFilterFac
     }
 
     private boolean isPublicEndpoint(String path, HttpMethod method) {
+        // Cho phép các endpoint ping kiểm tra trạng thái hoạt động đi qua không cần token
+        if (pathMatcher.match("/**/ping", path)) {
+            return true;
+        }
+
         // Danh sách các API không cần token
         // Match chính xác các route
         if (pathMatcher.match("/identity/auth/token", path) ||
